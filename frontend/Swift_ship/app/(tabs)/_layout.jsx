@@ -2,11 +2,11 @@ import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Tabs } from 'expo-router';
 import React, { useContext } from 'react';
 import Home from "../../assets/images/home.svg";
-import Myorders from "../../assets/images/my_orders.svg";
+import Myorders from "../../assets/images/annonce4.svg";
 import Inbox from "../../assets/images/inbox.svg";
 import Profiles from "../../assets/images/profile.svg";
 import Active_Home from "../../assets/images/dark_home.svg";
-import Active_Myorders from "../../assets/images/dark_my_orders.svg";
+import Active_Myorders from "../../assets/images/darkmode_annonce.svg";
 import Active_Inbox from "../../assets/images/dark_inbox.svg";
 import Active_Profiles from "../../assets/images/dark_profile.svg";
 import ThemeContext from '../../theme/ThemeContext';
@@ -52,7 +52,7 @@ const TabsLayout = () => {
               case 'home':
                 IconComponent = darkMode ? Active_Home : (focused ? Active_Home : Home);
                 break;
-              case 'my_orders':
+              case 'Annonces':
                 IconComponent = darkMode ? Active_Myorders : (focused ? Active_Myorders : Myorders);
                 break;
               case 'inbox':
@@ -76,9 +76,9 @@ const TabsLayout = () => {
           }}
         />
         <Tabs.Screen
-          name="my_orders"
+          name="Annonces"
           options={{
-            title: 'My orders',
+            title: 'Annonces',
           }}
         />
         <Tabs.Screen

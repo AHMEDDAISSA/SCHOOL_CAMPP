@@ -23,6 +23,12 @@ const Root_layout = () => {
         <Stack.Screen name='(screens)/chat_screen' />
         <Stack.Screen name='(screens)/inbox_call' />
         <Stack.Screen name='(screens)/track_order' />
+        
+        <Stack.Screen name='(screens)/annonces' />
+        <Stack.Screen name='(screens)/publier-annonce' />
+        <Stack.Screen name='(screens)/recherche_annonce' />
+        <Stack.Screen name='(screens)/annonce/:id' />
+        <Stack.Screen name='(screens)/abonnement' />
       </Stack>
     </ThemeProvider>
     </MessageProvider>
