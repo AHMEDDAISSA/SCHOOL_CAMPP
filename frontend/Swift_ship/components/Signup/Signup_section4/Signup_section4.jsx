@@ -1,14 +1,28 @@
 import { StyleSheet, Text, View, Modal, TouchableOpacity } from 'react-native';
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import Back from "../../../assets/images/back.svg";
 import Dark_back from "../../../assets/images/dark_back.svg";
 import Success from "../../../assets/images/success.svg";
 import ThemeContext from '../../../theme/ThemeContext';
 import Button from '../../Button/Button';
 import { router } from "expo-router";
+import Toast from 'react-native-toast-message';
 
 const Signup_section4 = ({ modalVisible6, closeModal6 }) => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
+
+    // Show success toast when modal becomes visible
+    useEffect(() => {
+        if (modalVisible6) {
+            Toast.show({
+                type: 'success',
+                text1: 'Inscription terminée',
+                text2: 'Votre compte a été créé avec succès',
+                visibilityTime: 4000,
+                topOffset: 50
+            });
+        }
+    }, [modalVisible6]);
 
     const handleContinue = () => {
         closeModal6();

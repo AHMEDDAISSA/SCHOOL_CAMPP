@@ -1,5 +1,4 @@
-// Signup_section3.jsx
-import { StyleSheet, Text, View, Modal, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, Modal, TouchableOpacity } from 'react-native';
 import React, { useContext, useState, useEffect } from 'react';
 import Back from "../../../assets/images/back.svg";
 import Dark_back from "../../../assets/images/dark_back.svg";
@@ -8,8 +7,9 @@ import Button from '../../Button/Button';
 import { Montserrat_400Regular, Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import Otp from '../../OTP/Otp';
 import Signup_section4 from '../Signup_section4/Signup_section4';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Make sure to install this package
-import { verifyOTP, resendOTP } from '../../../services/api'; // Import the API functions
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { verifyOTP, resendOTP } from '../../../services/api';
+import Toast from 'react-native-toast-message';
 
 const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   const { theme, darkMode } = useContext(ThemeContext);
@@ -65,7 +65,13 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   // Verify OTP with backend
   const handleContinue = async () => {
     if (!otpCode || otpCode.length !== 6) {
-      Alert.alert('Invalid Code', 'Please enter the 6-digit verification code');
+      Toast.show({
+        type: 'error',
+        text1: 'Code invalide',
+        text2: 'Veuillez entrer le code à 6 chiffres complet',
+        visibilityTime: 4000,
+        topOffset: 50
+      });
       return;
     }
     
@@ -85,19 +91,39 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
           }
         }
         
+        Toast.show({
+          type: 'success',
+          text1: 'Vérification réussie',
+          text2: 'Votre code a été vérifié avec succès',
+          visibilityTime: 4000,
+          topOffset: 50
+        });
+        
         // Close verification modal and open next step
         closeModal5();
         openModal6();
       } else {
         // Update attempts
         setAttempts(attempts + 1);
-        Alert.alert('Verification Failed', response.message || 'Invalid verification code');
+        Toast.show({
+          type: 'error',
+          text1: 'Echec de vérification',
+          text2: response.message || 'Code de vérification invalide',
+          visibilityTime: 4000,
+          topOffset: 50
+        });
       }
     } catch (error) {
       console.error('Error verifying OTP:', error);
       // Update attempts
       setAttempts(attempts + 1);
-      Alert.alert('Error', 'Network error. Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur!',
+        text2: 'Erreur réseau. Veuillez réessayer.',
+        visibilityTime: 4000,
+        topOffset: 50
+      });
     } finally {
       setLoading(false);
     }
@@ -117,13 +143,31 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
         setCanResend(false);
         setOtpCode(''); // Clear previous code
         setAttempts(0); // Reset attempts
-        Alert.alert('Success', 'New verification code sent successfully');
+        Toast.show({
+          type: 'success',
+          text1: 'Code envoyé',
+          text2: 'Nouveau code de vérification envoyé avec succès',
+          visibilityTime: 4000,
+          topOffset: 50
+        });
       } else {
-        Alert.alert('Error', response.message || 'Failed to send verification code');
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur!',
+          text2: response.message || 'Échec de l\'envoi du code de vérification',
+          visibilityTime: 4000,
+          topOffset: 50
+        });
       }
     } catch (error) {
       console.error('Error resending OTP:', error);
-      Alert.alert('Error', 'Network error. Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur!',
+        text2: 'Erreur réseau. Veuillez réessayer.',
+        visibilityTime: 4000,
+        topOffset: 50
+      });
     } finally {
       setLoading(false);
     }
@@ -200,5 +244,68 @@ export default Signup_section3;
 
 // Styles remain the same
 const styles = StyleSheet.create({
-  // ... your existing styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 60,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+  },
+  modal_header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 70,
+    marginBottom: 25,
+  },
+  heading: {
+    fontSize: 24,
+    lineHeight: 34,
+    fontFamily: 'Montserrat_600SemiBold',
+    color: '#151515',
+  },
+  head_text: {
+    fontSize: 14,
+    lineHeight: 24,
+    fontFamily: 'Montserrat_400Regular',
+    color: '#727272',
+  },
+  bottom_text: {
+    fontSize: 12,
+    lineHeight: 22,
+    fontFamily: 'Montserrat_600SemiBold',
+    color: '#474747',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  terms: {
+    fontSize: 12,
+    lineHeight: 22,
+    fontFamily: 'Montserrat_600SemiBold',
+    color: '#836EFE',
+    textDecorationLine: 'underline',
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginTop: 15,
+    marginBottom: 20,
+  },
+  resendText: {
+    fontSize: 14,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  timerContainer: {
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  timerText: {
+    fontSize: 14,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
 });

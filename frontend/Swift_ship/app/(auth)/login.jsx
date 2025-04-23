@@ -9,6 +9,7 @@ import Button from '../../components/Button/Button';
 import { router, Link } from "expo-router";
 import Log_method from '../../components/Log_method/Log_method';
 import ThemeContext from '../../theme/ThemeContext';
+import Toast from 'react-native-toast-message';
 
 const login = () => {
   const { theme, darkMode, toggleTheme } = useContext(ThemeContext);

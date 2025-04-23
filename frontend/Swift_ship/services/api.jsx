@@ -1,101 +1,125 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Create an axios instance with a timeout
+// Create an axios instance with timeout and base URL
 const api = axios.create({
-  baseURL: 'http://192.168.168.65:3001', // Ensure this IP is correct
+  baseURL: 'http://192.168.168.65:3001', // Update IP as needed
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // Add a reasonable timeout (10 seconds)
+  timeout: 10000, // 10 seconds timeout
 });
 
-// Add request interceptor for debugging
+// Request interceptor for logging
 api.interceptors.request.use(
   config => {
-    console.log('Request sent to:', config.url, 'with method:', config.method);
-    console.log('Request data:', config.data || config.params);
+    console.log(`[Request] ${config.method?.toUpperCase()} ${config.url}`);
+    if (config.data) console.log('Payload:', config.data);
+    if (config.params) console.log('Query Params:', config.params);
     return config;
   },
-  error => {
-    return Promise.reject(error);
-  }
+  error => Promise.reject(error)
 );
 
-// Add response interceptor for better error handling
+// Response interceptor for error handling
 api.interceptors.response.use(
   response => {
-    console.log('Response received successfully:', response.status);
+    console.log(`[Response] ${response.status}:`, response.data);
     return response;
   },
   error => {
     if (error.code === 'ECONNABORTED') {
-      console.error('Request timeout. Server might be down or unreachable.');
+      console.error('Request timeout. Server might be down.');
     } else if (!error.response) {
-      console.error('Network error. Please check your connection and server status.');
-      console.error('Server URL:', api.defaults.baseURL);
+      console.error('Network error. Check server and connection.');
     } else {
-      console.error('Response error:', error.response.status, error.response.data);
+      console.error(`[Error ${error.response.status}]`, error.response.data);
     }
     return Promise.reject(error);
   }
 );
 
-export default api;
+// === AUTH & USER METHODS ===
 
-// Method to add a user using GET request as per your current backend route
+// GET: Authenticate or add user
 export const addUser = async (email) => {
   try {
-    console.log('Attempting to add/authenticate user with email:', email);
-    // According to your backend code, user lookup is via GET request
-    const response = await api.get('/user/add-user', { 
-      params: { email } 
-    });
-    console.log('User authenticated successfully:', response.data);
+    const response = await api.get('/user/add-user', { params: { email } });
     return response.data;
   } catch (error) {
-    console.error('Error authenticating user:', error.message);
+    console.error('addUser error:', error.message);
     throw error;
   }
 };
 
-// Alternative method using POST to root endpoint (if you want to create users)
+// POST: Create new user
 export const createUser = async (email) => {
   try {
-    console.log('Attempting to create new user with email:', email);
-    // Your backend has a POST route at root /user
     const response = await api.post('/user', { email });
-    console.log('User created successfully:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error creating user:', error.message);
+    console.error('createUser error:', error.message);
     throw error;
   }
 };
 
-// Method to get all users (for admin purposes if needed)
+// POST: Get all users (admin purpose)
 export const getUsers = async () => {
   try {
     const response = await api.post('/user/get-users');
-    console.log('Users retrieved successfully:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error retrieving users:', error.message);
+    console.error('getUsers error:', error.message);
     throw error;
   }
 };
 
-// Method to get a specific user with authentication
+// POST: Get a user with token
 export const getUser = async (token) => {
   try {
     const response = await api.post('/user/get-user', {}, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: { Authorization: `Bearer ${token}` }
     });
-    console.log('User details retrieved successfully:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error retrieving user details:', error.message);
+    console.error('getUser error:', error.message);
     throw error;
   }
 };
+
+// POST: Register user (with extra data)
+export const registerUser = async (userData) => {
+  try {
+    const response = await api.post('/user', { user: userData });
+    return response.data;
+  } catch (error) {
+    console.error('registerUser error:', error.message);
+    throw error;
+  }
+};
+
+// === EMAIL VERIFICATION METHODS ===
+
+// POST: Verify email with code
+export const verifyEmail = async (email, camp, code) => {
+  try {
+    const response = await api.post('/auth/verify-email', { email, camp, code });
+    return response.data;
+  } catch (error) {
+    console.error('verifyEmail error:', error.message);
+    throw error;
+  }
+};
+
+// POST: Resend verification code
+export const resendVerificationCode = async (email, camp) => {
+  try {
+    const response = await api.post('/auth/resend-verification', { email, camp });
+    return response.data;
+  } catch (error) {
+    console.error('resendVerificationCode error:', error.message);
+    throw error;
+  }
+};
+
+export default api;

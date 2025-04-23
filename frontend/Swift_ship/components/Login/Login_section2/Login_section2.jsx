@@ -11,6 +11,7 @@ import Login_section5 from '../Login_section5/Login_section5';
 import Login_section6 from '../Login_section6/Login_section6';
 import { router, Link } from "expo-router";
 import { addUser } from '../../../services/api';
+import Toast from 'react-native-toast-message'; // Import Toast
 
 const Login_section2 = () => {
     const [email, setEmail] = useState('');
@@ -64,12 +65,26 @@ const Login_section2 = () => {
     // Login function
     const handleLogin = async () => {
         if (!email) {
-            alert('Please enter your email address');
+            // Replace alert with Toast
+            Toast.show({
+                type: 'error',
+                text1: 'Erreur!',
+                text2: 'Veuillez saisir votre adresse e-mail',
+                visibilityTime: 4000,
+                topOffset: 50
+            });
             return;
         }
 
         if (!validateEmail(email)) {
-            alert('Please enter a valid email address');
+            // Replace alert with Toast
+            Toast.show({
+                type: 'error',
+                text1: 'Erreur!',
+                text2: 'Veuillez saisir une adresse e-mail valide',
+                visibilityTime: 4000,
+                topOffset: 50
+            });
             return;
         }
 
@@ -80,19 +95,46 @@ const Login_section2 = () => {
 
             if (userData) {
                 console.log('User found:', userData);
-                // Store the user data locally if needed (e.g. in AsyncStorage or context)
-                router.push('/home');
+                // Show success toast
+                Toast.show({
+                    type: 'success',
+                    text1: 'Connexion réussie',
+                    text2: 'Vous êtes maintenant connecté',
+                    visibilityTime: 3000,
+                    topOffset: 50
+                });
+                
+                // Delay navigation slightly to allow toast to be seen
+                setTimeout(() => {
+                    router.push('/home');
+                }, 1000);
             }
         } catch (err) {
             console.error('Login error:', err);
 
+            // Create an appropriate error message based on the error
+            let errorMessage = 'Une erreur est survenue lors de la connexion';
+            
             if (err.response) {
-                alert(`Server error: ${err.response.status} - ${JSON.stringify(err.response.data)}`);
+                errorMessage = `Erreur de serveur: ${err.response.status}`;
+                // If you have specific error messages from the backend:
+                if (err.response.data && err.response.data.message) {
+                    errorMessage = err.response.data.message;
+                }
             } else if (err.request) {
-                alert('No response from server. Check your network connection.');
+                errorMessage = 'Pas de réponse du serveur. Vérifiez votre connexion réseau.';
             } else {
-                alert(`Error: ${err.message}`);
+                errorMessage = `Erreur: ${err.message}`;
             }
+
+            // Show error toast
+            Toast.show({
+                type: 'error',
+                text1: 'Échec de la connexion',
+                text2: errorMessage,
+                visibilityTime: 4000,
+                topOffset: 50
+            });
         } finally {
             setLoading(false);
         }
@@ -110,35 +152,14 @@ const Login_section2 = () => {
                     iconLeft={darkMode ? Dark_mail : Mail}
                     error={!isEmailValid ? "Please enter a valid email" : ""}
                 />
-                {/* Password section removed */}
             </View>
             
-            {/* <View style={styles.row}>
-                <View style={styles.switch_row}>
-                    <Switch
-                        trackColor={{ false: "#767577", true: "#836EFE" }}
-                        thumbColor={isRemember ? "#f4f3f4" : "#f4f3f4"}
-                        ios_backgroundColor="#3e3e3e"
-                        onValueChange={toggleSwitch}
-                        value={isRemember}
-                    />
-                    <Text style={styles.remember}>Remember Me</Text>
-                </View>
-                <Text style={styles.forget} onPress={openModal}>Forgot Email?</Text>
-            </View> */}
-            
             <Button
-                buttonText={loading ? "Logging in..." : "Login with Email"}
+                buttonText={loading ? "Connexion en cours..." : "Se connecter avec Email"}
                 onPress={handleLogin}
                 disabled={loading}
             />
             
-            {/* <View style={styles.infoContainer}>
-                <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-                    We'll send a verification link to your email to confirm your identity.
-                </Text>
-            </View>
-             */}
             {/* Modal sections */}
             <Login_section3 
                 modalVisible={modalVisible}
