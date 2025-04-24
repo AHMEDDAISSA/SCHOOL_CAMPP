@@ -44,7 +44,7 @@ const Home = () => {
         date: '18/04/2025'
       },
       {
-        id: '3',
+        id: '4',
         title: 'Kit de Ski',
         category: 'Louer',
         type: 'Combinaison de ski ',
@@ -76,9 +76,9 @@ const Home = () => {
           </View>
           <TouchableOpacity style={styles.notification_box} onPress={() => {router.push('(screens)/notification')}}>
             {darkMode ? <Dark_Notification style={styles.notification} /> : <Notification style={styles.notification} />}
-            <TouchableOpacity style={styles.circle} onPress={() => {router.push('(screens)/notification')}} >
+            <View style={styles.circle}>
               <Text style={styles.notification_count}>3</Text>
-            </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -158,7 +158,7 @@ const Home = () => {
           </View>
 
           {/* S'abonner */}
-          <TouchableOpacity style={styles.subscribeButton} onPress={() => {router.push('(screens)/abonnement')}}>
+          <TouchableOpacity style={styles.subscribeButton} onPress={() => {router.push('(screens)/#')}}>
             <Ionicons name="notifications-outline" size={20} color="white" />
             <Text style={styles.subscribeButtonText}>S'abonner aux nouvelles annonces</Text>
           </TouchableOpacity>
@@ -173,235 +173,234 @@ const Home = () => {
 };
 
 export default Home;
-
-
+//new one and all is on work 
 const styles = StyleSheet.create({
-    container: {
-        paddingTop: 50,
-        paddingHorizontal: 20,
-        flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems:'center',
-        justifyContent: 'space-between',
-    },
-    header_left:{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    profile: {
-        width: 65,
-        height: 65,
-    },
-    heading_text: {
-        fontSize: 12,
-        lineHeight: 14,
-        fontFamily: 'Montserrat_500Medium',
-        color: '#727272',
-        textTransform: 'capitalize',
-    },
-    heading: {
-        fontSize: 18,
-        lineHeight: 22,
-        fontFamily: 'Montserrat_700Bold',
-        color: '#39335E',
-        textTransform: 'capitalize',
-    },
-    notification_box: {
+  container: {
+      paddingTop: 50,
+      paddingHorizontal: 20,
+      flex: 1,
+  },
+  header: {
+      flexDirection: 'row',
+      alignItems:'center',
+      justifyContent: 'space-between',
+  },
+  header_left:{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+  },
+  profile: {
+      width: 65,
+      height: 65,
+  },
+  heading_text: {
+      fontSize: 12,
+      lineHeight: 14,
+      fontFamily: 'Montserrat_500Medium',
+      color: '#727272',
+      textTransform: 'capitalize',
+  },
+  heading: {
+      fontSize: 18,
+      lineHeight: 22,
+      fontFamily: 'Montserrat_700Bold',
+      color: '#39335E',
+      textTransform: 'capitalize',
+  },
+  notification_box: {
 
+  },
+  notification: {
+      position:'relative',
+  },
+  circle: {
+      position: 'absolute',
+      width: 15,
+      height: 15,
+      alignItems:'center',
+      justifyContent: 'center',
+      backgroundColor: '#EB001B',
+      borderRadius: 50,
+      right: -3,
+      top: -3,
+  },
+  notification_count: {
+      fontSize: 8,
+      lineHeight: 12,
+      fontFamily: 'Montserrat_600SemiBold',
+      color: '#FFFFFF',
+  },
+  
+  // Nouveaux styles
+  bourseHeader: {
+      marginTop: 20,
+      backgroundColor: '#39335E',
+      padding: 15,
+      borderRadius: 12,
+      marginBottom: 15,
+  },
+  bourseTitle: {
+      fontSize: 22,
+      fontFamily: 'Montserrat_700Bold',
+      color: '#FFFFFF',
+      marginBottom: 5,
+  },
+  bourseSubtitle: {
+      fontSize: 14,
+      fontFamily: 'Montserrat_500Medium',
+      color: '#FFFFFF',
+      opacity: 0.9,
+  },
+  publishButton: {
+      backgroundColor: '#EB001B',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 20,
+  },
+  publishButtonText: {
+      color: '#FFFFFF',
+      fontFamily: 'Montserrat_600SemiBold',
+      fontSize: 16,
+      marginLeft: 10,
+  },
+  sectionTitle: {
+      fontSize: 18,
+      fontFamily: 'Montserrat_700Bold',
+      color: '#39335E',
+      marginBottom: 10,
+  },
+  categoriesContainer: {
+      flexDirection: 'row',
+      marginBottom: 20,
+  },
+  categoryButton: {
+      padding: 12,
+      borderRadius: 8,
+      backgroundColor: '#F0F0F0',
+      marginRight: 10,
+      alignItems: 'center',
+      minWidth: 100,
+      flexDirection: 'row',
+      justifyContent: 'flex-start',
+  },
+  categoryIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: '#E6E6FA',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+  },
+  categoryText: {
+      fontFamily: 'Montserrat_600SemiBold',
+      fontSize: 12,
+  },
+  recentSection: {
+      marginBottom: 20,
+  },
+  sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+  },
+  seeAllText: {
+      color: '#EB001B',
+      fontFamily: 'Montserrat_600SemiBold',
+      fontSize: 14,
+  },
+  announceCard: {
+      backgroundColor: '#F9F9F9',
+      borderRadius: 10,
+      marginBottom: 15,
+      overflow: 'hidden',
+      flexDirection: 'row',
+      shadowColor: "#000",
+      shadowOffset: {
+          width: 0,
+          height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 3.84,
+      elevation: 5,
+  },
+  cardImageContainer: {
+      width: 80,
+      height: 80,
+      backgroundColor: '#E0E0E0',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-start',
+  },
+  categoryBadge: {
+      backgroundColor: '#39335E',
+      color: 'white',
+      fontSize: 10,
+      fontFamily: 'Montserrat_600SemiBold',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 12,
+      margin: 5,
+  },
+  cardContent: {
+      padding: 10,
+      flex: 1,
+  },
+  cardTitle: {
+      fontSize: 16,
+      fontFamily: 'Montserrat_600SemiBold',
+      color: '#39335E',
+      marginBottom: 5,
+  },
+  cardType: {
+      fontSize: 12,
+      fontFamily: 'Montserrat_500Medium',
+      color: '#727272',
+  },
+  cardDate: {
+      fontSize: 11,
+      fontFamily: 'Montserrat_500Medium',
+      color: '#9B9B9B',
+      marginTop: 5,
+  },
+  subscribeButton: {
+      backgroundColor: '#39335E',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 20,
+  },
+  subscribeButtonText: {
+      color: '#FFFFFF',
+      fontFamily: 'Montserrat_600SemiBold',
+      fontSize: 14,
+      marginLeft: 10,
+  },
+  cardImageWrapper: {
+      position: 'relative',
+      width: 80,
+      height: 80,
     },
-    notification: {
-        position:'relative',
+    cardImage: {
+      width: '100%',
+      height: '100%',
+      borderTopLeftRadius: 10,
+      borderBottomLeftRadius: 10,
     },
-    circle: {
-        position: 'absolute',
-        width: 15,
-        height: 15,
-        alignItems:'center',
-        justifyContent: 'center',
-        backgroundColor: '#EB001B',
-        borderRadius: 50,
-        right: -3,
-        top: -3,
-    },
-    notification_count: {
-        fontSize: 8,
-        lineHeight: 12,
-        fontFamily: 'Montserrat_600SemiBold',
-        color: '#FFFFFF',
+    categoryBadgeWrapper: {
+      position: 'absolute',
+      top: 5,
+      left: 5,
+      backgroundColor: '#39335E',
+      borderRadius: 12,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
     },
     
-    // Nouveaux styles
-    bourseHeader: {
-        marginTop: 20,
-        backgroundColor: '#39335E',
-        padding: 15,
-        borderRadius: 12,
-        marginBottom: 15,
-    },
-    bourseTitle: {
-        fontSize: 22,
-        fontFamily: 'Montserrat_700Bold',
-        color: '#FFFFFF',
-        marginBottom: 5,
-    },
-    bourseSubtitle: {
-        fontSize: 14,
-        fontFamily: 'Montserrat_500Medium',
-        color: '#FFFFFF',
-        opacity: 0.9,
-    },
-    publishButton: {
-        backgroundColor: '#EB001B',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 20,
-    },
-    publishButtonText: {
-        color: '#FFFFFF',
-        fontFamily: 'Montserrat_600SemiBold',
-        fontSize: 16,
-        marginLeft: 10,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Montserrat_700Bold',
-        color: '#39335E',
-        marginBottom: 10,
-    },
-    categoriesContainer: {
-        flexDirection: 'row',
-        marginBottom: 20,
-    },
-    categoryButton: {
-        padding: 12,
-        borderRadius: 8,
-        backgroundColor: '#F0F0F0',
-        marginRight: 10,
-        alignItems: 'center',
-        minWidth: 100,
-        flexDirection: 'row',
-        justifyContent: 'flex-start',
-    },
-    categoryIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#E6E6FA',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-    },
-    categoryText: {
-        fontFamily: 'Montserrat_600SemiBold',
-        fontSize: 12,
-    },
-    recentSection: {
-        marginBottom: 20,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    seeAllText: {
-        color: '#EB001B',
-        fontFamily: 'Montserrat_600SemiBold',
-        fontSize: 14,
-    },
-    announceCard: {
-        backgroundColor: '#F9F9F9',
-        borderRadius: 10,
-        marginBottom: 15,
-        overflow: 'hidden',
-        flexDirection: 'row',
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    cardImageContainer: {
-        width: 80,
-        height: 80,
-        backgroundColor: '#E0E0E0',
-        justifyContent: 'flex-start',
-        alignItems: 'flex-start',
-    },
-    categoryBadge: {
-        backgroundColor: '#39335E',
-        color: 'white',
-        fontSize: 10,
-        fontFamily: 'Montserrat_600SemiBold',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 12,
-        margin: 5,
-    },
-    cardContent: {
-        padding: 10,
-        flex: 1,
-    },
-    cardTitle: {
-        fontSize: 16,
-        fontFamily: 'Montserrat_600SemiBold',
-        color: '#39335E',
-        marginBottom: 5,
-    },
-    cardType: {
-        fontSize: 12,
-        fontFamily: 'Montserrat_500Medium',
-        color: '#727272',
-    },
-    cardDate: {
-        fontSize: 11,
-        fontFamily: 'Montserrat_500Medium',
-        color: '#9B9B9B',
-        marginTop: 5,
-    },
-    subscribeButton: {
-        backgroundColor: '#39335E',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 20,
-    },
-    subscribeButtonText: {
-        color: '#FFFFFF',
-        fontFamily: 'Montserrat_600SemiBold',
-        fontSize: 14,
-        marginLeft: 10,
-    },
-    cardImageWrapper: {
-        position: 'relative',
-        width: 80,
-        height: 80,
-      },
-      cardImage: {
-        width: '100%',
-        height: '100%',
-        borderTopLeftRadius: 10,
-        borderBottomLeftRadius: 10,
-      },
-      categoryBadgeWrapper: {
-        position: 'absolute',
-        top: 5,
-        left: 5,
-        backgroundColor: '#39335E',
-        borderRadius: 12,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-      },
-      
 })

@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, Switch, TouchableOpacity } from 'react-native';
 import React, { useContext, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Added missing import
 import Input from '../../Input/Input';
 import Mail from "../../../assets/images/mail.svg";
 import Dark_mail from "../../../assets/images/dark_mail.svg";
@@ -10,8 +11,8 @@ import ThemeContext from '../../../theme/ThemeContext';
 import Login_section5 from '../Login_section5/Login_section5';
 import Login_section6 from '../Login_section6/Login_section6';
 import { router, Link } from "expo-router";
-import { addUser } from '../../../services/api';
-import Toast from 'react-native-toast-message'; // Import Toast
+import { loginUser } from '../../../services/api';
+import Toast from 'react-native-toast-message';
 
 const Login_section2 = () => {
     const [email, setEmail] = useState('');
@@ -65,7 +66,6 @@ const Login_section2 = () => {
     // Login function
     const handleLogin = async () => {
         if (!email) {
-            // Replace alert with Toast
             Toast.show({
                 type: 'error',
                 text1: 'Erreur!',
@@ -77,7 +77,6 @@ const Login_section2 = () => {
         }
 
         if (!validateEmail(email)) {
-            // Replace alert with Toast
             Toast.show({
                 type: 'error',
                 text1: 'Erreur!',
@@ -91,23 +90,49 @@ const Login_section2 = () => {
         setLoading(true);
 
         try {
-            const userData = await addUser(email);
-
+            // Pass just the email as a simple object
+            const userData = await loginUser(email);
+        
+            // Check for success response and proper data
             if (userData) {
-                console.log('User found:', userData);
-                // Show success toast
-                Toast.show({
-                    type: 'success',
-                    text1: 'Connexion réussie',
-                    text2: 'Vous êtes maintenant connecté',
-                    visibilityTime: 3000,
-                    topOffset: 50
-                });
-                
-                // Delay navigation slightly to allow toast to be seen
-                setTimeout(() => {
-                    router.push('/home');
-                }, 1000);
+                // Handle different response formats (with or without status field)
+                if (userData.status === "success" || userData.token) {
+                    console.log('User logged in:', userData);
+                    
+                    // Store the token if it exists
+                    if (userData.token) {
+                        try {
+                            await AsyncStorage.setItem('userToken', userData.token);
+                            
+                            // Store user info if available
+                            if (userData.user) {
+                                await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
+                            }
+                            console.log('Token and user info stored successfully');
+                        } catch (storageError) {
+                            console.error('Failed to store token:', storageError);
+                        }
+                    }
+                    
+                    // Show success toast
+                    Toast.show({
+                        type: 'success',
+                        text1: 'Connexion réussie',
+                        text2: 'Vous êtes maintenant connecté',
+                        visibilityTime: 3000,
+                        topOffset: 50
+                    });
+                    
+                    // Delay navigation slightly to allow toast to be seen
+                    setTimeout(() => {
+                        router.push('/home');
+                    }, 1000);
+                } else {
+                    // Handle case where response came back but wasn't a success
+                    throw new Error(userData.message || 'Response received but login failed');
+                }
+            } else {
+                throw new Error('No data received from server');
             }
         } catch (err) {
             console.error('Login error:', err);
@@ -116,14 +141,28 @@ const Login_section2 = () => {
             let errorMessage = 'Une erreur est survenue lors de la connexion';
             
             if (err.response) {
-                errorMessage = `Erreur de serveur: ${err.response.status}`;
-                // If you have specific error messages from the backend:
-                if (err.response.data && err.response.data.message) {
-                    errorMessage = err.response.data.message;
+                // Server response with error status
+                const status = err.response.status;
+                
+                if (status === 404) {
+                    errorMessage = "Cet email n'est pas enregistré. Veuillez créer un compte.";
+                } else if (status === 401) {
+                    errorMessage = "Identifiants invalides. Veuillez réessayer.";
+                } else if (status === 400) {
+                    // Bad request - usually validation errors
+                    errorMessage = err.response.data?.message || "Données invalides. Vérifiez vos informations.";
+                } else {
+                    errorMessage = `Erreur de serveur: ${status}`;
+                    // If you have specific error messages from the backend:
+                    if (err.response.data && err.response.data.message) {
+                        errorMessage = err.response.data.message;
+                    }
                 }
             } else if (err.request) {
+                // No response received
                 errorMessage = 'Pas de réponse du serveur. Vérifiez votre connexion réseau.';
             } else {
+                // Something else happened
                 errorMessage = `Erreur: ${err.message}`;
             }
 
@@ -150,7 +189,7 @@ const Login_section2 = () => {
                     value={email}
                     onChangeText={handleEmailChange}
                     iconLeft={darkMode ? Dark_mail : Mail}
-                    error={!isEmailValid ? "Please enter a valid email" : ""}
+                    error={!isEmailValid ? "Veuillez saisir un email valide" : ""}
                 />
             </View>
             

@@ -41,6 +41,17 @@ api.interceptors.response.use(
 
 // === AUTH & USER METHODS ===
 
+// POST: Login user
+export const loginUser = async (email) => {
+  try {
+    const response = await api.post('/auth/login', { email });
+    return response.data;
+  } catch (error) {
+    console.error('loginUser error:', error.message);
+    throw error;
+  }
+};
+
 // GET: Authenticate or add user
 export const addUser = async (email) => {
   try {

@@ -11,41 +11,62 @@ import Log_method from '../../components/Log_method/Log_method';
 import ThemeContext from '../../theme/ThemeContext';
 import Toast from 'react-native-toast-message';
 
-const login = () => {
-  const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
+const Login = () => { // Changed to PascalCase for component name
+  const { theme, darkMode } = useContext(ThemeContext); // Removed unused toggleTheme
+  
   const back = () => {
     router.push('lets');
   };
+  
   return (
-    <View style={[styles.container, {backgroundColor:theme.background}]}>
-       <TouchableOpacity onPress={back}>
-          {darkMode ? <Dark_back /> : <Back />}
-        </TouchableOpacity>
+    <View style={[styles.container, {backgroundColor: theme.background}]}>
+      <TouchableOpacity onPress={back} style={styles.backButton}>
+        {darkMode ? <Dark_back /> : <Back />}
+      </TouchableOpacity>
+      
       <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.head_content}>
-        <Head />
-        <Text style={[styles.heading, {color:theme.color}]}>Heureux de vous revoir! 👋🏻</Text>
-        <Text style={[styles.heading_text, {color:theme.color3}]}>Ravis de vous revoir ! Connectez-vous pour accéder à votre compte et découvrir nos dernières fonctionnalités.</Text>
-      </View>
-      <Login_section2 />
-      <View style={styles.bottom_row}>
-        <View style={styles.line}></View>
-        <Text style={styles.or}>Or continue with</Text>
-        <View style={styles.line}></View>
-      </View>
-      <Log_method />
-      <Text style={[styles.bottom_text, {color:theme.color3}]}>Pas encore de compte?<Link href='/signup' style={styles.link}> Créez-en un</Link></Text>
+        <View style={styles.head_content}>
+          <Head />
+          <Text style={[styles.heading, {color: theme.color}]}>
+            Heureux de vous revoir! 👋🏻
+          </Text>
+          <Text style={[styles.heading_text, {color: theme.color3}]}>
+            Ravis de vous revoir ! Connectez-vous pour accéder à votre compte et découvrir nos dernières fonctionnalités.
+          </Text>
+        </View>
+        
+        <Login_section2 />
+        
+        <View style={styles.bottom_row}>
+          <View style={styles.line}></View>
+          <Text style={styles.or}>Or continue with</Text>
+          <View style={styles.line}></View>
+        </View>
+        
+        <Log_method />
+        
+        <Text style={[styles.bottom_text, {color: theme.color3}]}>
+          Pas encore de compte?
+          <Link href='/signup' style={styles.link}> Créez-en un</Link>
+        </Text>
       </ScrollView>
+      
+      {/* Add Toast component to ensure it's visible */}
+      <Toast />
     </View>
-  )
-}
+  );
+};
 
-export default login
+export default Login; // Changed export name to match
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1, // Added flex: 1 to ensure full screen coverage
     paddingTop: 50,
     paddingHorizontal: 20,
+  },
+  backButton: {
+    marginBottom: 10, // Added spacing below back button
   },
   head_content: {
     alignItems: 'center',
@@ -76,29 +97,29 @@ const styles = StyleSheet.create({
     color: '#727272',
     marginVertical: 30,
     paddingBottom: 20,
-},
-link: {
+  },
+  link: {
     fontFamily: 'Montserrat_700Bold',
     color: '#836EFE',
-},
-bottom_row: {
+  },
+  bottom_row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 20,
     marginLeft: -20,
     marginVertical: 30,
-},
-line: {
+  },
+  line: {
     borderBottomColor: '#9C9C9C',
     borderBottomWidth: 0.5,
     width: '35%',
     paddingTop: 2,
-},
-or: {
+  },
+  or: {
     fontSize: 12,
     lineHeight: 15,
     fontFamily: 'Montserrat_400Regular',
     color: '#9C9C9C',
-}
-})
+  }
+});

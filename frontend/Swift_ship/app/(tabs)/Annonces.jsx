@@ -499,7 +499,7 @@ const Annonces = () => {
           <View style={styles.subscribeButtonContainer}>
             <TouchableOpacity 
               style={styles.subscribeButton}
-              onPress={() => router.push('(screens)/abonnement')}
+              onPress={() => router.push('(screens)/#')}// kenet /abonnement 
               accessible={true}
               accessibilityLabel="S'abonner aux nouvelles annonces"
               accessibilityHint="Appuyez pour vous abonner aux notifications"

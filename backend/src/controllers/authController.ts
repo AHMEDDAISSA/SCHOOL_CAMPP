@@ -50,25 +50,50 @@ export const registerHandler = async (req: Request<{},{},{user:IUser}>, res: Res
         res.status(500).json({ status: "error", message: "Internal server error." });
     }
 };
+
 // Handler function for logging in a user
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export const loginHandler = async (req: Request<{},{},{user:IUser}>, res: Response): Promise<void> => {
-    const { email, camp } = req.body.user;
-    if(!email || !camp) {
-        res.status(400).send('Email and camp are required');
+// Modified to accept direct email and camp fields
+export const loginHandler = async (req: Request, res: Response): Promise<void> => {
+    const { email, camp } = req.body; // Changed from req.body.user to req.body
+    
+    // Check if email exists
+    if (!email) {
+        res.status(400).json({ 
+            status: "error", 
+            message: "Email is required." 
+        });
         return;
     }
+    
     try {
-        // Find user by email and camp
-        const user = await UserModel.findOne({ email, camp });
+        // For email-only login, we can make camp optional
+        let query: any = { email };
+        
+        // If camp is provided, add it to the query
+        if (camp) {
+            query.camp = camp;
+        }
+        
+        // Find user by email (and camp if provided)
+        const user = await UserModel.findOne(query);
+        
         if (!user) {
-            res.status(400).send('User not found');
+            res.status(404).json({ 
+                status: "error", 
+                message: "User not found. Please check your email or register." 
+            });
             return;
         }
 
-        // Generate a JWT with the user's actual role
+        // Generate a JWT with the user's information
         const token = jwt.sign(
-            { userId: user._id, email: user.email, camp: user.camp, role: user.role,  canPost: user.canPost },
+            { 
+                userId: user._id, 
+                email: user.email, 
+                camp: user.camp, 
+                role: user.role, 
+                canPost: user.canPost 
+            },
             process.env.JWT_SECRET as string,
             { expiresIn: '3d' }
         );
@@ -78,13 +103,20 @@ export const loginHandler = async (req: Request<{},{},{user:IUser}>, res: Respon
             message: "User logged in successfully",
             token: token,
             user: {
-                ...user.toObject(),
+                id: user._id,
+                email: user.email,
+                camp: user.camp,
                 role: user.role,
-                canPost: user.canPost
+                canPost: user.canPost,
+                first_name: user.first_name,
+                last_name: user.last_name
             }
         });
     } catch (error) {
-        console.log("Error logging in user:", error);
-        res.status(500).send('Error logging in user');
+        console.error("Error logging in user:", error);
+        res.status(500).json({ 
+            status: "error", 
+            message: "Internal server error. Please try again later." 
+        });
     }
 };
