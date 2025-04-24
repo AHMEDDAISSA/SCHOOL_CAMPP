@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create an axios instance with timeout and base URL
 const api = axios.create({
-  baseURL: 'http://192.168.168.65:3001', // Update IP as needed
+  baseURL: 'http://192.168.168.65:3001', 
   headers: {
     'Content-Type': 'application/json',
   },
@@ -129,6 +129,110 @@ export const resendVerificationCode = async (email, camp) => {
     return response.data;
   } catch (error) {
     console.error('resendVerificationCode error:', error.message);
+    throw error;
+  }
+};
+
+// POST: Create a new ad/listing
+export const createAd = async (token, adData) => {
+  try {
+    const response = await fetch(`/api/ads`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(adData)
+    });
+    return response.data;
+  } catch (error) {
+    console.error("createAd error:", error.message);
+    throw error;
+  }
+};
+
+// POST: Upload a single image
+export const uploadImage = async (token, imageUri, adId) => {
+  try {
+    // Create form data for file upload
+    const formData = new FormData();
+    
+    // Extract filename from uri
+    const uriParts = imageUri.split('/');
+    const fileName = uriParts[uriParts.length - 1];
+    
+    // Append image to form data
+    formData.append('image', {
+      uri: imageUri,
+      name: fileName,
+      type: 'image/jpeg' // Adjust based on your file type
+    });
+    
+    if (adId) {
+      formData.append('adId', adId);
+    }
+    
+    const response = await fetch(`/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      },
+      body: formData
+    });
+    return response.data;
+  } catch (error) {
+    console.error("uploadImage error:", error.message);
+    throw error;
+  }
+};
+
+// Helper function to upload multiple images
+export const uploadMultipleImages = async (token, imageUris, adId) => {
+  try {
+    const uploadPromises = imageUris.map(uri => 
+      uploadImage(token, uri, adId)
+    );
+    return await Promise.all(uploadPromises);
+  } catch (error) {
+    console.error("uploadMultipleImages error:", error.message);
+    throw error;
+  }
+};
+
+// GET: Get all ads/listings
+export const getAds = async () => {
+  try {
+    const response = await fetch(`/api/ads`);
+    return response.data;
+  } catch (error) {
+    console.error("getAds error:", error.message);
+    throw error;
+  }
+};
+
+// GET: Get a specific ad/listing by ID
+export const getAdById = async (adId) => {
+  try {
+    const response = await fetch(`/api/ads/${adId}`);
+    return response.data;
+  } catch (error) {
+    console.error("getAdById error:", error.message);
+    throw error;
+  }
+};
+
+// GET: Get user's ads/listings
+export const getUserAds = async (token) => {
+  try {
+    const response = await fetch(`/api/user/ads`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("getUserAds error:", error.message);
     throw error;
   }
 };

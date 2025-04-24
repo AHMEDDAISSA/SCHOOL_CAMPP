@@ -25,9 +25,9 @@ const TabBarButton = ({ children, onPress, accessibilityState, title }) => {
     >
       <View style={[styles.iconContainer, isSelected ? styles.activeIconContainer : null]}>
         {children}
-        <Text style={[[styles.title, {color:theme.color5}], isSelected ? styles.activeTitle : null]}>
-        {title}
-      </Text>
+        <Text style={[styles.title, { color: theme.color5 }, isSelected ? styles.activeTitle : null]}>
+          {title}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -39,60 +39,42 @@ const TabsLayout = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Tabs
-        screenOptions={({ route }) => ({
-          tabBarShowLabel: false,
-          tabBarButton: (props) => (
-            <TabBarButton {...props} title={route.name} />
-          ),
-          tabBarStyle: [styles.tabBar, { backgroundColor: theme.background }],
-          headerShown: false,
-          tabBarIcon: ({ focused }) => {
-            let IconComponent;
-            switch (route.name) {
-              case 'home':
-                IconComponent = darkMode ? Active_Home : (focused ? Active_Home : Home);
-                break;
-              case 'Annonces':
-                IconComponent = darkMode ? Active_Myorders : (focused ? Active_Myorders : Myorders);
-                break;
-              case 'inbox':
-                IconComponent = darkMode ? Active_Inbox : (focused ? Active_Inbox : Inbox);
-                break;
-              case 'profile':
-                IconComponent = darkMode ? Active_Profiles : (focused ? Active_Profiles : Profiles);
-                break;
-              default:
-                IconComponent = null;
-                break;
-            }
-            return IconComponent ? <IconComponent /> : null;
-          },
-        })}
+        screenOptions={({ route }) => {
+          return {
+            tabBarShowLabel: false,
+            tabBarButton: (props) => (
+              <TabBarButton {...props} title={route.name} />
+            ),
+            tabBarStyle: [styles.tabBar, { backgroundColor: theme.background }],
+            headerShown: false,
+            tabBarIcon: ({ focused }) => {
+              let IconComponent;
+              switch (route.name) {
+                case 'home':
+                  IconComponent = darkMode ? Active_Home : (focused ? Active_Home : Home);
+                  break;
+                case 'Annonces':
+                  IconComponent = darkMode ? Active_Myorders : (focused ? Active_Myorders : Myorders);
+                  break;
+                case 'inbox':
+                  IconComponent = darkMode ? Active_Inbox : (focused ? Active_Inbox : Inbox);
+                  break;
+                case 'profile':
+                  IconComponent = darkMode ? Active_Profiles : (focused ? Active_Profiles : Profiles);
+                  break;
+                default:
+                  IconComponent = null;
+                  break;
+              }
+              return IconComponent ? <IconComponent /> : null;
+            },
+          };
+        }}
       >
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: 'Home',
-          }}
-        />
-        <Tabs.Screen
-          name="Annonces"
-          options={{
-            title: 'Annonces',
-          }}
-        />
-        <Tabs.Screen
-          name="inbox"
-          options={{
-            title: 'Inbox',
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-          }}
-        />
+        <Tabs.Screen name="home" options={{ title: 'Home' }} />
+        <Tabs.Screen name="Annonces" options={{ title: 'Annonces' }} />
+        <Tabs.Screen name="inbox" options={{ title: 'Inbox' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
     </View>
   );

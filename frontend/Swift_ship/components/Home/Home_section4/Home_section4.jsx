@@ -9,7 +9,7 @@ const Home_section4 = () => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <Text style={[styles.heading, {color:theme.color}]}>Transaction History</Text>
         <TouchableOpacity onPress={() => {router.push('(screens)/transaction_history')}}>
         <Text style={styles.see}>see all</Text>
@@ -32,7 +32,7 @@ const Home_section4 = () => {
                 </TouchableOpacity>
             ))
         }
-      </View>
+      </View> */}
     </View>
   )
 }

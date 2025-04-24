@@ -14,7 +14,7 @@ const Home_section2 = () => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
   return (
     <View>
-        <TouchableOpacity style={[styles.input_container, {backgroundColor:theme.cardbg2}]} onPress={() => router.push('(screens)/search_page')}>
+        {/* <TouchableOpacity style={[styles.input_container, {backgroundColor:theme.cardbg2}]} onPress={() => router.push('(screens)/search_page')}>
         {darkMode? <Dark_search style={styles.search} /> : <Search style={styles.search} />}
         <Text style={[styles.placeholder, {color:theme.color}]}>Entrez le numéro d'identification du suivi</Text>
         <Filter style={styles.filter} />
@@ -32,7 +32,7 @@ const Home_section2 = () => {
                 <Text style={styles.card_no}>5282 3456 7890 1289</Text>
                 <Text style={styles.date}>09/25</Text>
             </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
     </View>
   )
 }
