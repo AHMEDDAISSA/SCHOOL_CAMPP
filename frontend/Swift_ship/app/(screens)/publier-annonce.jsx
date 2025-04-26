@@ -5,6 +5,7 @@ import Dark_back from "../../assets/images/dark_back.svg";
 import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
 import { router } from "expo-router";
 import ThemeContext from '../../theme/ThemeContext';
+import AnnonceContext from '../../contexts/AnnonceContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,6 +14,7 @@ import Toast from 'react-native-toast-message';
 
 const PublierAnnonce = () => {
   const { theme, darkMode } = useContext(ThemeContext);
+  const { addAnnonce } = useContext(AnnonceContext);
   
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -31,6 +33,9 @@ const PublierAnnonce = () => {
   const [condition, setCondition] = useState('');
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Champs obligatoires
+  const [missingFields, setMissingFields] = useState([]);
   
   // Catégories disponibles
   const categories = [
@@ -125,14 +130,40 @@ const PublierAnnonce = () => {
     });
   };
   
+  // Réinitialiser le formulaire
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setCategory('');
+    setType('');
+    setDuration('');
+    setPrice('');
+    setCondition('');
+    setImages([]);
+  };
+  
+  // Validation du formulaire
+  const validateForm = () => {
+    const missing = [];
+    
+    if (!title) missing.push('titre');
+    if (!description) missing.push('description');
+    if (!category) missing.push('catégorie');
+    if (!type) missing.push('type d\'objet');
+    
+    
+    setMissingFields(missing);
+    return missing.length === 0;
+  };
+  
   // Soumission du formulaire
   const handleSubmit = () => {
     // Validation de base
-    if (!title || !description || !category) {
+    if (!validateForm()) {
       Toast.show({
         type: 'error',
-        text1: 'Informations manquantes',
-        text2: 'Veuillez remplir tous les champs obligatoires.',
+        text1: 'Champs obligatoires manquants',
+        text2: `Veuillez remplir les champs suivants: ${missingFields.join(', ')}.`,
         position: 'bottom',
         visibilityTime: 4000
       });
@@ -141,19 +172,65 @@ const PublierAnnonce = () => {
     
     setLoading(true);
     
-    // Simulation d'envoi de données
-    setTimeout(() => {
+    // URL d'image par défaut si aucune image n'est sélectionnée
+    let imagesToSave = [...images]; 
+    
+    if (imagesToSave.length === 0) {
+      let defaultImageUrl = null;
+      if (type === 'Équipement ski') {
+        defaultImageUrl = 'https://images.unsplash.com/photo-1607250388533-ffdc26b6899e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80';
+      } else if (type === 'Vêtement hiver') {
+        defaultImageUrl = 'https://images.unsplash.com/photo-1608236415053-3691791bbffe?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80';
+      } else if (type === 'Chaussures') {
+        defaultImageUrl = 'https://images.unsplash.com/photo-1582398626929-4aaba43ffd66?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80';
+      }
+      if (defaultImageUrl) {
+        imagesToSave = [defaultImageUrl];
+      }
+    }
+    
+    try {
+      // Créer l'objet annonce
+      const nouvelleAnnonce = {
+        title,
+        description,
+        category,
+        type,
+        condition,
+        price,
+        duration,
+        images: imagesToSave
+      };
+      
+      // Ajouter l'annonce via le contexte
+      const annonceAjoutee = addAnnonce(nouvelleAnnonce);
+      
+      // Réinitialiser le formulaire
+      resetForm();
+      
+      setTimeout(() => {
+        setLoading(false);
+        Toast.show({
+          type: 'success',
+          text1: 'Annonce publiée !',
+          text2: 'Votre annonce a été publiée avec succès.',
+          position: 'bottom',
+          visibilityTime: 3000,
+          onHide: () => router.replace('(tabs)/Annonces') // Utiliser replace au lieu de push
+        });
+      }, 1000);
+    } catch (error) {
+      console.error("Erreur lors de l'ajout de l'annonce:", error);
       setLoading(false);
       Toast.show({
-        type: 'success',
-        text1: 'Annonce publiée !',
-        text2: 'Votre annonce a été publiée avec succès.',
+        type: 'error',
+        text1: 'Erreur',
+        text2: 'Une erreur est survenue lors de la publication.',
         position: 'bottom',
-        visibilityTime: 3000,
-        onHide: () => router.push('(tabs)/Annonces')
+        visibilityTime: 3000
       });
-    }, 2000);
-  };
+    }
+  }
   
   // Navigation
   const back = () => {
@@ -196,11 +273,24 @@ const PublierAnnonce = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.formContent}
       >
+        {/* Indication champs obligatoires */}
+        <View style={styles.requiredFieldsNote}>
+          <Text style={[styles.requiredFieldsText, {color: theme.color}]}>
+            Les champs marqués d'un astérisque (*) sont obligatoires
+          </Text>
+        </View>
+        
         {/* Section titre */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>Titre de l'annonce*</Text>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Titre de l'annonce<Text style={styles.requiredStar}>*</Text>
+          </Text>
           <TextInput
-            style={[styles.input, {backgroundColor: theme.cardbg2, color: theme.color}]}
+            style={[
+              styles.input, 
+              {backgroundColor: theme.cardbg2, color: theme.color},
+              !title && missingFields.includes('titre') ? styles.inputError : null
+            ]}
             placeholder="Ex: Gants de ski taille 8 en bon état"
             placeholderTextColor="#A8A8A8"
             value={title}
@@ -211,11 +301,16 @@ const PublierAnnonce = () => {
         
         {/* Section catégorie */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>Catégorie*</Text>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Catégorie<Text style={styles.requiredStar}>*</Text>
+          </Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
-            style={styles.categoriesContainer}
+            style={[
+              styles.categoriesContainer,
+              !category && missingFields.includes('catégorie') ? styles.scrollViewError : null
+            ]}
             contentContainerStyle={styles.categoriesContentContainer}
           >
             {categories.map(cat => (
@@ -264,8 +359,13 @@ const PublierAnnonce = () => {
         
         {/* Section Type */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>Type d'objet*</Text>
-          <View style={styles.typeButtonsContainer}>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Type d'objet<Text style={styles.requiredStar}>*</Text>
+          </Text>
+          <View style={[
+            styles.typeButtonsContainer, 
+            !type && missingFields.includes('type d\'objet') ? styles.containerError : null
+          ]}>
             {itemTypes.map((itemType, index) => (
               <Pressable 
                 key={index}
@@ -344,9 +444,15 @@ const PublierAnnonce = () => {
         
         {/* Section Description */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>Description*</Text>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Description<Text style={styles.requiredStar}>*</Text>
+          </Text>
           <TextInput
-            style={[styles.textArea, {backgroundColor: theme.cardbg2, color: theme.color}]}
+            style={[
+              styles.textArea, 
+              {backgroundColor: theme.cardbg2, color: theme.color},
+              !description && missingFields.includes('description') ? styles.inputError : null
+            ]}
             placeholder="Décrivez votre objet (état, taille, couleur, etc.)"
             placeholderTextColor="#A8A8A8"
             value={description}
@@ -421,9 +527,9 @@ const PublierAnnonce = () => {
         
         {/* Bouton de soumission */}
         <TouchableOpacity 
-          style={[styles.submitButton, !title || !description || !category ? styles.disabledButton : null]}
+          style={[styles.submitButton]}
           onPress={handleSubmit}
-          disabled={!title || !description || !category || loading}
+          disabled={loading}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
@@ -474,6 +580,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
+  requiredFieldsNote: {
+    marginBottom: 15,
+    backgroundColor: 'rgba(235, 0, 27, 0.1)',
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#EB001B',
+  },
+  requiredFieldsText: {
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 14,
+  },
+  requiredStar: {
+    color: '#EB001B',
+    fontSize: 18,
+  },
   formSection: {
     marginBottom: 20,
   },
@@ -487,6 +609,22 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     fontFamily: 'Montserrat_500Medium',
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: '#EB001B',
+  },
+  scrollViewError: {
+    borderWidth: 1,
+    borderColor: '#EB001B',
+    borderRadius: 10,
+    padding: 5,
+  },
+  containerError: {
+    borderWidth: 1,
+    borderColor: '#EB001B',
+    borderRadius: 10,
+    padding: 5,
   },
   textArea: {
     borderRadius: 10,
