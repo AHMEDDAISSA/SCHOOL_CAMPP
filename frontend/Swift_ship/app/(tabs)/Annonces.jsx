@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform } from 'react-native';
-import React, { useContext, useState, useEffect, useCallback } from 'react';
+import React, { useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
 import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
@@ -10,11 +10,7 @@ import ThemeContext from '../../theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import AnnonceContext from '../../contexts/AnnonceContext';
-
-
-
-
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Screen dimensions for responsive layouts
 const { width } = Dimensions.get('window');
@@ -85,9 +81,9 @@ const AnnonceCard = ({ item, darkMode, onPress }) => (
       styles.cardImageContainer,
       { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }
     ]}>
-      {item.imageUrl ? (
+      {(item.imageUrl || (item.images && item.images.length > 0)) ? (
         <Image 
-          source={{ uri: item.imageUrl }} 
+          source={{ uri: item.imageUrl || item.images[0] }} 
           style={styles.cardImage}
           resizeMode="cover"
         />
@@ -107,9 +103,40 @@ const AnnonceCard = ({ item, darkMode, onPress }) => (
         <Text style={styles.categoryBadge}>{item.category}</Text>
       </View>
     </View>
-    {/* Reste du code inchangé */}
+    <View style={styles.cardContent}>
+      <Text style={[
+        styles.cardTitle, 
+        { color: darkMode ? '#FFFFFF' : '#39335E' }
+      ]} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={[
+        styles.cardType, 
+        { color: darkMode ? '#AAAAAA' : '#666666' }
+      ]}>
+        {item.type}
+      </Text>
+      <View style={styles.cardFooter}>
+        <Text style={[
+          styles.cardDate, 
+          { color: darkMode ? '#AAAAAA' : '#666666' }
+        ]}>
+          {formatDate(item.date)}
+        </Text>
+        {item.isNew && (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>Nouveau</Text>
+          </View>
+        )}
+      </View>
+    </View>
   </TouchableOpacity>
 );
+
+// Optimisations avec memo
+const MemoizedAnnonceCard = React.memo(AnnonceCard);
+const MemoizedCategoryButton = React.memo(CategoryButton);
+
 // Helper functions
 const getCategoryIcon = (category) => {
   switch(category) {
@@ -159,6 +186,15 @@ const formatDate = (dateString) => {
 // Main component
 const Annonces = () => {
   const { theme, darkMode } = useContext(ThemeContext);
+  // Utiliser les fonctions du contexte
+  const { 
+    annonces, 
+    loading: contextLoading, 
+    refreshAnnonces, 
+    cleanOldAnnonces,
+    updateNewStatus
+  } = useContext(AnnonceContext);
+  
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -187,95 +223,47 @@ const Annonces = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   
-  // Données simulées pour les annonces
-  const [annonces, setAnnonces] = useState([
-    {
-      id: '1',
-      title: 'Gants de ski taille 8 en parfait état, peu utilisés',
-      category: 'Prêter',
-      type: 'Équipement ski',
-      date: '20/04/2025',
-      isNew: true,
-      imageUrl: 'https://images.unsplash.com/photo-1607250388533-ffdc26b6899e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80'
-    },
-    {
-      id: '2',
-      title: 'Bonnet rouge enfant',
-      category: 'Donner',
-      type: 'Vêtement hiver',
-      date: '19/04/2025',
-      isNew: true
-    },
-    {
-      id: '3',
-      title: 'Chaussures de randonnée T36',
-      category: 'Échanger',
-      type: 'Chaussures',
-      date: '18/04/2025',
-      imageUrl: 'https://images.unsplash.com/photo-1582398626929-4aaba43ffd66?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80'
-    },
-    {
-      id: '4',
-      title: 'Combinaison de ski 6 ans',
-      category: 'Prêter',
-      type: 'Vêtement hiver',
-      date: '17/04/2025'
-    },
-    {
-      id: '5',
-      title: 'Bâtons de ski 90cm',
-      category: 'Donner',
-      type: 'Équipement ski',
-      date: '16/04/2025',
-      imageUrl: 'https://images.unsplash.com/photo-1607348896103-2f53aa301afd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80'
-    }
-  ]);
+  // Initialisation et nettoyage
+  useEffect(() => {
+    // Nettoyer les anciennes annonces et mettre à jour le statut "nouveau"
+    const initializeData = async () => {
+      try {
+        // Mettre à jour le statut "nouveau" des annonces
+        await updateNewStatus();
+        
+        // Nettoyer les anciennes annonces (plus de 30 jours)
+        const deletedCount = await cleanOldAnnonces(30);
+        if (deletedCount > 0) {
+          console.log(`${deletedCount} anciennes annonces supprimées`);
+        }
+      } catch (error) {
+        console.error('Erreur d\'initialisation:', error);
+      }
+    };
+    
+    initializeData();
+  }, []);
   
-  // Simulating fetching data
+  // Fonction pour rafraîchir les données
   const fetchAnnonces = useCallback(async (isRefresh = false) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, you would fetch from an API
-      // For now we'll just use our static data
-      if (isRefresh) {
-        setAnnonces([
-          ...annonces,
-          {
-            id: '6',
-            title: 'Veste de ski homme taille L',
-            category: 'Louer',
-            type: 'Vêtement hiver',
-            date: '22/04/2025',
-            isNew: true,
-            imageUrl: 'https://images.unsplash.com/photo-1608236415053-3691791bbffe?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80'
-          },
-          {
-            id: '7',
-            title: 'Luge enfant bleue',
-            category: 'Prêter',
-            type: 'Équipement neige',
-            date: '21/04/2025',
-            isNew: true
-          }
-        ]);
-      }
+      // Utiliser la fonction de rafraîchissement du contexte
+      await refreshAnnonces();
       
       setPage(prev => isRefresh ? 1 : prev + 1);
-      setHasMore(page < 3); // Simulate pagination limit
+      setHasMore(page < 3); // Simuler la limite de pagination
       
     } catch (err) {
-      console.error('Error fetching annonces:', err);
+      console.error('Erreur lors du chargement des annonces:', err);
       setError('Impossible de charger les annonces. Veuillez réessayer.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page]);
+  }, [page, refreshAnnonces]);
   
   // Load data on component mount
   useEffect(() => {
@@ -285,7 +273,9 @@ const Annonces = () => {
   // Reload data when focused (coming back to this screen)
   useFocusEffect(
     useCallback(() => {
-      // You could check for updates here
+      // Vérifier les mises à jour et statuts "nouveau"
+      updateNewStatus();
+      
       return () => {
         // Clean up if needed
       };
@@ -306,16 +296,29 @@ const Annonces = () => {
   };
   
   // Filter annonces based on category and search
-  const filteredAnnonces = annonces.filter(item => {
-    const matchesCategory = activeFilter === '0' || 
-      item.category === categories.find(cat => cat.id === activeFilter)?.name;
-    
-    const matchesSearch = !searchQuery || 
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      item.type.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesCategory && matchesSearch;
-  });
+  const filteredAnnonces = useMemo(() => {
+    return annonces.filter(item => {
+      const matchesCategory = activeFilter === '0' || 
+        item.category === categories.find(cat => cat.id === activeFilter)?.name;
+      
+      const matchesSearch = !searchQuery || 
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        item.type.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      return matchesCategory && matchesSearch;
+    });
+  }, [annonces, activeFilter, searchQuery, categories]);
+  
+  // Optimiser les fonctions de rendu pour la FlatList
+  const keyExtractor = useCallback((item) => item.id, []);
+  
+  const renderItem = useCallback(({ item }) => (
+    <MemoizedAnnonceCard 
+      item={item}
+      darkMode={darkMode}
+      onPress={() => router.push(`(screens)/annonce/${item.id}`)}
+    />
+  ), [darkMode]);
   
   // Navigation
   const back = () => {
@@ -387,7 +390,7 @@ const Annonces = () => {
             contentContainerStyle={styles.categoriesContentContainer}
           >
             {categories.map(category => (
-              <CategoryButton 
+              <MemoizedCategoryButton 
                 key={category.id}
                 category={category}
                 isActive={activeFilter === category.id}
@@ -443,14 +446,8 @@ const Annonces = () => {
           {/* Annonces list */}
           <FlatList
             data={filteredAnnonces}
-            keyExtractor={item => item.id}
-            renderItem={({item}) => (
-              <AnnonceCard 
-                item={item}
-                darkMode={darkMode}
-                onPress={() => router.push(`(screens)/annonce/${item.id}`)}
-              />
-            )}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.announcesListContainer}
             refreshControl={
@@ -478,7 +475,7 @@ const Annonces = () => {
           <View style={styles.subscribeButtonContainer}>
             <TouchableOpacity 
               style={styles.subscribeButton}
-              onPress={() => router.push('(screens)/#')}// kenet /abonnement 
+              onPress={() => router.push('(screens)/#')} 
               accessible={true}
               accessibilityLabel="S'abonner aux nouvelles annonces"
               accessibilityHint="Appuyez pour vous abonner aux notifications"
@@ -493,6 +490,7 @@ const Annonces = () => {
     </SafeAreaView>
   );
 };
+
 
 export default Annonces;
 

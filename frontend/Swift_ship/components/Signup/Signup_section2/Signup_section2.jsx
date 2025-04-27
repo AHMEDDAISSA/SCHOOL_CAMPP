@@ -1,11 +1,10 @@
-import React, { useState, useContext, useRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useContext, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import PhoneInput from 'react-native-phone-number-input';
 import ThemeContext from '../../../theme/ThemeContext';
 import { router } from 'expo-router';
-import api from '../../../services/api';
+import { registerUser, verifyEmail, resendVerificationCode } from '../../../services/api';
 import Toast from 'react-native-toast-message';
-
 
 const Signup_section2 = () => {
   const { theme } = useContext(ThemeContext);
@@ -17,83 +16,103 @@ const Signup_section2 = () => {
     last_name: '',
     phone: '',
     countryCode: '+216',
-    camp: 'default-camp',
+    camp: '507f1f77bcf86cd799439011',
     role: 'parent'
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [verificationStep, setVerificationStep] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
-  const [formattedPhone, setFormattedPhone] = useState('');
 
   const handleChange = (field, value) => {
-    setFormData({
-      ...formData,
+    setFormData(prevState => ({
+      ...prevState,
       [field]: value
-    });
+    }));
+    // Remove excessive logging
   };
 
   const handleSignup = async () => {
-    if (!formData.email) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: 'Veuillez saisir votre email',
-        visibilityTime: 4000,
-        topOffset: 50
-      });
-      return;
-    }
-
-    if (!formData.email.includes('@') || !formData.email.includes('.')) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: 'Veuillez saisir un email valide',
-        visibilityTime: 4000,
-        topOffset: 50
-      });
-      return;
-    }
-
-    // Validation du numéro de téléphone
-    if (!phoneInput.current?.isValidNumber(formData.phone)) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: 'Veuillez saisir un numéro de téléphone valide',
-        visibilityTime: 4000,
-        topOffset: 50
-      });
-      return;
-    }
-
-    setIsLoading(true);
     try {
-      const response = await api.post('/auth/register', {
-        user: {
-          ...formData,
-          phone: formattedPhone // Utiliser le numéro formaté
-        }
-      });
+      console.log("Signup button pressed");
+      console.log("Current form data:", formData); // Log entire form data at once
+      
+      // Validate required fields
+      if (!formData.email) {
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur!',
+          text2: 'Veuillez saisir votre email',
+        });
+        return;
+      }
 
-      console.log('Registration response:', response.data);
-      setVerificationStep(true);
+      if (!formData.email.includes('@') || !formData.email.includes('.')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur!',
+          text2: 'Veuillez saisir un email valide',
+        });
+        return;
+      }
+
+      if (!formData.first_name || !formData.last_name) {
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur!',
+          text2: 'Veuillez saisir votre prénom et nom',
+        });
+        return;
+      }
+
+      // FIXED: Use formData.phone directly since it's being updated correctly
+      if (!formData.phone || formData.phone.trim() === '') {
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur!',
+          text2: 'Veuillez saisir un numéro de téléphone',
+        });
+        return;
+      }
+
+      setIsLoading(true);
+      
+      // Prepare the user data - IMPORTANT: send data correctly without nesting
+      const userData = {
+        email: formData.email.toLowerCase().trim(),
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        phone: formData.phone.trim(),
+        countryCode: formData.countryCode,
+        camp: formData.camp,
+        role: formData.role
+      };
+
+      console.log('Sending registration data:', userData);
+      
+      // Call registration API directly
+      const response = await registerUser(userData);
+      console.log('Registration successful:', response);
+
       Toast.show({
         type: 'success',
         text1: 'Inscription réussie',
-        text2: 'Un code de vérification a été envoyé à votre email.',
-        visibilityTime: 4000,
-        topOffset: 50
+        text2: response.message || 'Un code de vérification a été envoyé à votre email.',
       });
+
+      // Set verification step after short delay
+      setTimeout(() => {
+        setVerificationStep(true);
+      }, 1000);
+      
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Show error toast
       Toast.show({
         type: 'error',
         text1: 'Erreur!',
         text2: error.response?.data?.message || 'Une erreur est survenue lors de l\'inscription',
-        visibilityTime: 4000,
-        topOffset: 50
       });
     } finally {
       setIsLoading(false);
@@ -101,46 +120,35 @@ const Signup_section2 = () => {
   };
 
   const handleVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length < 6) {
+    if (!verificationCode || verificationCode.length !== 6) {
       Toast.show({
         type: 'error',
         text1: 'Code invalide',
         text2: 'Veuillez entrer le code à 6 chiffres complet',
-        visibilityTime: 4000,
-        topOffset: 50
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await api.post('/auth/verify-email', {
-        email: formData.email,
-        camp: formData.camp,
-        code: verificationCode
-      });
+      const response = await verifyEmail(formData.email.toLowerCase(), formData.camp, verificationCode);
+      console.log('Verification response:', response);
 
       Toast.show({
         type: 'success',
         text1: 'Vérification réussie',
         text2: 'Votre email a été vérifié avec succès.',
-        visibilityTime: 4000,
-        topOffset: 50
       });
-      
-      // Navigate after showing toast
+
       setTimeout(() => {
         router.push('/login');
       }, 2000);
-      
     } catch (error) {
       console.error('Verification error:', error);
       Toast.show({
         type: 'error',
         text1: 'Erreur!',
         text2: error.response?.data?.message || 'Code de vérification invalide',
-        visibilityTime: 4000,
-        topOffset: 50
       });
     } finally {
       setIsLoading(false);
@@ -150,17 +158,13 @@ const Signup_section2 = () => {
   const handleResendCode = async () => {
     setIsLoading(true);
     try {
-      await api.post('/auth/resend-verification', {
-        email: formData.email,
-        camp: formData.camp
-      });
+      const response = await resendVerificationCode(formData.email.toLowerCase(), formData.camp);
+      console.log('Resend code response:', response);
 
       Toast.show({
         type: 'success',
         text1: 'Code envoyé',
         text2: 'Un nouveau code de vérification a été envoyé à votre email',
-        visibilityTime: 4000,
-        topOffset: 50
       });
     } catch (error) {
       console.error('Resend code error:', error);
@@ -168,8 +172,6 @@ const Signup_section2 = () => {
         type: 'error',
         text1: 'Erreur!',
         text2: error.response?.data?.message || 'Une erreur est survenue lors de l\'envoi du code',
-        visibilityTime: 4000,
-        topOffset: 50
       });
     } finally {
       setIsLoading(false);
@@ -259,13 +261,17 @@ const Signup_section2 = () => {
         <PhoneInput
           ref={phoneInput}
           defaultValue={formData.phone}
-          defaultCode="CH" 
+          defaultCode="TN" 
           layout="first"
           onChangeText={(text) => {
             handleChange('phone', text);
           }}
           onChangeFormattedText={(text) => {
-            setFormattedPhone(text);
+            // Only set the countryCode, not duplicating logging
+            const countryCode = phoneInput.current?.getCountryCode();
+            if (countryCode) {
+              handleChange('countryCode', `+${countryCode}`);
+            }
           }}
           withDarkTheme={theme.dark}
           withShadow
@@ -282,7 +288,12 @@ const Signup_section2 = () => {
         />
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={isLoading}>
+      <TouchableOpacity 
+        style={styles.button} 
+        onPress={handleSignup} 
+        disabled={isLoading}
+        activeOpacity={0.7}
+      >
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
@@ -294,6 +305,9 @@ const Signup_section2 = () => {
 };
 
 export default Signup_section2;
+
+// Styles remain the same...
+
 
 const styles = StyleSheet.create({
   container: {
@@ -357,7 +371,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_700Bold',
     fontSize: 14,
   },
-  // Styles pour PhoneInput
   phoneInputContainer: {
     width: '100%',
     height: 50,

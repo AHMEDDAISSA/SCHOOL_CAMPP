@@ -50,7 +50,7 @@ const PublierAnnonce = () => {
   
   // Types d'objets (exemple)
   const itemTypes = [
-    "Vêtement hiver", "Équipement ski", "Équipement neige", "Chaussures", "Décoration", "Outil", "Électronique", "Livre", "Meuble", "Autre"
+    "Vêtement hiver", "Équipement ski", "Équipement neige", "Chaussures", "Décoration", "Outil", "Tente", "Autre"
   ];
   
   // États des objets
@@ -150,7 +150,17 @@ const PublierAnnonce = () => {
     if (!description) missing.push('description');
     if (!category) missing.push('catégorie');
     if (!type) missing.push('type d\'objet');
+    if (images.length === 0) missing.push('photos');
     
+    // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
+    if ((category === 'Louer' || category === 'Acheter') && !price) {
+      missing.push('prix');
+    }
+    
+    // Vérifier la durée si la catégorie est "Louer"
+    if (category === 'Louer' && !duration) {
+      missing.push('durée');
+    }
     
     setMissingFields(missing);
     return missing.length === 0;
@@ -172,23 +182,6 @@ const PublierAnnonce = () => {
     
     setLoading(true);
     
-    // URL d'image par défaut si aucune image n'est sélectionnée
-    let imagesToSave = [...images]; 
-    
-    if (imagesToSave.length === 0) {
-      let defaultImageUrl = null;
-      if (type === 'Équipement ski') {
-        defaultImageUrl = 'https://images.unsplash.com/photo-1607250388533-ffdc26b6899e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80';
-      } else if (type === 'Vêtement hiver') {
-        defaultImageUrl = 'https://images.unsplash.com/photo-1608236415053-3691791bbffe?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80';
-      } else if (type === 'Chaussures') {
-        defaultImageUrl = 'https://images.unsplash.com/photo-1582398626929-4aaba43ffd66?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=687&q=80';
-      }
-      if (defaultImageUrl) {
-        imagesToSave = [defaultImageUrl];
-      }
-    }
-    
     try {
       // Créer l'objet annonce
       const nouvelleAnnonce = {
@@ -199,7 +192,7 @@ const PublierAnnonce = () => {
         condition,
         price,
         duration,
-        images: imagesToSave
+        images: images
       };
       
       // Ajouter l'annonce via le contexte
@@ -216,7 +209,7 @@ const PublierAnnonce = () => {
           text2: 'Votre annonce a été publiée avec succès.',
           position: 'bottom',
           visibilityTime: 3000,
-          onHide: () => router.replace('(tabs)/Annonces') // Utiliser replace au lieu de push
+          onHide: () => router.replace('(tabs)/Annonces') 
         });
       }, 1000);
     } catch (error) {
@@ -398,8 +391,13 @@ const PublierAnnonce = () => {
         
         {/* Section Photos */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>Photos (max 5)</Text>
-          <View style={styles.imagePickerContainer}>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Photos (max 5)<Text style={styles.requiredStar}>*</Text>
+          </Text>
+          <View style={[
+            styles.imagePickerContainer,
+            images.length === 0 && missingFields.includes('photos') ? styles.containerError : null
+          ]}>
             {images.length < 5 && (
               <View style={styles.imageButtonsContainer}>
                 <TouchableOpacity 
@@ -418,7 +416,7 @@ const PublierAnnonce = () => {
                 </TouchableOpacity>
               </View>
             )}
-            
+                    
             {/* Affichage des images sélectionnées */}
             {images.length > 0 && (
               <ScrollView 
@@ -500,9 +498,16 @@ const PublierAnnonce = () => {
         {/* Afficher champs selon la catégorie sélectionnée */}
         {(category === 'Louer' || category === 'Prêter') && (
           <View style={styles.formSection}>
-            <Text style={[styles.label, {color: theme.color}]}>Durée disponible</Text>
+            <Text style={[styles.label, {color: theme.color}]}>
+              Durée disponible
+              {category === 'Louer' && <Text style={styles.requiredStar}>*</Text>}
+            </Text>
             <TextInput
-              style={[styles.input, {backgroundColor: theme.cardbg2, color: theme.color}]}
+              style={[
+                styles.input, 
+                {backgroundColor: theme.cardbg2, color: theme.color},
+                category === 'Louer' && !duration && missingFields.includes('durée') ? styles.inputError : null
+              ]}
               placeholder="Ex: 1 semaine, 2 mois, etc."
               placeholderTextColor="#A8A8A8"
               value={duration}
@@ -513,9 +518,15 @@ const PublierAnnonce = () => {
         
         {(category === 'Louer' || category === 'Acheter') && (
           <View style={styles.formSection}>
-            <Text style={[styles.label, {color: theme.color}]}>Prix</Text>
+            <Text style={[styles.label, {color: theme.color}]}>
+              Prix<Text style={styles.requiredStar}>*</Text>
+            </Text>
             <TextInput
-              style={[styles.input, {backgroundColor: theme.cardbg2, color: theme.color}]}
+              style={[
+                styles.input, 
+                {backgroundColor: theme.cardbg2, color: theme.color},
+                !price && missingFields.includes('prix') ? styles.inputError : null
+              ]}
               placeholder="Ex: 10€, 50€, etc."
               placeholderTextColor="#A8A8A8"
               value={price}

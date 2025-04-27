@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create an axios instance with timeout and base URL
 const api = axios.create({
-  baseURL: 'http://192.168.1.21:3001', 
+  baseURL: 'http://192.168.1.18:3001', 
   headers: {
     'Content-Type': 'application/json',
   },
@@ -98,13 +98,19 @@ export const getUser = async (token) => {
   }
 };
 
-// POST: Register user (with extra data)
 export const registerUser = async (userData) => {
   try {
-    const response = await api.post('/user', { user: userData });
+    console.log('Registering user with data:', userData);
+    // Send userData directly without nesting it under 'user'
+    const response = await api.post('/auth/register', { user: userData });
     return response.data;
   } catch (error) {
-    console.error('registerUser error:', error.message);
+    console.error('registerUser error:', error);
+    // More detailed error logging
+    if (error.response) {
+      console.error('Error response:', error.response.data);
+      console.error('Error status:', error.response.status);
+    }
     throw error;
   }
 };

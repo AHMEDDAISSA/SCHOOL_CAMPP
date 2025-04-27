@@ -8,7 +8,10 @@ const UserSchema = new mongoose.Schema(
         phone: { type: String, default: '' },
         camp: { type: mongoose.Schema.Types.ObjectId, ref: 'Camp', required: true },
         role: { type: String, enum: ['parent', 'admin'], required: true },
-        canPost: { type: Boolean, default: false }
+        canPost: { type: Boolean, default: false },
+        verificationCode: { type: String, default: null },
+        isVerified: { type: Boolean, default: true },
+        createdAt: { type: Date, default: Date.now },
     },
     { timestamps: true }
 );
