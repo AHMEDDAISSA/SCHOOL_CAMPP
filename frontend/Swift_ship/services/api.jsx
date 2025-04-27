@@ -118,9 +118,9 @@ export const registerUser = async (userData) => {
 // === EMAIL VERIFICATION METHODS ===
 
 // POST: Verify email with code
-export const verifyEmail = async (email, camp, code) => {
+export const verifyEmail = async (userId, code) => {
   try {
-    const response = await api.post('/auth/verify-email', { email, camp, code });
+    const response = await api.post('/auth/verify-email', { userId, code });
     return response.data;
   } catch (error) {
     console.error('verifyEmail error:', error.message);
@@ -128,17 +128,15 @@ export const verifyEmail = async (email, camp, code) => {
   }
 };
 
-// POST: Resend verification code
-export const resendVerificationCode = async (email, camp) => {
+export const resendVerificationCode = async (userId) => {
   try {
-    const response = await api.post('/auth/resend-verification', { email, camp });
+    const response = await api.post('/auth/resend-verification', { userId });
     return response.data;
   } catch (error) {
     console.error('resendVerificationCode error:', error.message);
     throw error;
   }
 };
-
 // POST: Create a new ad/listing
 export const createAd = async (token, adData) => {
   try {

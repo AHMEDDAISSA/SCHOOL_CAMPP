@@ -1,5 +1,5 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useContext, useRef } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import PhoneInput from 'react-native-phone-number-input';
 import ThemeContext from '../../../theme/ThemeContext';
 import { router } from 'expo-router';
@@ -29,14 +29,10 @@ const Signup_section2 = () => {
       ...prevState,
       [field]: value
     }));
-    // Remove excessive logging
   };
 
   const handleSignup = async () => {
     try {
-      console.log("Signup button pressed");
-      console.log("Current form data:", formData); // Log entire form data at once
-      
       // Validate required fields
       if (!formData.email) {
         Toast.show({
@@ -65,7 +61,6 @@ const Signup_section2 = () => {
         return;
       }
 
-      // FIXED: Use formData.phone directly since it's being updated correctly
       if (!formData.phone || formData.phone.trim() === '') {
         Toast.show({
           type: 'error',
@@ -76,8 +71,7 @@ const Signup_section2 = () => {
       }
 
       setIsLoading(true);
-      
-      // Prepare the user data - IMPORTANT: send data correctly without nesting
+
       const userData = {
         email: formData.email.toLowerCase().trim(),
         first_name: formData.first_name.trim(),
@@ -85,14 +79,15 @@ const Signup_section2 = () => {
         phone: formData.phone.trim(),
         countryCode: formData.countryCode,
         camp: formData.camp,
-        role: formData.role
+        role: formData.role,
       };
 
-      console.log('Sending registration data:', userData);
-      
-      // Call registration API directly
       const response = await registerUser(userData);
-      console.log('Registration successful:', response);
+
+      setFormData((prev) => ({
+        ...prev,
+        userId: response.user?.id,
+      }));
 
       Toast.show({
         type: 'success',
@@ -100,19 +95,14 @@ const Signup_section2 = () => {
         text2: response.message || 'Un code de vérification a été envoyé à votre email.',
       });
 
-      // Set verification step after short delay
       setTimeout(() => {
         setVerificationStep(true);
       }, 1000);
-      
     } catch (error) {
-      console.error('Registration error:', error);
-      
-      // Show error toast
       Toast.show({
         type: 'error',
         text1: 'Erreur!',
-        text2: error.response?.data?.message || 'Une erreur est survenue lors de l\'inscription',
+        text2: error.response?.data?.message || 'Une erreur inattendue est survenue lors de l\'inscription',
       });
     } finally {
       setIsLoading(false);
@@ -131,8 +121,7 @@ const Signup_section2 = () => {
 
     setIsLoading(true);
     try {
-      const response = await verifyEmail(formData.email.toLowerCase(), formData.camp, verificationCode);
-      console.log('Verification response:', response);
+      const response = await verifyEmail(formData.userId, verificationCode);
 
       Toast.show({
         type: 'success',
@@ -144,11 +133,10 @@ const Signup_section2 = () => {
         router.push('/login');
       }, 2000);
     } catch (error) {
-      console.error('Verification error:', error);
       Toast.show({
         type: 'error',
         text1: 'Erreur!',
-        text2: error.response?.data?.message || 'Code de vérification invalide',
+        text2: error.response?.data?.message || 'Une erreur inattendue est survenue lors de la vérification',
       });
     } finally {
       setIsLoading(false);
@@ -158,8 +146,7 @@ const Signup_section2 = () => {
   const handleResendCode = async () => {
     setIsLoading(true);
     try {
-      const response = await resendVerificationCode(formData.email.toLowerCase(), formData.camp);
-      console.log('Resend code response:', response);
+      const response = await resendVerificationCode(formData.userId);
 
       Toast.show({
         type: 'success',
@@ -167,11 +154,10 @@ const Signup_section2 = () => {
         text2: 'Un nouveau code de vérification a été envoyé à votre email',
       });
     } catch (error) {
-      console.error('Resend code error:', error);
       Toast.show({
         type: 'error',
         text1: 'Erreur!',
-        text2: error.response?.data?.message || 'Une erreur est survenue lors de l\'envoi du code',
+        text2: error.response?.data?.message || 'Une erreur inattendue est survenue lors de l\'envoi du code',
       });
     } finally {
       setIsLoading(false);
@@ -261,13 +247,12 @@ const Signup_section2 = () => {
         <PhoneInput
           ref={phoneInput}
           defaultValue={formData.phone}
-          defaultCode="TN" 
+          defaultCode="TN"
           layout="first"
           onChangeText={(text) => {
             handleChange('phone', text);
           }}
           onChangeFormattedText={(text) => {
-            // Only set the countryCode, not duplicating logging
             const countryCode = phoneInput.current?.getCountryCode();
             if (countryCode) {
               handleChange('countryCode', `+${countryCode}`);
@@ -288,9 +273,9 @@ const Signup_section2 = () => {
         />
       </View>
 
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={handleSignup} 
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleSignup}
         disabled={isLoading}
         activeOpacity={0.7}
       >
@@ -305,9 +290,6 @@ const Signup_section2 = () => {
 };
 
 export default Signup_section2;
-
-// Styles remain the same...
-
 
 const styles = StyleSheet.create({
   container: {

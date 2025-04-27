@@ -145,37 +145,40 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
     }
   };
   
-export const registerHandler = async (
-    req: Request,
-    res: Response
-  ): Promise<void> => {
+  export const registerHandler = async (req: Request, res: Response): Promise<void> => {
     // Handle both formats of data (direct or nested)
     const userData = req.body.user || req.body;
-    
-    const { email, first_name, last_name, phone, countryCode, camp, role = "parent" } = userData;
-    
-    console.log(email, first_name, last_name, phone, countryCode, camp);
-    
+  
+    const { email, first_name, last_name, phone, countryCode, camp, role = 'parent' } = userData;
+  
     // Required fields check
     if (!email || !camp || !role) {
-      res.status(400).json({ status: "error", message: "Email, camp, and role are required." });
+      res.status(400).json({ status: 'error', message: 'Email, camp, and role are required.' });
       return;
     }
-    
+  
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ status: 'error', message: 'Invalid email format.' });
+      return;
+    }
+  
     // Generate verification code
     const verificationCode = generateVerificationCode();
-    
+  
     // Normalize undefined fields
     const sanitizedUserData = {
       email: email.trim().toLowerCase(),
-      first_name: first_name?.trim() || "",
-      last_name: last_name?.trim() || "",
-      phone: phone || "",
-      countryCode: countryCode || "",
+      first_name: first_name?.trim() || '',
+      last_name: last_name?.trim() || '',
+      phone: phone?.trim() || '',
+      countryCode: countryCode?.trim() || '',
       camp: camp.trim(),
       role: role.trim(),
-      verificationCode: verificationCode,
-      isVerified: false, // Set to false until verified
+      verificationCode,
+      verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000), // Code expires in 10 minutes
+      isVerified: false,
     };
   
     try {
@@ -186,8 +189,8 @@ export const registerHandler = async (
       });
       if (existingUser) {
         res.status(400).json({
-          status: "error",
-          message: "User with this email and camp already exists.",
+          status: 'error',
+          message: 'User with this email and camp already exists.',
           user: { email: existingUser.email, camp: existingUser.camp },
         });
         return;
@@ -199,67 +202,76 @@ export const registerHandler = async (
   
       // Send verification email
       try {
-        await sendVerificationEmail(sanitizedUserData.email, verificationCode);
+        await sendVerificationEmail(sanitizedUserData.email, verificationCode, sanitizedUserData.first_name);
         console.log(`Verification code sent to ${sanitizedUserData.email}: ${verificationCode}`);
       } catch (emailError) {
         console.error('Error sending verification email:', emailError);
-        // Continue despite email error - we'll still tell the user to check their email
+        // Optionally inform the client to retry or contact support
+        res.status(201).json({
+          status: 'success',
+          message:
+            'User registered successfully, but there was an issue sending the verification email. Please use /resend-otp to request a new code.',
+          user: {
+            id: newUser._id,
+            email: sanitizedUserData.email,
+            camp: sanitizedUserData.camp,
+            role: sanitizedUserData.role,
+          },
+        });
+        return;
       }
   
       res.status(201).json({
-        status: "success",
-        message: "User registered successfully. Please check your email for the verification code.",
-        user: { 
-          id: newUser._id, // Include the user ID for verification
-          email: sanitizedUserData.email, 
-          camp: sanitizedUserData.camp, 
-          role: sanitizedUserData.role 
+        status: 'success',
+        message: 'User registered successfully. Please check your email for the verification code.',
+        user: {
+          id: newUser._id,
+          email: sanitizedUserData.email,
+          camp: sanitizedUserData.camp,
+          role: sanitizedUserData.role,
         },
       });
     } catch (error) {
-      console.error("Error registering user:", error);
-      res.status(500).json({ status: "error", message: "Internal server error." });
+      console.error('Error registering user:', error);
+      res.status(500).json({ status: 'error', message: 'Internal server error.' });
     }
   };
+  export const verifyEmailHandler = async (req: Request, res: Response): Promise<void> => {
+    const { userId, code } = req.body;
   
-// Handler function for verifying email
-export const verifyEmailHandler = async (req: Request, res: Response): Promise<void> => {
-  const { email, camp, code } = req.body;
-
-  // Required fields check
-  if (!email || !camp || !code) {
-    res.status(400).json({ status: "error", message: "Email, camp, and code are required." });
-    return;
-  }
-
-  try {
-    const user = await UserModel.findOne({ email: email.trim().toLowerCase(), camp: camp.trim() });
-    if (!user) {
-      res.status(404).json({ status: "error", message: "User not found." });
+    if (!userId || !code) {
+      res.status(400).json({ status: 'error', message: 'User ID and code are required.' });
       return;
     }
-
-    if (user.isVerified) {
-      res.status(400).json({ status: "error", message: "Email already verified." });
-      return;
+  
+    try {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        res.status(404).json({ status: 'error', message: 'User not found.' });
+        return;
+      }
+  
+      if (user.isVerified) {
+        res.status(400).json({ status: 'error', message: 'Email already verified.' });
+        return;
+      }
+  
+      if (user.verificationCode !== code) {
+        res.status(400).json({ status: 'error', message: 'Invalid verification code.' });
+        return;
+      }
+  
+      user.isVerified = true;
+      user.verificationCode = '';
+      await user.save();
+  
+      console.log(`Email verified for user ID: ${userId}`);
+      res.status(200).json({ status: 'success', message: 'Email verified successfully.' });
+    } catch (error) {
+      console.error('Verification error:', error);
+      res.status(500).json({ status: 'error', message: 'Internal server error.' });
     }
-
-    if (user.verificationCode !== code) {
-      res.status(400).json({ status: "error", message: "Invalid verification code." });
-      return;
-    }
-
-    // Update user as verified
-    user.isVerified = true;
-    user.verificationCode = ''; // Clear the code
-    await user.save();
-
-    res.status(200).json({ status: "success", message: "Email verified successfully." });
-  } catch (error) {
-    console.error("Verification error:", error);
-    res.status(500).json({ status: "error", message: "Internal server error." });
-  }
-};
+  };
 
 // Handler function for resending verification code
 // export const resendVerificationCodeHandler = async (req: Request, res: Response): Promise<void> => {
