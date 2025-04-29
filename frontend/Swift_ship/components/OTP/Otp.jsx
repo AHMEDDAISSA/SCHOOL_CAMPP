@@ -5,10 +5,10 @@ import ThemeContext from '../../theme/ThemeContext';
 const Otp = ({ onChange }) => {
     const { theme, darkMode } = useContext(ThemeContext);
     const otpInputs = useRef([]);
-    // Change to 6 digits for OTP
+    
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     
-    // Forward the complete OTP to parent component
+    
     useEffect(() => {
         if (onChange) {
             onChange(otp.join(''));

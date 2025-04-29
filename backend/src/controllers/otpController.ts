@@ -1,16 +1,12 @@
-// controllers/otpController.ts
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { generateOTP, verifyOTP } from '../utils/otpUtils';
 import OtpModel from '../models/Otp';
 
-/**
- * Request OTP generation
- * This function generates and sends an OTP to the authenticated user
- */
+
 export const requestOTP = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        // Ensure user is authenticated
+        
         if (!req.user || !req.user._id) {
             res.status(401).json({ success: false, message: 'User not authenticated' });
             return;
@@ -19,18 +15,18 @@ export const requestOTP = async (req: AuthRequest, res: Response): Promise<void>
         const userId = req.user._id.toString();
         const userIp = req.ip || '127.0.0.1';
 
-        // Delete any existing OTP for this user
+        
         await OtpModel.deleteMany({ userId });
 
-        // Generate a new OTP
+        
         const otp = await generateOTP(userId);
 
-        // Store the OTP with user info and IP
+        
         await OtpModel.create({
             userId,
             otp,
             attempts: 0,
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+            expiresAt: new Date(Date.now() + 3 * 60 * 1000), // 3 minutes
             userIp
         });
 
@@ -99,9 +95,7 @@ export const verifyOTPHandler = async (req: AuthRequest, res: Response): Promise
     }
 };
 
-/**
- * ✅ Request OTP by email (public route)
- */
+
 export const requestOTPByEmail = async (req: Request, res: Response): Promise<void> => {
     try {
         const { email } = req.body;
@@ -122,11 +116,11 @@ export const requestOTPByEmail = async (req: Request, res: Response): Promise<vo
             userId,
             otp,
             attempts: 0,
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+            expiresAt: new Date(Date.now() + 3 * 60 * 1000), // 3 minutes
             userIp,
         });
 
-        // TODO: Send OTP via email (e.g., nodemailer)
+        
 
         res.status(200).json({
             success: true,

@@ -12,6 +12,7 @@ export interface IUser {
     role: string;
     canPost?: boolean;
     verificationCode?: string | null;
+    verificationCodeExpires?: Date; 
     isVerified: boolean;
     // Add other fields as needed
   }

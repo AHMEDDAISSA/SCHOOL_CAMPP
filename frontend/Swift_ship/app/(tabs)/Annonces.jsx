@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform, Alert } from 'react-native';
 import React, { useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import AnnonceContext from '../../contexts/AnnonceContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 // Screen dimensions for responsive layouts
 const { width } = Dimensions.get('window');
@@ -64,8 +65,7 @@ const CategoryButton = ({ category, isActive, darkMode, onPress }) => (
   </TouchableOpacity>
 );
 
-// Component for annonce cards
-const AnnonceCard = ({ item, darkMode, onPress }) => (
+const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
   <TouchableOpacity 
     style={[
       styles.announceCard,
@@ -123,11 +123,22 @@ const AnnonceCard = ({ item, darkMode, onPress }) => (
         ]}>
           {formatDate(item.date)}
         </Text>
-        {item.isNew && (
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>Nouveau</Text>
-          </View>
-        )}
+        
+        {/* Bouton de suppression */}
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={(e) => {
+            e.stopPropagation(); // Empêcher la propagation vers la carte
+            onDelete(item.id);
+          }}
+          accessible={true}
+          accessibilityLabel="Supprimer l'annonce"
+          accessibilityHint="Appuyez pour supprimer cette annonce"
+          accessibilityRole="button"
+        >
+          <Ionicons name="trash-outline" size={14} color="white" />
+          <Text style={styles.deleteButtonText}>Effacer</Text>
+        </TouchableOpacity>
       </View>
     </View>
   </TouchableOpacity>
@@ -192,7 +203,8 @@ const Annonces = () => {
     loading: contextLoading, 
     refreshAnnonces, 
     cleanOldAnnonces,
-    updateNewStatus
+    updateNewStatus,
+    deleteAnnonce
   } = useContext(AnnonceContext);
   
   const [loading, setLoading] = useState(false);
@@ -295,6 +307,49 @@ const Annonces = () => {
     }
   };
   
+  // Fonction pour confirmer et gérer la suppression
+  const handleDeleteAnnonce = useCallback((id) => {
+    Alert.alert(
+      "Confirmation de suppression",
+      "Êtes-vous sûr de vouloir supprimer cette annonce ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            // Afficher un indicateur de chargement pendant la suppression
+            setLoading(true);
+            
+            // Appeler la fonction de suppression du contexte
+            const success = await deleteAnnonce(id);
+            
+            setLoading(false);
+            
+            // Afficher un message de succès ou d'erreur
+            if (success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Annonce supprimée avec succès',
+                visibilityTime: 2000,
+              });
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Erreur lors de la suppression',
+                text2: 'Veuillez réessayer',
+                visibilityTime: 2000,
+              });
+            }
+          }
+        }
+      ]
+    );
+  }, [deleteAnnonce]);
+  
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
     return annonces.filter(item => {
@@ -317,8 +372,9 @@ const Annonces = () => {
       item={item}
       darkMode={darkMode}
       onPress={() => router.push(`(screens)/annonce/${item.id}`)}
+      onDelete={handleDeleteAnnonce}
     />
-  ), [darkMode]);
+  ), [darkMode, handleDeleteAnnonce]);
   
   // Navigation
   const back = () => {
@@ -491,9 +547,7 @@ const Annonces = () => {
   );
 };
 
-
 export default Annonces;
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -773,5 +827,36 @@ const styles = StyleSheet.create({
   createButtonText: {
     color: 'white',
     fontFamily: 'Montserrat_600SemiBold',
+  },
+  cardActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  contactButton: {
+    backgroundColor: '#836EFE',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  contactButtonText: {
+    color: '#FFF',
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: '#EB001B',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Montserrat_600SemiBold',
+    marginLeft: 4,
   },
 });

@@ -1,4 +1,3 @@
-// contexts/AnnonceContext.js
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -8,7 +7,7 @@ export const AnnonceProvider = ({ children }) => {
   const [annonces, setAnnonces] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Charger les annonces depuis le stockage au démarrage
+  
   useEffect(() => {
     loadAnnonces();
   }, []);
@@ -63,59 +62,94 @@ export const AnnonceProvider = ({ children }) => {
   
   // Supprimer une annonce
   const deleteAnnonce = async (id) => {
-    const updatedAnnonces = annonces.filter(annonce => annonce.id !== id);
-    setAnnonces(updatedAnnonces);
-    await saveAnnonces(updatedAnnonces);
+    try {
+      // Filtrer l'annonce à supprimer
+      const updatedAnnonces = annonces.filter(annonce => annonce.id !== id);
+      
+      // Mettre à jour l'état
+      setAnnonces(updatedAnnonces);
+      
+      // Sauvegarder dans le stockage
+      await saveAnnonces(updatedAnnonces);
+      
+      return true; // Succès de la suppression
+    } catch (error) {
+      console.error('Erreur lors de la suppression de l\'annonce:', error);
+      return false; // Échec de la suppression
+    }
   };
   
   // Mettre à jour une annonce
   const updateAnnonce = async (id, updatedData) => {
-    const updatedAnnonces = annonces.map(annonce => 
-      annonce.id === id ? { ...annonce, ...updatedData } : annonce
-    );
-    setAnnonces(updatedAnnonces);
-    await saveAnnonces(updatedAnnonces);
+    try {
+      const updatedAnnonces = annonces.map(annonce => 
+        annonce.id === id ? { ...annonce, ...updatedData } : annonce
+      );
+      setAnnonces(updatedAnnonces);
+      await saveAnnonces(updatedAnnonces);
+      return true; // Succès de la mise à jour
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'annonce:', error);
+      return false; // Échec de la mise à jour
+    }
   };
   
   // Nettoyer les anciennes annonces (plus vieilles que maxAgeDays)
   const cleanOldAnnonces = async (maxAgeDays = 30) => {
-    const now = Date.now();
-    const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
-    
-    const updatedAnnonces = annonces.filter(annonce => {
-      return now - annonce.createdAt < maxAgeMs;
-    });
-    
-    // Ne mettre à jour que si des annonces ont été supprimées
-    if (updatedAnnonces.length < annonces.length) {
-      setAnnonces(updatedAnnonces);
-      await saveAnnonces(updatedAnnonces);
-      return annonces.length - updatedAnnonces.length; // Retourner le nombre d'annonces supprimées
+    try {
+      const now = Date.now();
+      const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+      
+      const updatedAnnonces = annonces.filter(annonce => {
+        return now - annonce.createdAt < maxAgeMs;
+      });
+      
+      // Ne mettre à jour que si des annonces ont été supprimées
+      if (updatedAnnonces.length < annonces.length) {
+        setAnnonces(updatedAnnonces);
+        await saveAnnonces(updatedAnnonces);
+        return annonces.length - updatedAnnonces.length; // Retourner le nombre d'annonces supprimées
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Erreur lors du nettoyage des anciennes annonces:', error);
+      return 0;
     }
-    
-    return 0;
   };
   
   // Retirer le statut "nouveau" après un certain temps
   const updateNewStatus = async (newStatusDays = 3) => {
-    const now = Date.now();
-    const newStatusMs = newStatusDays * 24 * 60 * 60 * 1000;
-    
-    const needsUpdate = annonces.some(
-      annonce => annonce.isNew && (now - annonce.createdAt > newStatusMs)
-    );
-    
-    if (needsUpdate) {
-      const updatedAnnonces = annonces.map(annonce => {
-        if (annonce.isNew && (now - annonce.createdAt > newStatusMs)) {
-          return { ...annonce, isNew: false };
-        }
-        return annonce;
-      });
+    try {
+      const now = Date.now();
+      const newStatusMs = newStatusDays * 24 * 60 * 60 * 1000;
       
-      setAnnonces(updatedAnnonces);
-      await saveAnnonces(updatedAnnonces);
+      const needsUpdate = annonces.some(
+        annonce => annonce.isNew && (now - annonce.createdAt > newStatusMs)
+      );
+      
+      if (needsUpdate) {
+        const updatedAnnonces = annonces.map(annonce => {
+          if (annonce.isNew && (now - annonce.createdAt > newStatusMs)) {
+            return { ...annonce, isNew: false };
+          }
+          return annonce;
+        });
+        
+        setAnnonces(updatedAnnonces);
+        await saveAnnonces(updatedAnnonces);
+        return true;
+      }
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut des annonces:', error);
+      return false;
     }
+  };
+  
+  // Récupérer une annonce par son ID
+  const getAnnonceById = (id) => {
+    return annonces.find(annonce => annonce.id === id) || null;
   };
   
   return (
@@ -128,7 +162,8 @@ export const AnnonceProvider = ({ children }) => {
         updateAnnonce,
         cleanOldAnnonces,
         updateNewStatus,
-        refreshAnnonces: loadAnnonces
+        refreshAnnonces: loadAnnonces,
+        getAnnonceById
       }}
     >
       {children}

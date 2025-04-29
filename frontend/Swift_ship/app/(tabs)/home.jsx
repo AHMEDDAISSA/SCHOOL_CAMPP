@@ -1,58 +1,94 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
-import React, { useContext, useState, useEffect } from 'react';
-import Profile_img from "../../assets/images/profil33.png";
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
+import React, { useContext, useState, useEffect, useMemo } from 'react';
+import Profile_img from "../../assets/images/profil33.png"; // Image par défaut
 import Notification from "../../assets/images/notification.svg";
-import Gants from "../../assets/images/Gants de ski.jpg";
-import bonnet from "../../assets/images/Bonnet.jpg";
-import kit from "../../assets/images/ski_k.jpg";
-import Chaussure from "../../assets/images/Chaussure.jpg";
 import Dark_Notification from "../../assets/images/dark_notification.svg";
 import { router } from "expo-router";
 import ThemeContext from '../../theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import AnnonceContext from '../../contexts/AnnonceContext';
 
 const Home = () => {
-    const { theme, darkMode } = useContext(ThemeContext);
+    const { theme, darkMode, profileData } = useContext(ThemeContext);
+    const { annonces, loading, refreshAnnonces, updateNewStatus } = useContext(AnnonceContext);
+    
+    // Ajouter un état pour suivre la catégorie sélectionnée
+    const [selectedCategory, setSelectedCategory] = useState('Tous');
+    
+    // Utiliser l'image de profil du contexte si disponible, sinon utiliser l'image par défaut
+    const profileImage = profileData && profileData.profileImage 
+      ? { uri: profileData.profileImage } 
+      : Profile_img;
 
-    const [recentAnnounces, setRecentAnnounces] = useState([
-      {
-        id: '1',
-        title: 'Gants de ski taille 8',
-        category: 'Prêter',
-        type: 'Équipement ski',
-        image: Gants,
-        date: '20/04/2025'
-      },
-      {
-        id: '2',
-        title: 'Bonnet rouge enfant',
-        category: 'Donner',
-        type: 'Vêtement hiver',
-        image: bonnet,
-        date: '19/04/2025'
-      },
-      {
-        id: '3',
-        title: 'Chaussures de randonnée T36',
-        category: 'Échanger',
-        type: 'Chaussures',
-        image: Chaussure,
-        date: '18/04/2025'
-      },
-      {
-        id: '4',
-        title: 'Kit de Ski',
-        category: 'Louer',
-        type: 'Combinaison de ski ',
-        image: kit,
-        date: '18/04/2025'
-      },
-    ]);
+    // Utiliser le nom complet du contexte si disponible, sinon utiliser un nom par défaut
+    const fullName = profileData && profileData.fullName 
+      ? profileData.fullName 
+      : 'Ahmed Aissa';
+      
+    // Récupérer les annonces récentes filtrées par catégorie
+    const recentAnnounces = useMemo(() => {
+      // Filtrer d'abord par catégorie si une est sélectionnée (sauf 'Tous')
+      const filteredAnnonces = selectedCategory === 'Tous' 
+        ? [...annonces] 
+        : [...annonces].filter(annonce => annonce.category === selectedCategory);
+      
+      // Puis trier par date
+      return filteredAnnonces
+        .sort((a, b) => {
+          // Conversion des dates au format DD/MM/YYYY en objets Date
+          const dateA = new Date(a.date.split('/').reverse().join('-'));
+          const dateB = new Date(b.date.split('/').reverse().join('-'));
+          return dateB - dateA;  // Du plus récent au plus ancien
+        })
+        .slice(0, 4);  // Ne prendre que les 4 premières annonces
+    }, [annonces, selectedCategory]); // Ajouter selectedCategory comme dépendance
 
     const [subscribed, setSubscribed] = useState(false);
 
+    // Charger les annonces au montage du composant
+    useEffect(() => {
+      refreshAnnonces();
+      updateNewStatus();
+    }, []);
+
+    // Helper function pour obtenir la couleur en fonction de la catégorie
+    const getCategoryColor = (category) => {
+      switch(category) {
+        case 'Donner': return '#4CAF50';
+        case 'Prêter': return '#2196F3';
+        case 'Emprunter': return '#FF9800';
+        case 'Louer': return '#9C27B0';
+        case 'Acheter': return '#F44336';
+        case 'Échanger': return '#009688';
+        default: return '#39335E';
+      }
+    };
+
+    // Helper function pour formater les dates
+    const formatDate = (dateString) => {
+      const today = new Date();
+      const date = new Date(dateString.split('/').reverse().join('-'));
+      
+      // Check if it's today
+      if (date.toDateString() === today.toDateString()) {
+        return "Aujourd'hui";
+      }
+      
+      // Check if it's yesterday
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (date.toDateString() === yesterday.toDateString()) {
+        return "Hier";
+      }
+      
+      // Otherwise return the original format
+      return dateString;
+    };
+
+    // Ajouter 'Tous' en première position dans les catégories
     const categories = [
+      { id: '0', name: 'Tous', icon: 'list-outline' },
       { id: '1', name: 'Donner', icon: 'gift-outline' },
       { id: '2', name: 'Prêter', icon: 'swap-horizontal-outline' },
       { id: '3', name: 'Emprunter', icon: 'hand-left-outline' },
@@ -68,10 +104,10 @@ const Home = () => {
 
         <View style={styles.header}>
           <View style={styles.header_left}>
-            <Image source={Profile_img} style={styles.profile} />
+            <Image source={profileImage} style={styles.profile} />
             <View style={styles.content}>
               <Text style={styles.heading_text}>Bienvenue à l'école de La Brillaz! 👋🏻</Text>
-              <Text style={[styles.heading, {color: theme.color}]}> Ahmed Aissa</Text>
+              <Text style={[styles.heading, {color: theme.color}]}>{fullName}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.notification_box} onPress={() => {router.push('(screens)/notification')}}>
@@ -98,13 +134,43 @@ const Home = () => {
             {categories.map(category => (
               <TouchableOpacity 
                 key={category.id}
-                style={[styles.categoryButton, { backgroundColor: darkMode ? '#363636' : '#F0F0F0' }]}
-                onPress={() => {router.push(`(screens)/categorie/${category.name}`)}}
+                style={[
+                  styles.categoryButton, 
+                  { 
+                    backgroundColor: selectedCategory === category.name 
+                      ? getCategoryColor(category.name) 
+                      : darkMode ? '#363636' : '#F0F0F0' 
+                  }
+                ]}
+                onPress={() => setSelectedCategory(category.name)}
               >
-                <View style={[styles.categoryIconContainer, { backgroundColor: darkMode ? '#5D5FEF' : '#E6E6FA' }]}> 
-                  <Ionicons name={category.icon} size={20} color={darkMode ? '#FFFFFF' : '#5D5FEF'} />
+                <View style={[
+                  styles.categoryIconContainer, 
+                  { 
+                    backgroundColor: selectedCategory === category.name 
+                      ? 'rgba(255, 255, 255, 0.2)' 
+                      : darkMode ? '#5D5FEF' : '#E6E6FA' 
+                  }
+                ]}> 
+                  <Ionicons 
+                    name={category.icon} 
+                    size={20} 
+                    color={selectedCategory === category.name 
+                      ? '#FFFFFF' 
+                      : darkMode ? '#FFFFFF' : '#5D5FEF'
+                    } 
+                  />
                 </View>
-                <Text style={[styles.categoryText, {color: darkMode ? '#FFFFFF' : '#39335E'}]}>{category.name}</Text>
+                <Text style={[
+                  styles.categoryText, 
+                  {
+                    color: selectedCategory === category.name 
+                      ? '#FFFFFF' 
+                      : darkMode ? '#FFFFFF' : '#39335E'
+                  }
+                ]}>
+                  {category.name}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -119,38 +185,62 @@ const Home = () => {
 
           <View style={styles.recentSection}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.color}]}>Annonces récentes</Text>
-              <TouchableOpacity onPress={() => {router.push('(screens)/toutes-annonces')}}>
+              <Text style={[styles.sectionTitle, {color: theme.color}]}>
+                {selectedCategory === 'Tous' ? 'Annonces récentes' : `Annonces - ${selectedCategory}`}
+              </Text>
+              <TouchableOpacity onPress={() => {router.push('(tabs)/Annonces')}}>
                 <Text style={styles.seeAllText}>Voir tout</Text>
               </TouchableOpacity>
             </View>
 
-            {recentAnnounces.map(item => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={[styles.announceCard, { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }]}
-                onPress={() => {router.push(`(screens)/annonce/${item.id}`)}}
-              >
-                <View style={styles.cardImageWrapper}>
-                  <Image
-                    source={typeof item.image === 'string' ? { uri: item.image } : item.image}
-                    style={styles.cardImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.categoryBadgeWrapper}>
-                    <Text style={styles.categoryBadge}>{item.category}</Text>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#39335E" />
+              </View>
+            ) : recentAnnounces.length > 0 ? (
+              recentAnnounces.map(item => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={[styles.announceCard, { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }]}
+                  onPress={() => {router.push(`(screens)/annonce/${item.id}`)}}
+                >
+                  <View style={styles.cardImageWrapper}>
+                    <Image
+                      source={
+                        (item.imageUrl || (item.images && item.images.length > 0)) 
+                          ? { uri: item.imageUrl || item.images[0] } 
+                          : require('../../assets/images/placeholder.png') 
+                      }
+                      style={styles.cardImage}
+                      resizeMode="cover"
+                    />
+                    <View style={[
+                      styles.categoryBadgeWrapper, 
+                      {backgroundColor: getCategoryColor(item.category)}
+                    ]}>
+                      <Text style={styles.categoryBadge}>{item.category}</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={[styles.cardTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>{item.title}</Text>
-                  <Text style={[styles.cardType, { color: darkMode ? '#B0B0B0' : '#727272' }]}>{item.type}</Text>
-                  <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{item.date}</Text>
-                  <TouchableOpacity style={styles.contactButton} onPress={() => router.push('/inbox')}>
-                    <Text style={styles.contactButtonText}>Contacter</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.cardTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]} numberOfLines={2}>{item.title}</Text>
+                    <Text style={[styles.cardType, { color: darkMode ? '#B0B0B0' : '#727272' }]}>{item.type}</Text>
+                    <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{formatDate(item.date)}</Text>
+                    <TouchableOpacity style={styles.contactButton} onPress={() => router.push('/inbox')}>
+                      <Text style={styles.contactButtonText}>Contacter</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, {color: theme.color}]}>
+                  {selectedCategory === 'Tous' 
+                    ? 'Aucune annonce disponible' 
+                    : `Aucune annonce disponible dans la catégorie ${selectedCategory}`
+                  }
+                </Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
@@ -175,7 +265,7 @@ const Home = () => {
 };
 
 export default Home;
-//new one and all is on work 
+
 const styles = StyleSheet.create({
   container: {
       paddingTop: 50,
@@ -195,6 +285,7 @@ const styles = StyleSheet.create({
   profile: {
       width: 65,
       height: 65,
+      borderRadius: 32.5, // Pour rendre l'image circulaire
   },
   heading_text: {
       fontSize: 12,
@@ -234,7 +325,7 @@ const styles = StyleSheet.create({
       color: '#FFFFFF',
   },
   
-  // Nouveaux styles
+  // Styles de base
   bourseHeader: {
       marginTop: 20,
       backgroundColor: '#39335E',
@@ -339,7 +430,6 @@ const styles = StyleSheet.create({
       alignItems: 'flex-start',
   },
   categoryBadge: {
-      backgroundColor: '#39335E',
       color: 'white',
       fontSize: 10,
       fontFamily: 'Montserrat_600SemiBold',
@@ -388,35 +478,48 @@ const styles = StyleSheet.create({
       position: 'relative',
       width: 80,
       height: 80,
-    },
-    cardImage: {
+  },
+  cardImage: {
       width: '100%',
       height: '100%',
       borderTopLeftRadius: 10,
       borderBottomLeftRadius: 10,
-    },
-    categoryBadgeWrapper: {
+  },
+  categoryBadgeWrapper: {
       position: 'absolute',
       top: 5,
       left: 5,
-      backgroundColor: '#39335E',
       borderRadius: 12,
       paddingHorizontal: 6,
       paddingVertical: 2,
-    },
-    contactButton: {
+  },
+  contactButton: {
       marginTop: 8,
       backgroundColor: '#836EFE',
       paddingVertical: 6,
       paddingHorizontal: 12,
       borderRadius: 8,
       alignSelf: 'flex-start',
-    },
-    contactButtonText: {
+  },
+  contactButtonText: {
       color: '#FFF',
       fontFamily: 'Montserrat_600SemiBold',
       fontSize: 12,
-    }
-  });
-  
-    
+  },
+  // Styles pour la gestion des états d'affichage
+  loadingContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  emptyContainer: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  emptyText: {
+      fontSize: 14,
+      fontFamily: 'Montserrat_500Medium',
+      textAlign: 'center',
+  },
+});

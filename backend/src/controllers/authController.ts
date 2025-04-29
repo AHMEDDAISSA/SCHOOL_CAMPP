@@ -82,22 +82,40 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
     }
   };
   
-  // Handler to resend OTP code
+  // Handler to resend OTP code - UPDATED VERSION
   export const resendOTPHandler = async (req: Request, res: Response): Promise<void> => {
     const { userId, email } = req.body;
   
-    if (!userId) {
+    // Check if we have at least the userId or email
+    if (!userId && !email) {
       res.status(400).json({ 
         success: false, 
-        message: "User ID is required." 
+        message: "User ID or email is required." 
       });
       return;
     }
   
     try {
-      const user = await UserModel.findById(userId);
+      // Initialize user variable
+      let user: IUser | null = null;
       
-      if (!user) {
+      // First try to find by userId if provided
+      if (userId) {
+        user = await UserModel.findById(userId);
+      }
+      
+      // If user not found by ID and we have an email, try to find by email
+      if (!user && email) {
+        user = await UserModel.findOne({ email: email.trim().toLowerCase() });
+        if (!user) {
+          res.status(404).json({ 
+            success: false, 
+            message: "User not found with the provided email." 
+          });
+          return;
+        }
+      } else if (!user) {
+        // If we still don't have a user, return 404
         res.status(404).json({ 
           success: false, 
           message: "User not found." 
@@ -114,14 +132,25 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
         return;
       }
   
-      // Generate and save new verification code
+      // Generate new verification code
       const newCode = generateVerificationCode();
-      user.verificationCode = newCode;
-      await user.save();
+      
+      // Update user with new code
+      // Note: We use updateOne to avoid TypeScript errors if verificationCodeExpires isn't in the interface
+      await UserModel.updateOne(
+        { _id: user._id },
+        { 
+          $set: { 
+            verificationCode: newCode,
+            verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes expiration
+          } 
+        }
+      );
   
       // Send verification email
       try {
-        await sendVerificationEmail(user.email, newCode);
+        // Use first_name if available for personalized emails
+        await sendVerificationEmail(user.email, newCode, user.first_name || '');
         console.log(`New verification code sent to ${user.email}: ${newCode}`);
       } catch (emailError) {
         console.error('Error sending verification email:', emailError);
