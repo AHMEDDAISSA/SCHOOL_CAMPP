@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create an axios instance with timeout and base URL
 const api = axios.create({
-  baseURL: 'http://192.168.1.18:3001', 
+  baseURL: 'http://192.168.168.65:3001', 
   headers: {
     'Content-Type': 'application/json',
   },
@@ -101,12 +101,10 @@ export const getUser = async (token) => {
 export const registerUser = async (userData) => {
   try {
     console.log('Registering user with data:', userData);
-    // Send userData directly without nesting it under 'user'
     const response = await api.post('/auth/register', { user: userData });
     return response.data;
   } catch (error) {
     console.error('registerUser error:', error);
-    // More detailed error logging
     if (error.response) {
       console.error('Error response:', error.response.data);
       console.error('Error status:', error.response.status);
@@ -117,40 +115,48 @@ export const registerUser = async (userData) => {
 
 // === EMAIL VERIFICATION METHODS ===
 
-// POST: Verify email with code
-export const verifyEmail = async (userId, code) => {
+// POST: Verify OTP with code
+export const verifyOTP = async (userId, code) => {
   try {
     const response = await api.post('/auth/verify-email', { userId, code });
     return response.data;
   } catch (error) {
-    console.error('verifyEmail error:', error.message);
+    console.error('verifyOTP error:', error.message);
     throw error;
   }
 };
 
-export const resendVerificationCode = async (userId) => {
+// POST: Resend OTP
+export const resendOTP = async (userId) => {
   try {
     const response = await api.post('/auth/resend-verification', { userId });
     return response.data;
   } catch (error) {
-    console.error('resendVerificationCode error:', error.message);
+    console.error('resendOTP error:', error.message);
     throw error;
   }
 };
+
+// If backend requires email for resendOTP, use this version instead:
+// export const resendOTP = async (userId, email) => {
+//   try {
+//     const response = await api.post('/auth/resend-verification', { userId, email });
+//     return response.data;
+//   } catch (error) {
+//     console.error('resendOTP error:', error.message);
+//     throw error;
+//   }
+// };
+
 // POST: Create a new ad/listing
 export const createAd = async (token, adData) => {
   try {
-    const response = await fetch(`/api/ads`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(adData)
+    const response = await api.post('/api/ads', adData, {
+      headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
   } catch (error) {
-    console.error("createAd error:", error.message);
+    console.error('createAd error:', error.message);
     throw error;
   }
 };
@@ -158,35 +164,29 @@ export const createAd = async (token, adData) => {
 // POST: Upload a single image
 export const uploadImage = async (token, imageUri, adId) => {
   try {
-    // Create form data for file upload
     const formData = new FormData();
-    
-    // Extract filename from uri
     const uriParts = imageUri.split('/');
     const fileName = uriParts[uriParts.length - 1];
     
-    // Append image to form data
     formData.append('image', {
       uri: imageUri,
       name: fileName,
-      type: 'image/jpeg' // Adjust based on your file type
+      type: 'image/jpeg'
     });
     
     if (adId) {
       formData.append('adId', adId);
     }
     
-    const response = await fetch(`/api/upload`, {
-      method: 'POST',
+    const response = await api.post('/api/upload', formData, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
-      },
-      body: formData
+      }
     });
     return response.data;
   } catch (error) {
-    console.error("uploadImage error:", error.message);
+    console.error('uploadImage error:', error.message);
     throw error;
   }
 };
@@ -199,7 +199,7 @@ export const uploadMultipleImages = async (token, imageUris, adId) => {
     );
     return await Promise.all(uploadPromises);
   } catch (error) {
-    console.error("uploadMultipleImages error:", error.message);
+    console.error('uploadMultipleImages error:', error.message);
     throw error;
   }
 };
@@ -207,10 +207,10 @@ export const uploadMultipleImages = async (token, imageUris, adId) => {
 // GET: Get all ads/listings
 export const getAds = async () => {
   try {
-    const response = await fetch(`/api/ads`);
+    const response = await api.get('/api/ads');
     return response.data;
   } catch (error) {
-    console.error("getAds error:", error.message);
+    console.error('getAds error:', error.message);
     throw error;
   }
 };
@@ -218,10 +218,10 @@ export const getAds = async () => {
 // GET: Get a specific ad/listing by ID
 export const getAdById = async (adId) => {
   try {
-    const response = await fetch(`/api/ads/${adId}`);
+    const response = await api.get(`/api/ads/${adId}`);
     return response.data;
   } catch (error) {
-    console.error("getAdById error:", error.message);
+    console.error('getAdById error:', error.message);
     throw error;
   }
 };
@@ -229,14 +229,12 @@ export const getAdById = async (adId) => {
 // GET: Get user's ads/listings
 export const getUserAds = async (token) => {
   try {
-    const response = await fetch(`/api/user/ads`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+    const response = await api.get('/api/user/ads', {
+      headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
   } catch (error) {
-    console.error("getUserAds error:", error.message);
+    console.error('getUserAds error:', error.message);
     throw error;
   }
 };

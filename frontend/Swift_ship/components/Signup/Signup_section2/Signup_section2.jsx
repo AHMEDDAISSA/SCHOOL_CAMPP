@@ -3,8 +3,34 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator 
 import PhoneInput from 'react-native-phone-number-input';
 import ThemeContext from '../../../theme/ThemeContext';
 import { router } from 'expo-router';
-import { registerUser, verifyEmail, resendVerificationCode } from '../../../services/api';
+import { registerUser } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+import Signup_section3 from '../Signup_section3/Signup_section3';
+
+// Custom wrapper for PhoneInput to handle props and avoid defaultProps warning
+const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFormattedText, containerStyle, textContainerStyle, textInputStyle, codeTextStyle, textInputProps, flagButtonStyle }) => {
+  return (
+    <PhoneInput
+      defaultValue={defaultValue}
+      defaultCode={defaultCode}
+      layout="first"
+      onChangeText={onChangeText}
+      onChangeFormattedText={onChangeFormattedText}
+      containerStyle={containerStyle}
+      textContainerStyle={textContainerStyle}
+      textInputStyle={textInputStyle}
+      codeTextStyle={codeTextStyle}
+      textInputProps={{
+        ...textInputProps,
+        placeholder: textInputProps.placeholder || 'Votre numéro de téléphone', // Explicitly set placeholder
+      }}
+      flagButtonStyle={flagButtonStyle}
+      withDarkTheme={false} // Explicitly set to avoid defaultProps
+      withShadow={false} // Explicitly set to avoid defaultProps
+      autoFocus={false} // Explicitly set to avoid defaultProps
+    />
+  );
+};
 
 const Signup_section2 = () => {
   const { theme } = useContext(ThemeContext);
@@ -15,58 +41,56 @@ const Signup_section2 = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    countryCode: '+216',
+    countryCode: '',
     camp: '507f1f77bcf86cd799439011',
-    role: 'parent'
+    role: 'parent',
+    userId: null,
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [verificationStep, setVerificationStep] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
+  const [modalVisible5, setModalVisible5] = useState(false);
+
+  const showToast = (type, text1, text2) => {
+    Toast.show({
+      type,
+      text1,
+      text2,
+      position: 'top',
+      visibilityTime: 4000,
+      autoHide: true,
+    });
+  };
 
   const handleChange = (field, value) => {
-    setFormData(prevState => ({
+    setFormData((prevState) => ({
       ...prevState,
-      [field]: value
+      [field]: value,
     }));
+  };
+
+  const closeModal5 = () => {
+    setModalVisible5(false);
   };
 
   const handleSignup = async () => {
     try {
-      // Validate required fields
       if (!formData.email) {
-        Toast.show({
-          type: 'error',
-          text1: 'Erreur!',
-          text2: 'Veuillez saisir votre email',
-        });
+        showToast('error', 'Erreur!', 'Veuillez saisir votre email');
         return;
       }
 
       if (!formData.email.includes('@') || !formData.email.includes('.')) {
-        Toast.show({
-          type: 'error',
-          text1: 'Erreur!',
-          text2: 'Veuillez saisir un email valide',
-        });
+        showToast('error', 'Erreur!', 'Veuillez saisir un email valide');
         return;
       }
 
       if (!formData.first_name || !formData.last_name) {
-        Toast.show({
-          type: 'error',
-          text1: 'Erreur!',
-          text2: 'Veuillez saisir votre prénom et nom',
-        });
+        showToast('error', 'Erreur!', 'Veuillez saisir votre prénom et nom');
         return;
       }
 
       if (!formData.phone || formData.phone.trim() === '') {
-        Toast.show({
-          type: 'error',
-          text1: 'Erreur!',
-          text2: 'Veuillez saisir un numéro de téléphone',
-        });
+        showToast('error', 'Erreur!', 'Veuillez saisir un numéro de téléphone');
         return;
       }
 
@@ -89,121 +113,17 @@ const Signup_section2 = () => {
         userId: response.user?.id,
       }));
 
-      Toast.show({
-        type: 'success',
-        text1: 'Inscription réussie',
-        text2: response.message || 'Un code de vérification a été envoyé à votre email.',
-      });
+      showToast('success', 'Inscription réussie', response.message || 'Un code de vérification a été envoyé à votre email.');
 
       setTimeout(() => {
-        setVerificationStep(true);
+        setModalVisible5(true);
       }, 1000);
     } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: error.response?.data?.message || 'Une erreur inattendue est survenue lors de l\'inscription',
-      });
+      showToast('error', 'Erreur!', error.response?.data?.message || 'Une erreur inattendue est survenue lors de l\'inscription');
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
-      Toast.show({
-        type: 'error',
-        text1: 'Code invalide',
-        text2: 'Veuillez entrer le code à 6 chiffres complet',
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const response = await verifyEmail(formData.userId, verificationCode);
-
-      Toast.show({
-        type: 'success',
-        text1: 'Vérification réussie',
-        text2: 'Votre email a été vérifié avec succès.',
-      });
-
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: error.response?.data?.message || 'Une erreur inattendue est survenue lors de la vérification',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResendCode = async () => {
-    setIsLoading(true);
-    try {
-      const response = await resendVerificationCode(formData.userId);
-
-      Toast.show({
-        type: 'success',
-        text1: 'Code envoyé',
-        text2: 'Un nouveau code de vérification a été envoyé à votre email',
-      });
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: error.response?.data?.message || 'Une erreur inattendue est survenue lors de l\'envoi du code',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (verificationStep) {
-    return (
-      <View style={styles.container}>
-        <Text style={[styles.heading, { color: theme.color }]}>Vérification de l'email</Text>
-        <Text style={[styles.subheading, { color: theme.color3 }]}>
-          Nous avons envoyé un code de vérification à {formData.email}
-        </Text>
-
-        <View style={styles.form_section}>
-          <Text style={[styles.label, { color: theme.color }]}>Code de vérification</Text>
-          <TextInput
-            style={[styles.input, { color: theme.color, borderColor: theme.border }]}
-            placeholder="Entrez le code à 6 chiffres"
-            placeholderTextColor={theme.color3}
-            value={verificationCode}
-            onChangeText={setVerificationCode}
-            keyboardType="number-pad"
-            maxLength={6}
-          />
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handleVerifyCode} disabled={isLoading}>
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Vérifier</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.resendContainer}>
-          <Text style={[styles.resendText, { color: theme.color3 }]}>
-            Vous n'avez pas reçu le code ?
-          </Text>
-          <TouchableOpacity onPress={handleResendCode} disabled={isLoading}>
-            <Text style={styles.resendButton}>Renvoyer</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -234,7 +154,7 @@ const Signup_section2 = () => {
       <View style={styles.form_section}>
         <Text style={[styles.label, { color: theme.color }]}>Nom</Text>
         <TextInput
-          style={[styles.input, { color: theme.color, borderColor: theme.border }]}
+          style={[styles.input, { color: theme.color, borderColor: theme.border, backgroundColor: theme.dark ? '#333333' : 'transparent' }]}
           placeholder="Votre nom"
           placeholderTextColor={theme.color3}
           value={formData.last_name}
@@ -244,47 +164,45 @@ const Signup_section2 = () => {
 
       <View style={styles.form_section}>
         <Text style={[styles.label, { color: theme.color }]}>Téléphone</Text>
-        <PhoneInput
+        <CustomPhoneInput
           ref={phoneInput}
           defaultValue={formData.phone}
-          defaultCode="TN"
-          layout="first"
-          onChangeText={(text) => {
-            handleChange('phone', text);
-          }}
+          defaultCode="CH"
+          onChangeText={(text) => handleChange('phone', text)}
           onChangeFormattedText={(text) => {
             const countryCode = phoneInput.current?.getCountryCode();
             if (countryCode) {
               handleChange('countryCode', `+${countryCode}`);
             }
           }}
-          withDarkTheme={theme.dark}
-          withShadow
-          containerStyle={[styles.phoneInputContainer, { borderColor: theme.border }]}
-          textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: 'transparent' }]}
+          containerStyle={[styles.phoneInputContainer, {
+            borderColor: theme.border || '#CCCCCC',
+            backgroundColor: theme.dark ? '#333333' : 'transparent',
+          }]}
+          textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: theme.dark ? '#333333' : 'transparent' }]}
           textInputStyle={[styles.phoneInputText, { color: theme.color }]}
           codeTextStyle={{ color: theme.color }}
-          countryPickerButtonStyle={{ borderRightWidth: 1, borderRightColor: theme.border }}
-          placeholder="Numéro sans indicatif"
           textInputProps={{
             placeholderTextColor: theme.color3,
-            selectionColor: '#836EFE',
           }}
+          flagButtonStyle={{ backgroundColor: theme.dark ? '#333333' : 'transparent' }}
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleSignup}
-        disabled={isLoading}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={isLoading} activeOpacity={0.7}>
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text style={styles.buttonText}>S'inscrire</Text>
         )}
       </TouchableOpacity>
+
+      <Signup_section3
+        modalVisible5={modalVisible5}
+        closeModal5={closeModal5}
+        email={formData.email}
+        userId={formData.userId}
+      />
     </View>
   );
 };
@@ -295,18 +213,6 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     marginTop: 30,
-  },
-  heading: {
-    fontSize: 24,
-    fontFamily: 'Montserrat_700Bold',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  subheading: {
-    fontSize: 14,
-    fontFamily: 'Montserrat_500Medium',
-    marginBottom: 30,
-    textAlign: 'center',
   },
   form_section: {
     marginBottom: 20,
@@ -337,38 +243,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_700Bold',
     fontSize: 16,
   },
-  resendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  resendText: {
-    fontFamily: 'Montserrat_500Medium',
-    fontSize: 14,
-    marginRight: 5,
-  },
-  resendButton: {
-    color: '#836EFE',
-    fontFamily: 'Montserrat_700Bold',
-    fontSize: 14,
-  },
   phoneInputContainer: {
     width: '100%',
     height: 50,
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   phoneInputTextContainer: {
-    backgroundColor: 'transparent',
     paddingVertical: 0,
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     borderRadius: 8,
   },
   phoneInputText: {
-    height: 46,
     fontFamily: 'Montserrat_500Medium',
     fontSize: 14,
-  }
+    height: 50,
+  },
 });

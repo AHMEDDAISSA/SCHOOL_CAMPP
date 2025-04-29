@@ -6,10 +6,12 @@ import ThemeContext from '../../../theme/ThemeContext';
 import Button from '../../Button/Button';
 import { Montserrat_400Regular, Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import Otp from '../../OTP/Otp';
-import Signup_section4 from '../Signup_section4/Signup_section4';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { verifyOTP, resendOTP } from '../../../services/api';
 import Toast from 'react-native-toast-message';
+
+// Import Signup_section4 lazily to break the circular dependency
+const LazySignup_section4 = React.lazy(() => import('../Signup_section4/Signup_section4'));
 
 const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   const { theme, darkMode } = useContext(ThemeContext);
@@ -19,30 +21,32 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   const [countdown, setCountdown] = useState(300); // 5 minutes in seconds
   const [canResend, setCanResend] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [isVerified, setIsVerified] = useState(false); // New state to track verification
 
   // Countdown timer for OTP expiration
   useEffect(() => {
     let timer;
-    if (modalVisible5 && countdown > 0) {
+    if (modalVisible5 && countdown > 0 && !isVerified) {
       timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     } else if (countdown === 0) {
       setCanResend(true);
     }
     return () => clearTimeout(timer);
-  }, [countdown, modalVisible5]);
+  }, [countdown, modalVisible5, isVerified]);
 
-  // Reset countdown when modal opens
+  // Reset states when modal opens
   useEffect(() => {
     if (modalVisible5) {
-      setCountdown(300); // 5 minutes as per your OTP model
+      setCountdown(300); // 5 minutes
       setCanResend(false);
-      setOtpCode(''); // Clear previous code
+      setOtpCode(''); // Clear OTP
       setAttempts(0); // Reset attempts
+      setIsVerified(false); // Reset verification status
     }
   }, [modalVisible5]);
 
   const openModal6 = () => {
-    setTimeout(() => setModalVisible6(true), 300);
+    setTimeout(() => setModalVisible6(true), 500); // Slight delay to ensure modal5 closes
   };  
   
   const closeModal6 = () => {
@@ -51,7 +55,6 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
 
   // Handle OTP input changes
   const handleOtpChange = (code) => {
-    // Get the combined OTP value from all inputs
     setOtpCode(code);
   };
   
@@ -74,13 +77,19 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
       });
       return;
     }
+
+    if (isVerified) {
+      // If already verified, skip submission and proceed to next modal
+      closeModal5();
+      openModal6();
+      return;
+    }
     
     setLoading(true);
     try {
-      // Use the updated API function
       const response = await verifyOTP(userId, otpCode);
       
-      if (response.success) {
+      if (response.status === 'success') {
         // Store the JWT token if provided
         if (response.token) {
           try {
@@ -91,6 +100,7 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
           }
         }
         
+        setIsVerified(true); // Mark as verified
         Toast.show({
           type: 'success',
           text1: 'Vérification réussie',
@@ -103,11 +113,10 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
         closeModal5();
         openModal6();
       } else {
-        // Update attempts
         setAttempts(attempts + 1);
         Toast.show({
           type: 'error',
-          text1: 'Echec de vérification',
+          text1: 'Échec de vérification',
           text2: response.message || 'Code de vérification invalide',
           visibilityTime: 4000,
           topOffset: 50
@@ -115,15 +124,29 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
       }
     } catch (error) {
       console.error('Error verifying OTP:', error);
-      // Update attempts
       setAttempts(attempts + 1);
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur!',
-        text2: 'Erreur réseau. Veuillez réessayer.',
-        visibilityTime: 4000,
-        topOffset: 50
-      });
+      
+      // Handle "Email already verified" error
+      if (error.response?.status === 400 && error.response?.data?.message === 'Email already verified.') {
+        setIsVerified(true);
+        Toast.show({
+          type: 'info',
+          text1: 'Déjà vérifié',
+          text2: 'Votre email est déjà vérifié. Passez à l\'étape suivante.',
+          visibilityTime: 4000,
+          topOffset: 50
+        });
+        closeModal5();
+        openModal6();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur!',
+          text2: error.response?.data?.message || 'Erreur réseau. Veuillez réessayer.',
+          visibilityTime: 4000,
+          topOffset: 50
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -131,14 +154,13 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   
   // Request new OTP from backend
   const handleResendCode = async () => {
-    if (!canResend) return;
+    if (!canResend || isVerified) return;
     
     setLoading(true);
     try {
-      // Use the updated API function
-      const response = await resendOTP(userId, email);
+      const response = await resendOTP(userId); // Only pass userId
       
-      if (response.success) {
+      if (response.status === 'success') {
         setCountdown(300); // Reset to 5 minutes
         setCanResend(false);
         setOtpCode(''); // Clear previous code
@@ -164,7 +186,7 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
       Toast.show({
         type: 'error',
         text1: 'Erreur!',
-        text2: 'Erreur réseau. Veuillez réessayer.',
+        text2: error.response?.data?.message || 'Erreur réseau. Veuillez réessayer.',
         visibilityTime: 4000,
         topOffset: 50
       });
@@ -172,6 +194,21 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
       setLoading(false);
     }
   };
+
+  // If resendOTP requires email, use this version instead:
+  // const handleResendCode = async () => {
+  //   if (!canResend || isVerified) return;
+  //   
+  //   setLoading(true);
+  //   try {
+  //     const response = await resendOTP(userId, email);
+  //     // ... rest of the code ...
+  //   } catch (error) {
+  //     // ... error handling ...
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <View>
@@ -184,58 +221,61 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
             <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
                 <View style={styles.modal_header}>
                     <TouchableOpacity onPress={closeModal5}>
-                      {darkMode? <Dark_back /> : <Back />}
+                      {darkMode ? <Dark_back /> : <Back />}
                     </TouchableOpacity>
-                    <Text style={[styles.heading, { color: theme.color }]}>Verification</Text>
+                    <Text style={[styles.heading, { color: theme.color }]}>Vérification</Text>
                 </View>
                 <Text style={[styles.head_text, {color:theme.color3}]}>
-                    Enter the 6 digits code that you received on your email.
+                    Entrez le code à 6 chiffres que vous avez reçu par e-mail.
                 </Text>
                 
                 <View style={styles.timerContainer}>
                     <Text style={[styles.timerText, {color: theme.color3}]}>
-                        Code expires in: {formatTime(countdown)}
+                        Le code expire dans: {formatTime(countdown)}
                     </Text>
                 </View>
                 
                 {/* OTP component */}
-                <Otp onChange={handleOtpChange} />
+                <Otp onChange={handleOtpChange} value={otpCode} />
                 
                 <Button 
                     buttonText={loading ? "Verifying..." : "Continue"} 
                     onPress={handleContinue}
-                    disabled={loading} 
+                    disabled={loading || isVerified} 
                 />
                 
                 <TouchableOpacity 
                     onPress={handleResendCode}
-                    disabled={!canResend || loading}
+                    disabled={!canResend || loading || isVerified}
                     style={styles.resendContainer}
                 >
                     <Text style={[
                         styles.resendText, 
-                        { color: canResend ? '#836EFE' : theme.color3 }
+                        { color: canResend && !isVerified ? '#836EFE' : theme.color3 }
                     ]}>
-                        {canResend ? 'Resend code' : `Wait until timer expires to resend`}
+                        {canResend && !isVerified ? 'Renvoyer le code' : `Veuillez attendre l'expiration du minuteur pour renvoyer`}
                     </Text>
                 </TouchableOpacity>
                 
                 <Text style={[styles.bottom_text, {color:theme.color3}]}>
-                    By continuing, you agree to Shopping
-                    <Text style={styles.terms}> Conditions of Use</Text> and
-                    <Text style={styles.terms}> Privacy Notice</Text>
+                      En continuant, vous acceptez les
+                    <Text style={styles.terms}> Conditions d'utilisation</Text> and
+                    <Text style={styles.terms}> Politique de confidentialité</Text>
                 </Text>
             </View>
         </View>
      </Modal>
      
-     <Signup_section4
-        modalVisible6={modalVisible6}
-        closeModal6={closeModal6}
-        openModal6={openModal6}
-        email={email}
-        userId={userId}
-     />
+     {/* Use React.Suspense to handle lazy loading */}
+     <React.Suspense fallback={<View />}>
+       <LazySignup_section4
+          modalVisible6={modalVisible6}
+          closeModal6={closeModal6}
+          openModal6={openModal6}
+          email={email}
+          userId={userId}
+       />
+     </React.Suspense>
     </View>
   );
 };
@@ -290,22 +330,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_600SemiBold',
     color: '#836EFE',
     textDecorationLine: 'underline',
-  },
-  resendContainer: {
-    alignItems: 'center',
-    marginTop: 15,
-    marginBottom: 20,
-  },
-  resendText: {
-    fontSize: 14,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  timerContainer: {
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  timerText: {
-    fontSize: 14,
-    fontFamily: 'Montserrat_600SemiBold',
   },
 });

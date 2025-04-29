@@ -1,18 +1,17 @@
-// Profile_setup_section2.jsx
-import { StyleSheet, Text, View, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import React, { useContext, useState } from 'react';
 import Input from '../../components/Input/Input';
 import DateInput from '../DateInput/DateInput';
 import GenderDropdown from '../Gender_dropdown/Gender_dropdown';
-import Phone from '../Phone/Phone'; 
+import Phone from '../Phone/Phone';
 import Button from '../../components/Button/Button';
-import { router, Link } from "expo-router";
+import { router } from 'expo-router';
 import ThemeContext from '../../theme/ThemeContext';
+import Toast from 'react-native-toast-message'; // Importation de la bibliothèque Toast
 
 const Profile_setup_section2 = () => {
-  const { theme, darkMode } = useContext(ThemeContext);
+  const { theme, darkMode, updateProfileData } = useContext(ThemeContext);
   
-  // State to store form values
   const [formData, setFormData] = useState({
     fullName: '',
     nickName: '',
@@ -20,56 +19,56 @@ const Profile_setup_section2 = () => {
     email: '',
     phoneNumber: '',
     gender: '',
-    isPhoneValid: true // Add flag to track phone validation
+    isPhoneValid: true,
   });
 
-  // Handle general input changes
   const handleInputChange = (field, value) => {
-    setFormData({
-      ...formData,
-      [field]: value
-    });
+    setFormData({ ...formData, [field]: value });
   };
 
-  // Handle date change from DateInput
   const handleDateChange = (date, formattedDate) => {
-    setFormData({
-      ...formData,
-      dob: formattedDate
-    });
+    setFormData({ ...formData, dob: formattedDate });
   };
 
-  // Handle phone number change from Phone component
   const handlePhoneChange = (phoneNumber, isValid) => {
-    setFormData({
-      ...formData,
-      phoneNumber,
-      isPhoneValid: isValid
-    });
+    setFormData({ ...formData, phoneNumber, isPhoneValid: isValid });
   };
 
-  // Handle gender selection
   const handleGenderChange = (gender) => {
-    setFormData({
-      ...formData,
-      gender
+    setFormData({ ...formData, gender });
+  };
+
+  const showToast = (message, type = 'error') => {
+    Toast.show({
+      type: type, // 'success', 'error', 'info'
+      text1: 'Attention',
+      text2: message,
+      position: 'top',
+      visibilityTime: 4000,
+      autoHide: true,
+      topOffset: 50,
     });
   };
 
-  // Validate the form before submission
   const validateForm = () => {
-    // Check if phone is valid
-    if (!formData.isPhoneValid) {
-      Alert.alert('Invalid Input', 'Please enter a valid phone number');
+    if (!formData.fullName || !formData.email || !formData.phoneNumber) {
+      showToast('Veuillez remplir tous les champs obligatoires (nom complet, email, numéro de téléphone).');
       return false;
     }
-    
+    if (!formData.isPhoneValid) {
+      showToast('Veuillez entrer un numéro de téléphone valide.');
+      return false;
+    }
     return true;
   };
 
-  // Handle form submission
   const handleContinue = () => {
     if (validateForm()) {
+      updateProfileData({
+        fullName: formData.fullName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+      });
       router.push('/login');
     }
   };
@@ -77,43 +76,37 @@ const Profile_setup_section2 = () => {
   return (
     <View style={styles.container}>
       <View style={styles.input_container}>
-        <Input 
-          placeholder="Full Name" 
+        <Input
+          placeholder="Nom complet"
           value={formData.fullName}
           onChangeText={(text) => handleInputChange('fullName', text)}
         />
-        <Input 
-          placeholder="Nick Name" 
+        <Input
+          placeholder="Surnom"
           value={formData.nickName}
           onChangeText={(text) => handleInputChange('nickName', text)}
         />
-        <DateInput 
-          placeholder="Date of birth" 
+        <DateInput
+          placeholder="Date de naissance"
           onDateChange={handleDateChange}
-          // value={formData.date}
-          // onChangeText={(text) => handleInputChange('', text)}
         />
-        
-        <Input 
-          placeholder="Email" 
+        <Input
+          placeholder="Email"
           value={formData.email}
           onChangeText={(text) => handleInputChange('email', text)}
           keyboardType="email-address"
         />
-        
-        
-        <Phone 
-          placeholder="Phone Number"
+        <Phone
+          placeholder="Numéro de téléphone"
           onChangePhone={handlePhoneChange}
           initialValue={formData.phoneNumber}
         />
-        
-        <GenderDropdown 
-          placeholder="Gender" 
+        <GenderDropdown
+          placeholder="Genre"
           onSelect={handleGenderChange}
         />
       </View>
-      <Button buttonText="Continue" onPress={handleContinue} />
+      <Button buttonText="Continuer" onPress={handleContinue} />
     </View>
   );
 };
@@ -127,5 +120,5 @@ const styles = StyleSheet.create({
   },
   input_container: {
     flex: 1,
-  }
+  },
 });

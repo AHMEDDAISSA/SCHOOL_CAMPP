@@ -1,6 +1,5 @@
-
 import React, { createContext, useState, useEffect } from 'react';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const lightTheme = {
   background: '#FFFFFF',
@@ -17,7 +16,7 @@ const lightTheme = {
   cardbg2: '#F5F4F8',
   cardbg3: 'rgba(26, 22, 51, 0.20)',
   card: '#f6f6f6',
-  overlay:  'rgba(0, 0, 0, 0.5)',
+  overlay: 'rgba(0, 0, 0, 0.5)',
   bordercolor: 'rgba(0, 0, 0, 0.25)',
 };
 
@@ -46,22 +45,40 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(false);
   const [theme, setTheme] = useState(lightTheme);
+  const [profileData, setProfileData] = useState({
+    fullName: '',
+    email: '',
+    phoneNumber: '',
+    profileImage: null // Ajout de la propriété profileImage pour stocker l'URI de l'image
+  });
 
   useEffect(() => {
     const loadDarkModeState = async () => {
       try {
-        const darkModeState = await AsyncStorage.getItem("darkMode");
+        const darkModeState = await AsyncStorage.getItem('darkMode');
         if (darkModeState !== null) {
           const parsedState = JSON.parse(darkModeState);
           setDarkMode(parsedState.darkMode);
           setTheme(parsedState.darkMode ? darkTheme : lightTheme);
         }
       } catch (error) {
-        console.error("Error loading dark mode state:", error);
+        console.error('Error loading dark mode state:', error);
+      }
+    };
+
+    const loadProfileData = async () => {
+      try {
+        const storedProfileData = await AsyncStorage.getItem('profileData');
+        if (storedProfileData !== null) {
+          setProfileData(JSON.parse(storedProfileData));
+        }
+      } catch (error) {
+        console.error('Error loading profile data:', error);
       }
     };
 
     loadDarkModeState();
+    loadProfileData();
   }, []);
 
   const toggleTheme = async () => {
@@ -69,14 +86,64 @@ export const ThemeProvider = ({ children }) => {
       const newDarkMode = !darkMode;
       setDarkMode(newDarkMode);
       setTheme(newDarkMode ? darkTheme : lightTheme);
-      await AsyncStorage.setItem("darkMode", JSON.stringify({ darkMode: newDarkMode }));
+      await AsyncStorage.setItem('darkMode', JSON.stringify({ darkMode: newDarkMode }));
     } catch (error) {
-      console.error("Error saving dark mode state:", error);
+      console.error('Error saving dark mode state:', error);
+    }
+  };
+
+  const updateProfileData = async (data) => {
+    try {
+      const newProfileData = { ...profileData, ...data };
+      setProfileData(newProfileData);
+      await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+    } catch (error) {
+      console.error('Error saving profile data:', error);
+    }
+  };
+
+  // Ajout d'une fonction spécifique pour mettre à jour l'image de profil
+  const updateProfileImage = async (imageUri) => {
+    try {
+      const newProfileData = { 
+        ...profileData, 
+        profileImage: imageUri 
+      };
+      setProfileData(newProfileData);
+      await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+    } catch (error) {
+      console.error('Error saving profile image:', error);
+    }
+  };
+
+  // Ajout d'une fonction pour effacer toutes les données du profil
+  const clearProfileData = async () => {
+    try {
+      const emptyProfile = {
+        fullName: '',
+        email: '',
+        phoneNumber: '',
+        profileImage: null
+      };
+      setProfileData(emptyProfile);
+      await AsyncStorage.setItem('profileData', JSON.stringify(emptyProfile));
+    } catch (error) {
+      console.error('Error clearing profile data:', error);
     }
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, darkMode, toggleTheme }}>
+    <ThemeContext.Provider 
+      value={{ 
+        theme, 
+        darkMode, 
+        toggleTheme, 
+        profileData, 
+        updateProfileData,
+        updateProfileImage, // Exposer la nouvelle fonction
+        clearProfileData    // Exposer la fonction de réinitialisation
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );
