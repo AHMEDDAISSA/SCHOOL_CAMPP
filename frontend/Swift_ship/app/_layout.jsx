@@ -71,7 +71,7 @@ const RootLayout = () => {
             <Stack.Screen name="(screens)/annonce/:id" />
             <Stack.Screen name="(screens)/#" /> {/* kanettt 9ball /abonnement */}
           </Stack>
-          <Toast config={toastConfig}/>
+          <Toast config={toastConfig}/> 
         </AnnonceProvider>
       </ThemeProvider>
     </MessageProvider>

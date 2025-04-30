@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create an axios instance with timeout and base URL
 const api = axios.create({
-  baseURL: 'http://192.168.168.65:3001', 
+  baseURL: 'http://192.168.168.65:3001',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -127,26 +127,19 @@ export const verifyOTP = async (userId, code) => {
 };
 
 // POST: Resend OTP
-export const resendOTP = async (userId) => {
+export const resendOTP = async (userId, email = null) => {
   try {
-    const response = await api.post('/auth/resend-verification', { userId });
+    const payload = { userId };
+    if (email) {
+      payload.email = email; // Include email only if provided
+    }
+    const response = await api.post('/auth/resend-verification', payload);
     return response.data;
   } catch (error) {
     console.error('resendOTP error:', error.message);
     throw error;
   }
 };
-
-// If backend requires email for resendOTP, use this version instead:
-// export const resendOTP = async (userId, email) => {
-//   try {
-//     const response = await api.post('/auth/resend-verification', { userId, email });
-//     return response.data;
-//   } catch (error) {
-//     console.error('resendOTP error:', error.message);
-//     throw error;
-//   }
-// };
 
 // POST: Create a new ad/listing
 export const createAd = async (token, adData) => {

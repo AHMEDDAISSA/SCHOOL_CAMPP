@@ -11,6 +11,7 @@ import Toast from 'react-native-toast-message';
 const Signup_section4 = ({ modalVisible6, closeModal6 }) => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
 
+    
     // Show success toast when modal becomes visible
     useEffect(() => {
         if (modalVisible6) {

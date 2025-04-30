@@ -29,14 +29,15 @@ export const sendVerificationEmail = async (email: string, code: string, firstNa
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
       <h2 style="color: #836EFE; text-align: center;">Email Verification</h2>
       <p>Hello ${firstName || 'User'},</p>
-      <p>Thank you for registering. To confirm your email address, please enter the 6-digit verification code below:</p>
+      <p>Merci pour votre inscription.
+Pour confirmer votre adresse e-mail, veuillez saisir le code de vérification à 6 chiffres ci-dessous :</p>
       <div style="text-align: center; margin: 30px 0;">
         <div style="font-size: 28px; letter-spacing: 5px; font-weight: bold; color: #333; background-color: #f5f5f5; padding: 15px; border-radius: 5px; display: inline-block;">
           ${code}
         </div>
       </div>
-      <p style="font-size: 14px; color: #666;">This code will expire in <strong>10 minutes</strong>.</p>
-      <p>If you didn't request this code, you can safely ignore this email.</p>
+      <p style="font-size: 14px; color: #666;">Ce code expirera dans  <strong>10 minutes.</strong>.</p>
+      <p>Si vous n’avez pas demandé ce code, vous pouvez ignorer cet e-mail en toute sécurité.</p>
       <p style="margin-top: 30px; font-size: 14px; color: #888; text-align: center;">
         © ${new Date().getFullYear()} Your App. All rights reserved.
       </p>

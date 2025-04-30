@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema(
         last_name: { type: String, default: '' },
         phone: { type: String, default: '' },
         camp: { type: mongoose.Schema.Types.ObjectId, ref: 'Camp', required: true },
-        role: { type: String, enum: ['parent', 'admin'], required: true },
+        role: { type: String, enum: ['parent', 'admin','exploitant'], required: true },
         canPost: { type: Boolean, default: false },
         verificationCode: { type: String, default: null },
         isVerified: { type: Boolean, default: true },
