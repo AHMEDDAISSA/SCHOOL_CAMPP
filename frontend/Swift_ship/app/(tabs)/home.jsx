@@ -124,7 +124,7 @@ const Home = () => {
             <Text style={styles.bourseSubtitle}>Échangez, prêtez, donnez pour les camps de ski et camps verts</Text>
           </View>
 
-          <TouchableOpacity style={styles.publishButton} onPress={() => {router.push('(tabs)/Annonces')}}>
+          <TouchableOpacity style={styles.publishButton} onPress={() => {router.push('(screens)/publier-annonce')}}>
             <Ionicons name="add-circle" size={24} color="white" />
             <Text style={styles.publishButtonText}>Publier une annonce</Text>
           </TouchableOpacity>
