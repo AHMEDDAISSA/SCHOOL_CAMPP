@@ -10,6 +10,48 @@ import { router, Link } from "expo-router";
 import Log_method from '../../components/Log_method/Log_method';
 import Signup_section2 from '../../components/Signup/Signup_section2/Signup_section2';
 import ThemeContext from '../../theme/ThemeContext';
+import Toast from 'react-native-toast-message';
+
+
+
+const toastConfig = {
+  success: ({ text1, text2, ...rest }) => (
+    <BaseToast
+      {...rest}
+      style={{ borderLeftColor: '#2ecc71', borderLeftWidth: 5 }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1={text1}
+      text2={text2}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: 'bold',
+        fontFamily: 'Montserrat_700Bold',
+      }}
+      text2Style={{
+        fontSize: 13,
+        fontFamily: 'Montserrat_500Medium',
+      }}
+    />
+  ),
+  error: ({ text1, text2, ...rest }) => (
+    <BaseToast
+      {...rest}
+      style={{ borderLeftColor: '#e74c3c', borderLeftWidth: 5 }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1={text1}
+      text2={text2}
+      text1Style={{
+        fontSize: 30,
+        fontWeight: 'bold',
+        fontFamily: 'Montserrat_700Bold',
+      }}
+      text2Style={{
+        fontSize: 13,
+        fontFamily: 'Montserrat_500Medium',
+      }}
+    />
+  ),
+};
 
 const signup = () => {
   const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
@@ -36,6 +78,7 @@ const signup = () => {
       <Log_method />
       <Text style={styles.bottom_text}>Vous avez déjà un compte<Link href='/login' style={styles.link}> S'identifier</Link></Text>
       </ScrollView>
+      <Toast/>
     </View>
   )
 }

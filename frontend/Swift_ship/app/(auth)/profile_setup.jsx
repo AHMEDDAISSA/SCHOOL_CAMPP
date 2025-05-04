@@ -2,7 +2,6 @@ import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Platform, 
 import React, { useContext, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import Back from "../../assets/images/back.svg";
-import Dark_back from "../../assets/images/dark_back.svg";
 import { Montserrat_700Bold } from '@expo-google-fonts/montserrat';
 import Profile from "../../assets/images/anny.jpg";
 import Edit from "../../assets/images/Edit.svg";
@@ -11,7 +10,10 @@ import ThemeContext from '../../theme/ThemeContext';
 import { router } from "expo-router";
 import Toast from 'react-native-toast-message';
 
-// Get screen dimensions for better sizing
+
+
+
+
 const { width, height } = Dimensions.get('window');
 
 const ProfileSetup = () => {
@@ -40,18 +42,18 @@ const ProfileSetup = () => {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const imageUri = result.assets[0].uri;
       setImage(imageUri);
-      updateProfileImage(imageUri); // Save to ThemeContext
+      updateProfileImage(imageUri);
     }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#282449' }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#282449" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
       <View style={styles.header}>
         <TouchableOpacity onPress={back} style={styles.backButton}>
-          <Dark_back />
+          <Back fill={theme.color} />
         </TouchableOpacity>
-        <Text style={[styles.heading, { color: '#FFFFFF' }]}>
+        <Text style={[styles.heading, { color: theme.color }]}>
           Compléter votre profil
         </Text>
       </View>
@@ -62,8 +64,8 @@ const ProfileSetup = () => {
           source={image ? { uri: image } : Profile} 
           alt="image de profil" 
         />
-        <TouchableOpacity style={styles.editButton} onPress={pickImage}>
-          <Edit />
+        <TouchableOpacity style={[styles.editButton, { backgroundColor: theme.cardbg }]} onPress={pickImage}>
+          <Edit fill={theme.color} />
         </TouchableOpacity>
       </View>
 
@@ -85,7 +87,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? 50 : 35,
-    paddingHorizontal: 0, // No horizontal padding to maximize space
+    paddingHorizontal: 0,
   },
   scrollView: {
     flex: 1,
@@ -111,7 +113,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 20, // Reduced vertical margin
+    marginVertical: 20,
     position: 'relative',
   },
   image: {
@@ -123,7 +125,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     right: 110,
-    backgroundColor: '#fff',
     borderRadius: 50,
     padding: 6,
     elevation: 5,

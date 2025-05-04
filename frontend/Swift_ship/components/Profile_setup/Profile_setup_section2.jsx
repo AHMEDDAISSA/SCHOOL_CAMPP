@@ -7,11 +7,9 @@ import Button from '../../components/Button/Button';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
-// Get screen dimensions for better spacing
 const { width, height } = Dimensions.get('window');
 
-// Custom wrapper for PhoneInput to handle props and avoid defaultProps warning
-const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFormattedText, containerStyle, textContainerStyle, textInputStyle, codeTextStyle, textInputProps, flagButtonStyle, hasError }) => {
+const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFormattedText, containerStyle, textContainerStyle, textInputStyle, codeTextStyle, textInputProps, flagButtonStyle, hasError, theme }) => {
   return (
     <PhoneInput
       defaultValue={defaultValue}
@@ -20,12 +18,12 @@ const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFor
       onChangeText={onChangeText}
       onChangeFormattedText={onChangeFormattedText}
       containerStyle={[
-        containerStyle, 
-        hasError && styles.inputError
+        containerStyle,
+        hasError && [styles.inputError, { borderColor: theme.log }]
       ]}
       textContainerStyle={[
-        textContainerStyle, 
-        hasError && { backgroundColor: '#4A3048' }
+        textContainerStyle,
+        hasError && { backgroundColor: theme.background2 }
       ]}
       textInputStyle={textInputStyle}
       codeTextStyle={codeTextStyle}
@@ -35,7 +33,7 @@ const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFor
       }}
       flagButtonStyle={[
         flagButtonStyle,
-        hasError && { backgroundColor: '#4A3048' }
+        hasError && { backgroundColor: theme.background2 }
       ]}
       withDarkTheme={false}
       withShadow={false}
@@ -46,21 +44,21 @@ const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFor
 
 const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
   const roles = [
-    { 
-      id: 'parent', 
-      label: 'Parent', 
+    {
+      id: 'parent',
+      label: 'Parent',
       icon: 'people-outline',
       description: 'Gérer le compte de votre enfant'
     },
-    { 
-      id: 'admin', 
-      label: 'Administrateur', 
+    {
+      id: 'admin',
+      label: 'Administrateur',
       icon: 'settings-outline',
       description: 'Administrer la plateforme'
     },
-    { 
-      id: 'exploitant', 
-      label: 'Exploitant', 
+    {
+      id: 'exploitant',
+      label: 'Exploitant',
       icon: 'business-outline',
       description: 'Gérer les services'
     }
@@ -69,49 +67,49 @@ const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
   return (
     <View style={styles.roleSelectionContainer}>
       {hasError && (
-        <Text style={styles.errorText}>Veuillez sélectionner un profil</Text>
+        <Text style={[styles.errorText, { color: theme.log }]}>Veuillez sélectionner un profil</Text>
       )}
       {roles.map((role) => (
         <TouchableOpacity
           key={role.id}
           style={[
             styles.roleCard,
-            { 
-              backgroundColor: '#FFFFFF',
-              borderColor: selectedRole === role.id ? '#836EFE' : (hasError ? '#FF5A5A' : '#EEEEEE'),
+            {
+              backgroundColor: theme.card,
+              borderColor: selectedRole === role.id ? theme.pagination : (hasError ? theme.log : theme.bordercolor),
               borderWidth: selectedRole === role.id ? 2 : (hasError ? 2 : 1),
-              shadowColor: '#000',
+              shadowColor: theme.color2,
             }
           ]}
           onPress={() => onRoleSelect(role.id)}
         >
           <View style={styles.roleCardContent}>
             <View style={[
-              styles.iconContainer, 
-              { backgroundColor: selectedRole === role.id ? '#836EFE' : '#E0E0E0' }
+              styles.iconContainer,
+              { backgroundColor: selectedRole === role.id ? theme.pagination : theme.cardbg3 }
             ]}>
-              <Ionicons 
-                name={role.icon} 
-                size={24} 
-                color={selectedRole === role.id ? '#FFFFFF' : '#555555'} 
+              <Ionicons
+                name={role.icon}
+                size={24}
+                color={selectedRole === role.id ? theme.background : theme.color3}
               />
             </View>
             <Text style={[
-              styles.roleTitle, 
-              { color: selectedRole === role.id ? '#836EFE' : '#333333' }
+              styles.roleTitle,
+              { color: selectedRole === role.id ? theme.pagination : theme.color }
             ]}>
               {role.label}
             </Text>
             <Text style={[
-              styles.roleDescription, 
-              { color: '#666666' }
+              styles.roleDescription,
+              { color: theme.color3 }
             ]}>
               {role.description}
             </Text>
           </View>
           {selectedRole === role.id && (
             <View style={styles.checkmarkContainer}>
-              <Ionicons name="checkmark-circle" size={24} color="#836EFE" />
+              <Ionicons name="checkmark-circle" size={24} color={theme.pagination} />
             </View>
           )}
         </TouchableOpacity>
@@ -123,19 +121,18 @@ const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
 const Profile_setup_section2 = () => {
   const { theme, updateProfileData } = useContext(ThemeContext);
   const phoneInput = useRef(null);
-  
+
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     nickName: '',
-    email: '', // This will be pre-filled from signup
+    email: '',
     phone: '',
     countryCode: '',
     role: '',
     camp: '507f1f77bcf86cd799439011',
   });
 
-  // État pour suivre les champs qui ont été touchés
   const [touchedFields, setTouchedFields] = useState({
     first_name: false,
     last_name: false,
@@ -143,7 +140,6 @@ const Profile_setup_section2 = () => {
     role: false
   });
 
-  // État pour les erreurs
   const [errors, setErrors] = useState({
     first_name: false,
     last_name: false,
@@ -151,23 +147,19 @@ const Profile_setup_section2 = () => {
     role: false
   });
 
-  // Vérifier la validité du formulaire à chaque changement dans formData
   useEffect(() => {
-    // Ne vérifie que les champs qui ont été touchés
     const newErrors = {
       first_name: touchedFields.first_name && !formData.first_name,
       last_name: touchedFields.last_name && !formData.last_name,
       phone: touchedFields.phone && (!formData.phone || formData.phone.trim() === ''),
       role: touchedFields.role && !formData.role
     };
-    
+
     setErrors(newErrors);
   }, [formData, touchedFields]);
 
   const handleInputChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    
-    // Marquer le champ comme touché
     if (!touchedFields[field]) {
       setTouchedFields({ ...touchedFields, [field]: true });
     }
@@ -192,14 +184,13 @@ const Profile_setup_section2 = () => {
       autoHide: true,
       topOffset: 70,
       props: {
-        backgroundColor: '#FF5A5A',
-        textColor: '#FFFFFF',
+        backgroundColor: theme.log,
+        textColor: theme.background,
       }
     });
   };
 
   const validateForm = () => {
-    // Marquer tous les champs comme touchés pour afficher toutes les erreurs
     setTouchedFields({
       first_name: true,
       last_name: true,
@@ -207,17 +198,15 @@ const Profile_setup_section2 = () => {
       role: true
     });
 
-    // Vérifier tous les champs obligatoires
     const newErrors = {
       first_name: !formData.first_name,
       last_name: !formData.last_name,
       phone: !formData.phone || formData.phone.trim() === '',
       role: !formData.role
     };
-    
+
     setErrors(newErrors);
 
-    // Construire le message d'erreur
     let errorMsg = "";
     if (newErrors.first_name || newErrors.last_name) {
       errorMsg = 'Veuillez saisir votre prénom et nom.';
@@ -231,60 +220,54 @@ const Profile_setup_section2 = () => {
       showToast(errorMsg);
       return false;
     }
-    
+
     return true;
   };
 
   const handleContinue = () => {
     if (validateForm()) {
-      // Combiner first_name et last_name pour créer 
       const fullName = `${formData.first_name} ${formData.last_name}`;
-      
-      // Mettre à jour les données du profil avec le bon format pour ThemeContext
       updateProfileData({
         fullName: fullName,
-        email: formData.email, // Conserver l'email s'il est disponible
+        email: formData.email,
         phoneNumber: formData.phone,
-        // Stocker également les champs individuels si vous en avez besoin ultérieurement
         first_name: formData.first_name,
         last_name: formData.last_name,
         nickName: formData.nickName,
         countryCode: formData.countryCode,
         role: formData.role,
       });
-      
       router.push('/login');
     }
   };
 
-  // Composant pour les étiquettes avec astérisque pour les champs obligatoires
   const RequiredLabel = ({ text }) => (
     <View style={styles.labelContainer}>
-      <Text style={[styles.label, { color: '#FFFFFF' }]}>{text}</Text>
-      <Text style={styles.asterisk}>*</Text>
+      <Text style={[styles.label, { color: theme.color }]}>{text}</Text>
+      <Text style={[styles.asterisk, { color: theme.log }]}>*</Text>
     </View>
   );
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#282449' }}>
-      <View style={[styles.container, { backgroundColor: '#282449' }]}>
+    <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.input_container}>
           <View style={styles.form_section}>
             <RequiredLabel text="Nom" />
             {errors.last_name && (
-              <Text style={styles.errorText}>Ce champ est obligatoire</Text>
+              <Text style={[styles.errorText, { color: theme.log }]}>Ce champ est obligatoire</Text>
             )}
             <TextInput
               style={[
-                styles.input, 
-                { 
-                  color: '#FFFFFF', 
-                  borderColor: '#393463', 
-                  backgroundColor: errors.last_name ? '#4A3048' : '#393463'
+                styles.input,
+                {
+                  color: theme.color,
+                  borderColor: theme.bordercolor,
+                  backgroundColor: errors.last_name ? theme.background2 : theme.cardbg,
                 }
               ]}
               placeholder="Votre nom"
-              placeholderTextColor="rgba(255, 255, 255, 0.6)"
+              placeholderTextColor={theme.color3}
               value={formData.last_name}
               onChangeText={(text) => handleInputChange('last_name', text)}
               onBlur={() => handleInputBlur('last_name')}
@@ -294,19 +277,19 @@ const Profile_setup_section2 = () => {
           <View style={styles.form_section}>
             <RequiredLabel text="Prénom" />
             {errors.first_name && (
-              <Text style={styles.errorText}>Ce champ est obligatoire</Text>
+              <Text style={[styles.errorText, { color: theme.log }]}>Ce champ est obligatoire</Text>
             )}
             <TextInput
               style={[
-                styles.input, 
-                { 
-                  color: '#FFFFFF', 
-                  borderColor: '#393463',
-                  backgroundColor: errors.first_name ? '#4A3048' : '#393463'
+                styles.input,
+                {
+                  color: theme.color,
+                  borderColor: theme.bordercolor,
+                  backgroundColor: errors.first_name ? theme.background2 : theme.cardbg,
                 }
               ]}
               placeholder="Votre prénom"
-              placeholderTextColor="rgba(255, 255, 255, 0.6)"
+              placeholderTextColor={theme.color3}
               value={formData.first_name}
               onChangeText={(text) => handleInputChange('first_name', text)}
               onBlur={() => handleInputBlur('first_name')}
@@ -314,15 +297,15 @@ const Profile_setup_section2 = () => {
           </View>
 
           <View style={styles.form_section}>
-            <Text style={[styles.label, { color: '#FFFFFF' }]}>Surnom (optionnel)</Text>
+            <Text style={[styles.label, { color: theme.color }]}>Surnom (optionnel)</Text>
             <TextInput
-              style={[styles.input, { 
-                color: '#FFFFFF', 
-                borderColor: '#393463',
-                backgroundColor: '#393463'  
+              style={[styles.input, {
+                color: theme.color,
+                borderColor: theme.bordercolor,
+                backgroundColor: theme.cardbg,
               }]}
               placeholder="Votre surnom"
-              placeholderTextColor="rgba(255, 255, 255, 0.6)"
+              placeholderTextColor={theme.color3}
               value={formData.nickName}
               onChangeText={(text) => handleInputChange('nickName', text)}
             />
@@ -331,7 +314,7 @@ const Profile_setup_section2 = () => {
           <View style={styles.form_section}>
             <RequiredLabel text="Téléphone" />
             {errors.phone && (
-              <Text style={styles.errorText}>Ce champ est obligatoire</Text>
+              <Text style={[styles.errorText, { color: theme.log }]}>Ce champ est obligatoire</Text>
             )}
             <CustomPhoneInput
               ref={phoneInput}
@@ -345,32 +328,33 @@ const Profile_setup_section2 = () => {
                 }
               }}
               containerStyle={[styles.phoneInputContainer, {
-                borderColor: '#393463',
-                backgroundColor: '#393463',
+                borderColor: theme.bordercolor,
+                backgroundColor: theme.cardbg,
               }]}
-              textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: '#393463' }]}
-              textInputStyle={[styles.phoneInputText, { color: '#FFFFFF' }]}
-              codeTextStyle={{ color: '#FFFFFF' }}
+              textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: theme.cardbg }]}
+              textInputStyle={[styles.phoneInputText, { color: theme.color }]}
+              codeTextStyle={{ color: theme.color }}
               textInputProps={{
-                placeholderTextColor: "rgba(255, 255, 255, 0.6)",
+                placeholderTextColor: theme.color3,
                 onBlur: () => handleInputBlur('phone'),
               }}
-              flagButtonStyle={{ backgroundColor: '#393463' }}
+              flagButtonStyle={{ backgroundColor: theme.background }}
               hasError={errors.phone}
+              theme={theme}
             />
           </View>
 
           <View style={styles.form_section}>
             <RequiredLabel text="Choisissez votre profil" />
-            <RoleSelector 
-              selectedRole={formData.role} 
-              onRoleSelect={handleRoleSelect} 
+            <RoleSelector
+              selectedRole={formData.role}
+              onRoleSelect={handleRoleSelect}
               theme={theme}
               hasError={errors.role}
             />
           </View>
         </View>
-        
+
         <View style={styles.buttonContainer}>
           <Button buttonText="Continuer" onPress={handleContinue} />
         </View>
@@ -385,7 +369,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    minHeight: height * 0.85, // Make it take more screen space
+    minHeight: height * 0.85,
     paddingBottom: 100,
   },
   input_container: {
@@ -393,7 +377,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   form_section: {
-    marginBottom: 30, // Increased spacing between sections
+    marginBottom: 30,
   },
   labelContainer: {
     flexDirection: 'row',
@@ -401,44 +385,35 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   label: {
-    fontSize: 16, 
+    fontSize: 16,
     fontFamily: 'Montserrat_700Bold',
   },
   asterisk: {
     fontSize: 16,
     fontFamily: 'Montserrat_700Bold',
-    color: '#FF5A5A',
     marginLeft: 5,
   },
   errorText: {
-    color: '#FF5A5A',
     fontSize: 12,
     fontFamily: 'Montserrat_400Regular',
     marginBottom: 5,
   },
-  sectionTitle: {
-    fontSize: 18, 
-    fontFamily: 'Montserrat_700Bold',
-    marginBottom: 25, 
-  },
   input: {
-    height: 60, // Increased height
-    borderWidth: 0, // No border
-    borderRadius: 12, // Rounded corners
+    height: 60,
+    borderWidth: 1,
+    borderRadius: 12,
     paddingHorizontal: 20,
     fontFamily: 'Montserrat_500Medium',
     fontSize: 16,
   },
   inputError: {
     borderWidth: 2,
-    borderColor: '#FF5A5A',
-    backgroundColor: '#4A3048', // Rouge foncé pour le mode sombre
   },
   phoneInputContainer: {
     width: '100%',
-    height: 60, // Increased height
-    borderWidth: 0, // No border
-    borderRadius: 12, // Rounded corners
+    height: 60,
+    borderWidth: 1,
+    borderRadius: 12,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
