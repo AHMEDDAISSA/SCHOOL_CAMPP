@@ -1,5 +1,5 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Dimensions, Image, Platform } from 'react-native';
 import PhoneInput from 'react-native-phone-number-input';
 import { Ionicons } from '@expo/vector-icons';
 import ThemeContext from '../../theme/ThemeContext';
@@ -75,8 +75,8 @@ const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
           style={[
             styles.roleCard,
             {
-              backgroundColor: theme.card,
-              borderColor: selectedRole === role.id ? theme.pagination : (hasError ? theme.log : theme.bordercolor),
+              backgroundColor: '#F9F9F9',
+              borderColor: selectedRole === role.id ? '#6D5FFD' : (hasError ? theme.log : '#E0E0E0'),
               borderWidth: selectedRole === role.id ? 2 : (hasError ? 2 : 1),
               shadowColor: theme.color2,
             }
@@ -86,30 +86,30 @@ const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
           <View style={styles.roleCardContent}>
             <View style={[
               styles.iconContainer,
-              { backgroundColor: selectedRole === role.id ? theme.pagination : theme.cardbg3 }
+              { backgroundColor: selectedRole === role.id ? '#6D5FFD' : '#E0E0E0' }
             ]}>
               <Ionicons
                 name={role.icon}
                 size={24}
-                color={selectedRole === role.id ? theme.background : theme.color3}
+                color={selectedRole === role.id ? '#FFFFFF' : '#757575'}
               />
             </View>
             <Text style={[
               styles.roleTitle,
-              { color: selectedRole === role.id ? theme.pagination : theme.color }
+              { color: selectedRole === role.id ? '#6D5FFD' : '#424242' }
             ]}>
               {role.label}
             </Text>
             <Text style={[
               styles.roleDescription,
-              { color: theme.color3 }
+              { color: '#757575' }
             ]}>
               {role.description}
             </Text>
           </View>
           {selectedRole === role.id && (
             <View style={styles.checkmarkContainer}>
-              <Ionicons name="checkmark-circle" size={24} color={theme.pagination} />
+              <Ionicons name="checkmark-circle" size={24} color="#6D5FFD" />
             </View>
           )}
         </TouchableOpacity>
@@ -129,7 +129,7 @@ const Profile_setup_section2 = () => {
     email: '',
     phone: '',
     countryCode: '',
-    role: '',
+    role: 'exploitant',
     camp: '507f1f77bcf86cd799439011',
   });
 
@@ -137,7 +137,7 @@ const Profile_setup_section2 = () => {
     first_name: false,
     last_name: false,
     phone: false,
-    role: false
+    role: true
   });
 
   const [errors, setErrors] = useState({

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Platform, Dimensions, StatusBar } from 'react-native';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import Back from "../../assets/images/back.svg";
 import { Montserrat_700Bold } from '@expo-google-fonts/montserrat';
@@ -10,15 +10,16 @@ import ThemeContext from '../../theme/ThemeContext';
 import { router } from "expo-router";
 import Toast from 'react-native-toast-message';
 
-
-
-
-
 const { width, height } = Dimensions.get('window');
 
 const ProfileSetup = () => {
   const { theme, darkMode, updateProfileImage, profileData } = useContext(ThemeContext);
   const [image, setImage] = useState(profileData.profileImage || null);
+  
+  // Effet pour mettre à jour l'état local quand profileData change
+  useEffect(() => {
+    setImage(profileData.profileImage);
+  }, [profileData.profileImage]);
 
   const back = () => {
     router.push('signup');

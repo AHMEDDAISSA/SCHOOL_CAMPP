@@ -132,6 +132,21 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
+  // Nouvelle fonction pour réinitialiser uniquement l'image de profil
+  const resetProfileImage = async () => {
+    try {
+      const updatedProfileData = {
+        ...profileData,
+        profileImage: null
+      };
+      setProfileData(updatedProfileData);
+      await AsyncStorage.setItem('profileData', JSON.stringify(updatedProfileData));
+    } catch (error) {
+      console.error('Error resetting profile image:', error);
+    }
+  };
+
+  // C'est ici que j'ai ajouté resetProfileImage dans l'objet value
   return (
     <ThemeContext.Provider 
       value={{ 
@@ -140,8 +155,9 @@ export const ThemeProvider = ({ children }) => {
         toggleTheme, 
         profileData, 
         updateProfileData,
-        updateProfileImage, // Exposer la nouvelle fonction
-        clearProfileData    // Exposer la fonction de réinitialisation
+        updateProfileImage,
+        clearProfileData,
+        resetProfileImage // Assurez-vous que cette ligne est présente
       }}
     >
       {children}
