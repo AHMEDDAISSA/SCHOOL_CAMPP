@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Platform, Dimensions, StatusBar } from 'react-native';
 import React, { useContext, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import Back from "../../assets/images/back.svg";
@@ -9,6 +9,10 @@ import Edit from "../../assets/images/Edit.svg";
 import Profile_setup_section2 from '../../components/Profile_setup/Profile_setup_section2';
 import ThemeContext from '../../theme/ThemeContext';
 import { router } from "expo-router";
+import Toast from 'react-native-toast-message';
+
+// Get screen dimensions for better sizing
+const { width, height } = Dimensions.get('window');
 
 const ProfileSetup = () => {
   const { theme, darkMode, updateProfileImage, profileData } = useContext(ThemeContext);
@@ -41,12 +45,13 @@ const ProfileSetup = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: '#282449' }]}>
+      <StatusBar barStyle="light-content" backgroundColor="#282449" />
       <View style={styles.header}>
         <TouchableOpacity onPress={back} style={styles.backButton}>
-          {darkMode ? <Dark_back /> : <Back />}
+          <Dark_back />
         </TouchableOpacity>
-        <Text style={[styles.heading, { color: theme.color }]}>
+        <Text style={[styles.heading, { color: '#FFFFFF' }]}>
           Compléter votre profil
         </Text>
       </View>
@@ -62,9 +67,14 @@ const ProfileSetup = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+        style={styles.scrollView}
+      >
         <Profile_setup_section2 />
       </ScrollView>
+      <Toast/>
     </View>
   );
 };
@@ -73,31 +83,35 @@ export default ProfileSetup;
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 50,
-    paddingHorizontal: 20,
     flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 50 : 35,
+    paddingHorizontal: 0, // No horizontal padding to maximize space
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
   },
   header: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
+    paddingHorizontal: 20,
   },
   backButton: {
     position: 'absolute',
-    left: 0,
+    left: 20,
   },
   heading: {
     fontSize: 20,
     lineHeight: 24,
     fontFamily: 'Montserrat_700Bold',
-    color: '#39335E',
     textAlign: 'center',
   },
   imageContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 30,
+    marginVertical: 20, // Reduced vertical margin
     position: 'relative',
   },
   image: {

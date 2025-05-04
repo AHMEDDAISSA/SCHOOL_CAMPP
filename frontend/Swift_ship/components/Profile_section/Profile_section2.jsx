@@ -46,6 +46,14 @@ const Profile_section2 = () => {
           <Text style={[styles.no, { color: theme.color4 }]}>
             {profileData.phoneNumber || '(208) 808-946'}
           </Text>
+          
+          {profileData.role && (
+            <Text style={[styles.role, { color: theme.color4 }]}>
+              Profil: {profileData.role === 'parent' ? 'Parent' : 
+                      profileData.role === 'admin' ? 'Administrateur' : 
+                      profileData.role === 'exploitant' ? 'Exploitant' : ''}
+            </Text>
+          )}
         </View>
         <Profile_section3 />
         <Profile_section4 />
@@ -62,6 +70,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginVertical: 30,
     position: 'relative',
+  },
+  role: {
+    fontSize: 12,
+    lineHeight: 20,
+    fontFamily: 'Montserrat_500Medium',
+    color: '#4C4C4C',
+    marginTop: 4,
   },
   circle: {
     backgroundColor: '#836EFE',
