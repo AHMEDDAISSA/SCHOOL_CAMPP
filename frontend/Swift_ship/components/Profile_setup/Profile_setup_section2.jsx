@@ -297,21 +297,6 @@ const Profile_setup_section2 = () => {
           </View>
 
           <View style={styles.form_section}>
-            <Text style={[styles.label, { color: theme.color }]}>Surnom (optionnel)</Text>
-            <TextInput
-              style={[styles.input, {
-                color: theme.color,
-                borderColor: theme.bordercolor,
-                backgroundColor: theme.cardbg,
-              }]}
-              placeholder="Votre surnom"
-              placeholderTextColor={theme.color3}
-              value={formData.nickName}
-              onChangeText={(text) => handleInputChange('nickName', text)}
-            />
-          </View>
-
-          <View style={styles.form_section}>
             <RequiredLabel text="Téléphone" />
             {errors.phone && (
               <Text style={[styles.errorText, { color: theme.log }]}>Ce champ est obligatoire</Text>

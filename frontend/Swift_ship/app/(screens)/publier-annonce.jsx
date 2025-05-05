@@ -9,7 +9,7 @@ import AnnonceContext from '../../contexts/AnnonceContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
-import { createAd, uploadMultipleImages } from '../../services/api';
+import { createAd, uploadMultipleImages, sendEmailOTP, verifyOTP } from '../../services/api'; // Ajouté les fonctions d'API
 import Toast from 'react-native-toast-message';
 
 const PublierAnnonce = () => {
@@ -34,6 +34,22 @@ const PublierAnnonce = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   
+  // Nouveaux champs pour les coordonnées et préférences de communication
+  const [userName, setUserName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [showName, setShowName] = useState(false);
+  const [showPhone, setShowPhone] = useState(false);
+  const [showEmail, setShowEmail] = useState(true);
+  const [preferredContact, setPreferredContact] = useState('email');
+  const [isActive, setIsActive] = useState(true);
+  
+  // États pour l'authentification par OTP
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  
   // Champs obligatoires
   const [missingFields, setMissingFields] = useState([]);
   
@@ -45,7 +61,6 @@ const PublierAnnonce = () => {
     { id: '6', name: 'Échanger', icon: 'repeat-outline' },
     { id: '4', name: 'Louer', icon: 'cash-outline' },
     { id: '5', name: 'Acheter', icon: 'cart-outline' },
-    
   ];
   
   // Types d'objets (exemple)
@@ -58,6 +73,78 @@ const PublierAnnonce = () => {
     "Neuf", "Très bon état", "Bon état", "État moyen", "À réparer"
   ];
   
+  // Moyens de communication
+  const contactMethods = [
+    { id: 'email', name: 'Email', icon: 'mail-outline' },
+    { id: 'phone', name: 'Téléphone', icon: 'call-outline' },
+    { id: 'app', name: 'Application', icon: 'chatbubble-outline' },
+  ];
+  
+  // Fonction pour envoyer OTP
+  const handleSendOTP = async () => {
+    if (!email) {
+      Toast.show({
+        type: 'error',
+        text1: 'Email requis',
+        text2: 'Veuillez entrer votre adresse email pour recevoir le code de vérification.',
+        position: 'bottom'
+      });
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Simuler l'envoi d'OTP (à remplacer par l'appel API réel)
+      // await sendEmailOTP(email);
+      setTimeout(() => {
+        setOtpSent(true);
+        setLoading(false);
+        Toast.show({
+          type: 'success',
+          text1: 'Code envoyé',
+          text2: 'Un code de vérification a été envoyé à votre adresse email.',
+          position: 'bottom'
+        });
+      }, 1500);
+    } catch (error) {
+      setLoading(false);
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: 'Impossible d\'envoyer le code de vérification.',
+        position: 'bottom'
+      });
+    }
+  };
+  
+  // Fonction pour vérifier OTP
+  const handleVerifyOTP = async () => {
+    if (!otp) {
+      setOtpError('Veuillez entrer le code de vérification');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Simuler la vérification d'OTP (à remplacer par l'appel API réel)
+      // await verifyOTP(email, otp);
+      setTimeout(() => {
+        setIsAuthenticated(true);
+        setLoading(false);
+        Toast.show({
+          type: 'success',
+          text1: 'Vérification réussie',
+          text2: 'Vous pouvez maintenant publier votre annonce.',
+          position: 'bottom'
+        });
+      }, 1500);
+    } catch (error) {
+      setLoading(false);
+      setOtpError('Code de vérification incorrect');
+    }
+  };
   
   // Fonction pour sélectionner une image depuis la galerie
   const pickImage = async () => {
@@ -69,11 +156,11 @@ const PublierAnnonce = () => {
     });
 
     if (!result.canceled) {
-      if (images.length >= 5) {
+      if (images.length >= 4) { // Modifié de 5 à 4
         Toast.show({
           type: 'error',
           text1: 'Maximum atteint',
-          text2: 'Vous ne pouvez pas ajouter plus de 5 images.',
+          text2: 'Vous ne pouvez pas ajouter plus de 4 images.',
           position: 'bottom'
         });
       } else {
@@ -103,11 +190,11 @@ const PublierAnnonce = () => {
     });
 
     if (!result.canceled) {
-      if (images.length >= 5) {
+      if (images.length >= 4) { // Modifié de 5 à 4
         Toast.show({
           type: 'error',
           text1: 'Maximum atteint',
-          text2: 'Vous ne pouvez pas ajouter plus de 5 images.',
+          text2: 'Vous ne pouvez pas ajouter plus de 4 images.',
           position: 'bottom'
         });
       } else {
@@ -140,6 +227,9 @@ const PublierAnnonce = () => {
     setPrice('');
     setCondition('');
     setImages([]);
+    setIsActive(true);
+    setPreferredContact('email');
+    // Garder les coordonnées personnelles pour faciliter les futures publications
   };
   
   // Validation du formulaire
@@ -162,12 +252,28 @@ const PublierAnnonce = () => {
       missing.push('durée');
     }
     
+    // Vérifier le moyen de communication préféré
+    if (preferredContact === 'phone' && !phoneNumber) {
+      missing.push('numéro de téléphone');
+    }
+    
     setMissingFields(missing);
     return missing.length === 0;
   };
   
   // Soumission du formulaire
   const handleSubmit = () => {
+    // Vérifier l'authentification
+    if (!isAuthenticated) {
+      Toast.show({
+        type: 'error',
+        text1: 'Authentification requise',
+        text2: 'Veuillez vous authentifier avant de publier une annonce.',
+        position: 'bottom'
+      });
+      return;
+    }
+    
     // Validation de base
     if (!validateForm()) {
       Toast.show({
@@ -190,9 +296,17 @@ const PublierAnnonce = () => {
         category,
         type,
         condition,
-        price,
-        duration,
-        images: images
+        price: category === 'Louer' || category === 'Acheter' ? price : '',
+        duration: category === 'Louer' || category === 'Prêter' ? duration : '',
+        images: images,
+        isActive,
+        contact: {
+          name: showName ? userName : '',
+          phone: showPhone ? phoneNumber : '',
+          email: showEmail ? email : '',
+          preferredMethod: preferredContact
+        },
+        createdAt: new Date().toISOString()
       };
       
       // Ajouter l'annonce via le contexte
@@ -223,7 +337,7 @@ const PublierAnnonce = () => {
         visibilityTime: 3000
       });
     }
-  }
+  };
   
   // Navigation
   const back = () => {
@@ -236,6 +350,115 @@ const PublierAnnonce = () => {
       <View style={[styles.loadingContainer, {backgroundColor: theme.background}]}>
         <ActivityIndicator size="large" color="#39335E" />
       </View>
+    );
+  }
+  
+  // Afficher le formulaire d'authentification si non authentifié
+  if (!isAuthenticated) {
+    return (
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.container, {backgroundColor: theme.background}]}
+      >
+        <StatusBar style={darkMode ? 'light' : 'dark'} />
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={back}
+            accessible={true}
+            accessibilityLabel="Retour"
+            accessibilityHint="Retourner à l'écran précédent"
+            accessibilityRole="button"
+          >
+            {darkMode ? <Dark_back /> : <Back />}
+          </TouchableOpacity>
+          <Text style={[styles.heading, {color:theme.color}]}>Publication d'annonce</Text>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+        
+        <View style={styles.authContainer}>
+          <Text style={[styles.authTitle, {color: theme.color}]}>Authentification requise</Text>
+          <Text style={[styles.authDescription, {color: theme.color}]}>
+            Pour publier une annonce, veuillez vous authentifier avec votre adresse email.
+          </Text>
+          
+          {!otpSent ? (
+            <>
+              <View style={styles.formSection}>
+                <Text style={[styles.label, {color: theme.color}]}>Email<Text style={styles.requiredStar}>*</Text></Text>
+                <TextInput
+                  style={[styles.input, {backgroundColor: theme.cardbg2, color: theme.color}]}
+                  placeholder="Votre adresse email"
+                  placeholderTextColor="#A8A8A8"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.submitButton, loading && styles.disabledButton]}
+                onPress={handleSendOTP}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Recevoir un code de vérification</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.formSection}>
+                <Text style={[styles.label, {color: theme.color}]}>Code de vérification<Text style={styles.requiredStar}>*</Text></Text>
+                <TextInput
+                  style={[
+                    styles.input, 
+                    {backgroundColor: theme.cardbg2, color: theme.color},
+                    otpError ? styles.inputError : null
+                  ]}
+                  placeholder="Entrez le code reçu par email"
+                  placeholderTextColor="#A8A8A8"
+                  value={otp}
+                  onChangeText={(text) => {
+                    setOtp(text);
+                    if (otpError) setOtpError('');
+                  }}
+                  keyboardType="number-pad"
+                />
+                {otpError ? <Text style={styles.errorText}>{otpError}</Text> : null}
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.submitButton, loading && styles.disabledButton]}
+                onPress={handleVerifyOTP}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Vérifier</Text>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.resendButton}
+                onPress={() => {
+                  setOtpSent(false);
+                  setOtp('');
+                  setOtpError('');
+                }}
+              >
+                <Text style={styles.resendButtonText}>Utiliser une autre adresse email</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+        <Toast />
+      </KeyboardAvoidingView>
     );
   }
   
@@ -392,13 +615,13 @@ const PublierAnnonce = () => {
         {/* Section Photos */}
         <View style={styles.formSection}>
           <Text style={[styles.label, {color: theme.color}]}>
-            Photos (max 5)<Text style={styles.requiredStar}>*</Text>
+            Photos (max 4)<Text style={styles.requiredStar}>*</Text>
           </Text>
           <View style={[
             styles.imagePickerContainer,
             images.length === 0 && missingFields.includes('photos') ? styles.containerError : null
           ]}>
-            {images.length < 5 && (
+            {images.length < 4 && ( // Modifié de 5 à 4
               <View style={styles.imageButtonsContainer}>
                 <TouchableOpacity 
                   style={[styles.imageButton, {backgroundColor: theme.cardbg2}]}
@@ -536,9 +759,141 @@ const PublierAnnonce = () => {
           </View>
         )}
         
+        {/* NOUVELLES SECTIONS */}
+        
+        {/* Section Informations de contact */}
+        <View style={[styles.formSection, styles.sectionSeparator]}>
+          <Text style={[styles.sectionTitle, {color: theme.color}]}>Informations de contact</Text>
+          
+          {/* Email (déjà entré lors de l'authentification) */}
+          <View style={styles.contactFieldRow}>
+            <View style={styles.contactFieldLabel}>
+              <Text style={[styles.label, {color: theme.color}]}>Email</Text>
+              <Text style={[styles.fieldValue, {color: theme.color}]}>{email}</Text>
+            </View>
+            <View style={styles.switchContainer}>
+              <Text style={{color: theme.color, fontSize: 14, marginRight: 8}}>Afficher</Text>
+              <Switch
+                value={showEmail}
+                onValueChange={setShowEmail}
+                trackColor={{ false: "#767577", true: "#39335E" }}
+              />
+            </View>
+          </View>
+          
+          {/* Nom (facultatif) */}
+          <View style={styles.contactField}>
+            <View style={styles.contactFieldRow}>
+              <Text style={[styles.label, {color: theme.color}]}>Nom (facultatif)</Text>
+              <Switch
+                value={showName}
+                onValueChange={setShowName}
+                trackColor={{ false: "#767577", true: "#39335E" }}
+              />
+            </View>
+            <TextInput
+              style={[styles.input, {backgroundColor: theme.cardbg2, color: theme.color}]}
+              placeholder="Votre nom ou prénom"
+              placeholderTextColor="#A8A8A8"
+              value={userName}
+              onChangeText={setUserName}
+            />
+          </View>
+          
+          {/* Téléphone (facultatif) */}
+          <View style={styles.contactField}>
+            <View style={styles.contactFieldRow}>
+              <Text style={[styles.label, {color: theme.color}]}>
+                Téléphone (facultatif)
+                {preferredContact === 'phone' && <Text style={styles.requiredStar}>*</Text>}
+              </Text>
+              <Switch
+                value={showPhone}
+                onValueChange={setShowPhone}
+                trackColor={{ false: "#767577", true: "#39335E" }}
+              />
+            </View>
+            <TextInput
+              style={[
+                styles.input, 
+                {backgroundColor: theme.cardbg2, color: theme.color},
+                preferredContact === 'phone' && !phoneNumber && missingFields.includes('numéro de téléphone') ? styles.inputError : null
+              ]}
+              placeholder="Votre numéro de téléphone"
+              placeholderTextColor="#A8A8A8"
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              keyboardType="phone-pad"
+            />
+          </View>
+          
+          {/* Moyen de communication préféré */}
+          <View style={styles.formSection}>
+            <Text style={[styles.label, {color: theme.color}]}>Moyen de communication préféré</Text>
+            <View style={styles.contactMethodsContainer}>
+              {contactMethods.map(method => (
+                <TouchableOpacity 
+                  key={method.id}
+                  style={[
+                    styles.contactMethodButton, 
+                    { backgroundColor: darkMode 
+                      ? (preferredContact === method.id ? '#5D5FEF' : '#363636') 
+                      : (preferredContact === method.id ? '#39335E' : '#F0F0F0') 
+                    }
+                  ]}
+                  onPress={() => setPreferredContact(method.id)}
+                >
+                  <Ionicons 
+                    name={method.icon} 
+                    size={20} 
+                    color={preferredContact === method.id 
+                      ? '#FFFFFF' 
+                      : (darkMode ? '#FFFFFF' : '#39335E')
+                    } 
+                  />
+                  <Text 
+                    style={[
+                      styles.contactMethodText, 
+                      {color: preferredContact === method.id 
+                        ? '#FFFFFF' 
+                        : (darkMode ? '#FFFFFF' : '#39335E')
+                      }
+                    ]}
+                  >
+                    {method.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+        
+        {/* Section de visibilité de l'annonce */}
+        <View style={[styles.formSection, styles.sectionSeparator]}>
+          <Text style={[styles.sectionTitle, {color: theme.color}]}>Options de publication</Text>
+          
+          <View style={styles.visibilityContainer}>
+            <Text style={[styles.label, {color: theme.color}]}>Annonce active</Text>
+            <View style={styles.switchWithLabel}>
+              <Text style={{color: theme.color, marginRight: 8}}>
+                {isActive ? 'Oui' : 'Non'}
+              </Text>
+              <Switch
+                value={isActive}
+                onValueChange={setIsActive}
+                trackColor={{ false: "#767577", true: "#39335E" }}
+              />
+            </View>
+          </View>
+          
+          <Text style={[styles.visibilityDescription, {color: theme.darkGrey}]}>
+            Si désactivée, votre annonce ne sera pas visible par les autres utilisateurs mais restera dans votre compte.
+          </Text>
+        </View>
+        
         {/* Bouton de soumission */}
         <TouchableOpacity 
-          style={[styles.submitButton]}
+          style={[styles.submitButton, loading && styles.disabledButton]}
           onPress={handleSubmit}
           disabled={loading}
         >
@@ -624,6 +979,12 @@ const styles = StyleSheet.create({
   inputError: {
     borderWidth: 1,
     borderColor: '#EB001B',
+  },
+  errorText: {
+    color: '#EB001B',
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 14,
+    marginTop: 5,
   },
   scrollViewError: {
     borderWidth: 1,
@@ -776,4 +1137,102 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 10,
   },
+  
+  // Nouvelles styles pour l'authentification
+  authContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  authTitle: {
+    fontSize: 22,
+    fontFamily: 'Montserrat_700Bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  authDescription: {
+    fontSize: 16,
+    fontFamily: 'Montserrat_500Medium',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  resendButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  resendButtonText: {
+    fontFamily: 'Montserrat_600SemiBold',
+    color: '#39335E',
+    textDecorationLine: 'underline',
+  },
+  
+  // Nouvelles styles pour les sections de contact
+  sectionSeparator: {
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    paddingTop: 20,
+    marginTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Montserrat_700Bold',
+    marginBottom: 15,
+  },
+  contactField: {
+    marginBottom: 15,
+  },
+  contactFieldRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  contactFieldLabel: {
+    flex: 1,
+  },
+  fieldValue: {
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 14,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  contactMethodsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  contactMethodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  contactMethodText: {
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 10,
+    marginLeft: 6,
+  },
+  
+  
+  visibilityContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  switchWithLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  visibilityDescription: {
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 14,
+    fontStyle: 'italic',
+  }
 });
