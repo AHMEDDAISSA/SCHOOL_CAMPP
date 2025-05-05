@@ -1,78 +1,91 @@
 import React, { useContext, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, ActivityIndicator, SafeAreaView, Platform, Alert } from 'react-native';
-import Back from "../../assets/images/back.svg";
-import Dark_back from "../../assets/images/dark_back.svg";
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, ActivityIndicator, SafeAreaView, Platform, Alert, Share, Dimensions } from 'react-native';
+import Back from "../../../assets/images/back.svg";
+import Dark_back from "../../../assets/images/dark_back.svg";
 import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
-import ThemeContext from '../../theme/ThemeContext';
+import ThemeContext from '../../../theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import AnnonceContext from '../../contexts/AnnonceContext';
+import AnnonceContext from '../../../contexts/AnnonceContext';
 import { router, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
-const AnnonceDetail = () => {
-  const { theme, darkMode } = useContext(ThemeContext);
+// Get screen width for responsive designs
+const { width } = Dimensions.get('window');
+
+export default function AnnonceDetail() {
+  const { theme, darkMode, profileData } = useContext(ThemeContext);
   const { annonces, deleteAnnonce } = useContext(AnnonceContext);
-  const { id } = useLocalSearchParams(); // Récupérer l'ID de l'annonce depuis les paramètres de navigation
+  const { id } = useLocalSearchParams();
   const [annonce, setAnnonce] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Charger les polices
   const [fontsLoaded] = useFonts({
     Montserrat_700Bold,
     Montserrat_600SemiBold,
     Montserrat_500Medium,
   });
 
-  // Trouver l'annonce correspondant à l'ID
+  // Debugger logs to help troubleshoot
+  useEffect(() => {
+    console.log("ID received:", id);
+    console.log("Annonces count:", annonces?.length || 0);
+  }, [id, annonces]);
+
   useEffect(() => {
     if (annonces && id) {
-      const foundAnnonce = annonces.find(item => item.id === id);
+      // Log exact match attempt
+      console.log("Looking for annonce with ID:", id);
+      
+      const foundAnnonce = annonces.find(item => {
+        // Log each ID comparison
+        console.log("Comparing with:", item.id, "Match:", item.id === id);
+        return item.id === id;
+      });
+      
       if (foundAnnonce) {
+        console.log("Annonce found:", foundAnnonce.title);
         setAnnonce(foundAnnonce);
         setLoading(false);
       } else {
+        console.log("Annonce not found");
         setError('Annonce non trouvée');
         setLoading(false);
       }
     }
   }, [annonces, id]);
 
-  // Fonction pour retourner à l'écran précédent
   const goBack = () => {
     router.back();
   };
 
-  // Fonction pour gérer la suppression
   const handleDeleteAnnonce = useCallback(() => {
     Alert.alert(
       "Confirmation de suppression",
       "Êtes-vous sûr de vouloir supprimer cette annonce ?",
       [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
+        { text: "Annuler", style: "cancel" },
         {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
-            setLoading(true);
+            setIsDeleting(true);
             const success = await deleteAnnonce(id);
-            setLoading(false);
+            setIsDeleting(false);
             if (success) {
               Toast.show({
                 type: 'success',
                 text1: 'Annonce supprimée avec succès',
                 visibilityTime: 2000,
               });
-              router.back(); // Revenir à l'écran précédent après suppression
+              router.back();
             } else {
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
-                text2: 'Veuillez réessayer',
                 visibilityTime: 2000,
               });
             }
@@ -82,7 +95,20 @@ const AnnonceDetail = () => {
     );
   }, [deleteAnnonce, id]);
 
-  // Fonction pour obtenir l'icône de catégorie
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: `Découvrez cette annonce : ${annonce.title}\nType: ${annonce.type}\n${annonce.description || ''}`,
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur lors du partage',
+        visibilityTime: 2000,
+      });
+    }
+  }, [annonce]);
+
   const getCategoryIcon = (category) => {
     switch(category) {
       case 'Donner': return 'gift-outline';
@@ -95,7 +121,6 @@ const AnnonceDetail = () => {
     }
   };
 
-  // Fonction pour obtenir la couleur de catégorie
   const getCategoryColor = (category) => {
     switch(category) {
       case 'Donner': return '#4CAF50';
@@ -108,22 +133,16 @@ const AnnonceDetail = () => {
     }
   };
 
-  // Formatter la date
   const formatDate = (dateString) => {
     const today = new Date();
     const date = new Date(dateString.split('/').reverse().join('-'));
-    if (date.toDateString() === today.toDateString()) {
-      return "Aujourd'hui";
-    }
+    if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
-      return "Hier";
-    }
+    if (date.toDateString() === yesterday.toDateString()) return "Hier";
     return dateString;
   };
 
-  // Afficher un indicateur de chargement si les polices ou les données sont en cours de chargement
   if (!fontsLoaded || loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
@@ -132,7 +151,6 @@ const AnnonceDetail = () => {
     );
   }
 
-  // Afficher un message d'erreur si l'annonce n'est pas trouvée
   if (error) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -146,7 +164,7 @@ const AnnonceDetail = () => {
             <View style={styles.headerRightPlaceholder} />
           </View>
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={[styles.errorText, { color: theme.color }]}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={goBack}>
               <Text style={styles.retryButtonText}>Retourner</Text>
             </TouchableOpacity>
@@ -156,32 +174,42 @@ const AnnonceDetail = () => {
     );
   }
 
+  // Get images array or create from single image url
+  const images = (annonce.images && annonce.images.length > 0) ? 
+                 annonce.images : 
+                 (annonce.imageUrl ? [annonce.imageUrl] : []);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* En-tête */}
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={goBack} 
             accessible={true} 
             accessibilityLabel="Retour" 
-            accessibilityHint="Retourner à l'écran précédent" 
             accessibilityRole="button"
           >
             {darkMode ? <Dark_back /> : <Back />}
           </TouchableOpacity>
           <Text style={[styles.heading, { color: theme.color }]}>Détails de l'annonce</Text>
-          <View style={styles.headerRightPlaceholder} />
+          <TouchableOpacity 
+            onPress={handleShare}
+            accessible={true}
+            accessibilityLabel="Partager l'annonce"
+            accessibilityRole="button"
+          >
+            <Ionicons name="share-outline" size={24} color={theme.color} />
+          </TouchableOpacity>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Image de l'annonce */}
+          {/* Image display */}
           <View style={[styles.imageContainer, { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }]}>
-            {(annonce.imageUrl || (annonce.images && annonce.images.length > 0)) ? (
-              <Image 
-                source={{ uri: annonce.imageUrl || annonce.images[0] }} 
-                style={styles.image} 
+            {images.length > 0 ? (
+              <Image
+                source={{ uri: images[activeImageIndex] }}
+                style={styles.image}
                 resizeMode="cover"
               />
             ) : (
@@ -193,22 +221,64 @@ const AnnonceDetail = () => {
                 />
               </View>
             )}
+            
+            {/* Category badge */}
             <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(annonce.category) }]}>
               <Text style={styles.categoryBadgeText}>{annonce.category}</Text>
             </View>
           </View>
+          
+          {/* Image pagination dots if multiple images */}
+          {images.length > 1 && (
+            <View style={styles.paginationContainer}>
+              {images.map((_, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    { backgroundColor: index === activeImageIndex ? '#39335E' : '#D0D0D0' }
+                  ]}
+                  onPress={() => setActiveImageIndex(index)}
+                />
+              ))}
+            </View>
+          )}
 
-          {/* Contenu de l'annonce */}
           <View style={styles.contentContainer}>
             <Text style={[styles.title, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>
               {annonce.title}
             </Text>
-            <Text style={[styles.type, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-              Type: {annonce.type}
-            </Text>
-            <Text style={[styles.date, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-              Publié: {formatDate(annonce.date)}
-            </Text>
+            
+            <View style={[styles.userContainer, { backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+              <Image 
+                source={profileData?.profileImage ? { uri: profileData.profileImage } : require('../../../assets/images/placeholder.png')}
+                style={styles.userAvatar}
+              />
+              <View>
+                <Text style={[styles.userName, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>
+                  {profileData?.fullName || 'Utilisateur inconnu'}
+                </Text>
+                <Text style={[styles.userRole, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                  Membre depuis {new Date().getFullYear()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.infoContainer}>
+              <View style={styles.infoRow}>
+                <Ionicons name="pricetag-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+                <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                  Type: {annonce.type}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Ionicons name="calendar-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+                <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                  Publié: {formatDate(annonce.date)}
+                </Text>
+              </View>
+            </View>
+
             <Text style={[styles.descriptionTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>
               Description
             </Text>
@@ -217,11 +287,11 @@ const AnnonceDetail = () => {
             </Text>
           </View>
 
-          {/* Boutons d'action */}
           <View style={styles.actionButtons}>
             <TouchableOpacity 
-              style={styles.contactButton}
-              onPress={() => Alert.alert('Contacter', 'Cette fonctionnalité sera implémentée bientôt.')}
+              style={[styles.contactButton, { opacity: isDeleting ? 0.5 : 1 }]}
+              onPress={() => router.push('/inbox')}
+              disabled={isDeleting}
               accessible={true}
               accessibilityLabel="Contacter l'annonceur"
               accessibilityRole="button"
@@ -230,23 +300,28 @@ const AnnonceDetail = () => {
               <Text style={styles.contactButtonText}>Contacter</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.deleteButton}
+              style={[styles.deleteButton, { opacity: isDeleting ? 0.5 : 1 }]}
               onPress={handleDeleteAnnonce}
+              disabled={isDeleting}
               accessible={true}
               accessibilityLabel="Supprimer l'annonce"
               accessibilityRole="button"
             >
-              <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.deleteButtonText}>Supprimer</Text>
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.deleteButtonText}>Supprimer</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
     </SafeAreaView>
   );
-};
-
-export default AnnonceDetail;
+}
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -274,6 +349,8 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 20,
     fontFamily: 'Montserrat_700Bold',
+    flex: 1,
+    textAlign: 'center',
   },
   imageContainer: {
     width: '100%',
@@ -283,7 +360,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   image: {
     width: '100%',
@@ -294,6 +371,18 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
   },
   categoryBadge: {
     position: 'absolute',
@@ -314,17 +403,41 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontFamily: 'Montserrat_700Bold',
-    marginBottom: 10,
+    marginBottom: 15,
   },
-  type: {
+  userContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    padding: 10,
+    borderRadius: 10,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  userName: {
+    fontSize: 16,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  userRole: {
+    fontSize: 12,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  infoContainer: {
+    marginBottom: 15,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoText: {
     fontSize: 16,
     fontFamily: 'Montserrat_500Medium',
-    marginBottom: 5,
-  },
-  date: {
-    fontSize: 14,
-    fontFamily: 'Montserrat_500Medium',
-    marginBottom: 15,
+    marginLeft: 8,
   },
   descriptionTitle: {
     fontSize: 18,
@@ -378,7 +491,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: '#EB001B',
     fontSize: 16,
     fontFamily: 'Montserrat_500Medium',
     marginBottom: 20,

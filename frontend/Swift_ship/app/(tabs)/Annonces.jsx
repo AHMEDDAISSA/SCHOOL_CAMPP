@@ -371,7 +371,7 @@ const Annonces = () => {
     <MemoizedAnnonceCard 
       item={item}
       darkMode={darkMode}
-      onPress={() => router.push(`(screens)/annonce/${item.id}`)}
+      onPress={() => router.push(`/annonce/${item.id}`)}  // Remove (screens) prefix
       onDelete={handleDeleteAnnonce}
     />
   ), [darkMode, handleDeleteAnnonce]);

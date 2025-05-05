@@ -57,6 +57,7 @@ const ProfileSetup = () => {
         <Text style={[styles.heading, { color: theme.color }]}>
           Compléter votre profil
         </Text>
+        <Toast/>
       </View>
 
       <View style={styles.imageContainer}>
@@ -68,6 +69,7 @@ const ProfileSetup = () => {
         <TouchableOpacity style={[styles.editButton, { backgroundColor: theme.cardbg }]} onPress={pickImage}>
           <Edit fill={theme.color} />
         </TouchableOpacity>
+        <Toast/>
       </View>
 
       <ScrollView 

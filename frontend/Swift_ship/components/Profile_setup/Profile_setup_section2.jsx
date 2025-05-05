@@ -129,7 +129,7 @@ const Profile_setup_section2 = () => {
     email: '',
     phone: '',
     countryCode: '',
-    role: 'exploitant',
+    role: '',
     camp: '507f1f77bcf86cd799439011',
   });
 

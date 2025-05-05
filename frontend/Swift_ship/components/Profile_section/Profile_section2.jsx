@@ -48,11 +48,16 @@ const Profile_section2 = () => {
           </Text>
           
           {profileData.role && (
-            <Text style={[styles.role, { color: theme.color4 }]}>
-              Profil: {profileData.role === 'parent' ? 'Parent' : 
-                      profileData.role === 'admin' ? 'Administrateur' : 
-                      profileData.role === 'exploitant' ? 'Exploitant' : ''}
-            </Text>
+            <View style={styles.roleContainer}>
+              <Text style={[styles.role, { color: theme.color4 }]}>
+                Profil:{' '}
+              </Text>
+              <Text style={[styles.roleValue]}>
+                {profileData.role === 'parent' ? 'Parent' : 
+                 profileData.role === 'admin' ? 'Administrateur' : 
+                 profileData.role === 'exploitant' ? 'Exploitant' : ''}
+              </Text>
+            </View>
           )}
         </View>
         <Profile_section3 />
@@ -71,12 +76,22 @@ const styles = StyleSheet.create({
     marginVertical: 30,
     position: 'relative',
   },
+  roleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   role: {
     fontSize: 12,
     lineHeight: 20,
     fontFamily: 'Montserrat_500Medium',
     color: '#4C4C4C',
-    marginTop: 4,
+  },
+  roleValue: {
+    fontSize: 12,
+    lineHeight: 20,
+    fontFamily: 'Montserrat_500Medium',
+    color: '#836EFE',
   },
   circle: {
     backgroundColor: '#836EFE',

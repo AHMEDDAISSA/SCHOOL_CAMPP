@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
 import React, { useContext, useState, useEffect, useMemo } from 'react';
-import Profile_img from "../../assets/images/profil33.png"; // Image par défaut
 import Notification from "../../assets/images/notification.svg";
 import Dark_Notification from "../../assets/images/dark_notification.svg";
 import { router } from "expo-router";
@@ -13,18 +12,18 @@ const Home = () => {
     const { theme, darkMode, profileData } = useContext(ThemeContext);
     const { annonces, loading, refreshAnnonces, updateNewStatus } = useContext(AnnonceContext);
     
-    // Ajouter un état pour suivre la catégorie sélectionnée
+    
     const [selectedCategory, setSelectedCategory] = useState('Tous');
     
-    // Utiliser l'image de profil du contexte si disponible, sinon utiliser l'image par défaut
+    
     const profileImage = profileData && profileData.profileImage 
-      ? { uri: profileData.profileImage } 
-      : Profile_img;
+  ? { uri: profileData.profileImage } 
+  : require('../../assets/images/placeholder.png'); // Image de secours;
 
     // Utiliser le nom complet du contexte si disponible, sinon utiliser un nom par défaut
     const fullName = profileData && profileData.fullName 
       ? profileData.fullName 
-      : 'Ahmed Aissa';
+      : '';
       
     // Récupérer les annonces récentes filtrées par catégorie
     const recentAnnounces = useMemo(() => {
@@ -200,9 +199,9 @@ const Home = () => {
             ) : recentAnnounces.length > 0 ? (
               recentAnnounces.map(item => (
                 <TouchableOpacity 
-                  key={item.id} 
-                  style={[styles.announceCard, { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }]}
-                  onPress={() => {router.push(`(screens)/annonce/${item.id}`)}}
+                   key={item.id} 
+                    style={[styles.announceCard, { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }]}
+                   onPress={() => router.push(`/annonce/${item.id}`)}  
                 >
                   <View style={styles.cardImageWrapper}>
                     <Image

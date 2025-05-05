@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Switch, TouchableOpacity } from 'react-native';
 import React, { useContext, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Added missing import
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Input from '../../Input/Input';
 import Mail from "../../../assets/images/mail.svg";
 import Dark_mail from "../../../assets/images/dark_mail.svg";
@@ -17,7 +17,7 @@ import Toast from 'react-native-toast-message';
 const Login_section2 = () => {
     const [email, setEmail] = useState('');
     const [isEmailValid, setIsEmailValid] = useState(true);
-    const { theme, darkMode } = useContext(ThemeContext);
+    const { theme, darkMode, setProfileData } = useContext(ThemeContext);
     const [isRemember, setIsRemember] = useState(false);
     const [loading, setLoading] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
@@ -34,11 +34,10 @@ const Login_section2 = () => {
     // Handle email input change
     const handleEmailChange = (text) => {
         setEmail(text);
-        // Only validate if there's text
         if (text.length > 0) {
             setIsEmailValid(validateEmail(text));
         } else {
-            setIsEmailValid(true); // Don't show error when field is empty
+            setIsEmailValid(true);
         }
     };
 
@@ -90,83 +89,70 @@ const Login_section2 = () => {
         setLoading(true);
 
         try {
-            // Pass just the email as a simple object
             const userData = await loginUser(email);
-        
-            // Check for success response and proper data
-            if (userData) {
-                // Handle different response formats (with or without status field)
-                if (userData.status === "success" || userData.token) {
-                    console.log('User logged in:', userData);
-                    
-                    // Store the token if it exists
-                    if (userData.token) {
-                        try {
-                            await AsyncStorage.setItem('userToken', userData.token);
-                            
-                            // Store user info if available
-                            if (userData.user) {
-                                await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
-                            }
-                            console.log('Token and user info stored successfully');
-                        } catch (storageError) {
-                            console.error('Failed to store token:', storageError);
+
+            if (userData.status === "success" || userData.token) {
+                console.log('User logged in:', userData);
+
+                if (userData.token) {
+                    try {
+                        await AsyncStorage.setItem('userToken', userData.token);
+                        await AsyncStorage.setItem('userEmail', email); // Store email
+                        if (userData.user) {
+                            await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
+                            // Update profileData in ThemeContext
+                            setProfileData(prev => ({
+                                ...prev,
+                                email,
+                                ...userData.user,
+                            }));
+                        } else {
+                            // Update only email if no user data
+                            setProfileData(prev => ({ ...prev, email }));
                         }
+                        console.log('Token, email, and user info stored successfully');
+                    } catch (storageError) {
+                        console.error('Failed to store data:', storageError);
                     }
-                    
-                    // Show success toast
-                    Toast.show({
-                        type: 'success',
-                        text1: 'Connexion réussie',
-                        text2: 'Vous êtes maintenant connecté',
-                        visibilityTime: 3000,
-                        topOffset: 50
-                    });
-                    
-                    // Delay navigation slightly to allow toast to be seen
-                    setTimeout(() => {
-                        router.push('/home');
-                    }, 1000);
-                } else {
-                    // Handle case where response came back but wasn't a success
-                    throw new Error(userData.message || 'Response received but login failed');
                 }
+
+                Toast.show({
+                    type: 'success',
+                    text1: 'Connexion réussie',
+                    text2: 'Vous êtes maintenant connecté',
+                    visibilityTime: 3000,
+                    topOffset: 50
+                });
+
+                setTimeout(() => {
+                    router.push('/home');
+                }, 1000);
             } else {
-                throw new Error('No data received from server');
+                throw new Error(userData.message || 'Response received but login failed');
             }
         } catch (err) {
             console.error('Login error:', err);
-
-            // Create an appropriate error message based on the error
             let errorMessage = 'Une erreur est survenue lors de la connexion';
-            
             if (err.response) {
-                // Server response with error status
                 const status = err.response.status;
-                
                 if (status === 404) {
                     errorMessage = "Cet email n'est pas enregistré. Veuillez créer un compte.";
                 } else if (status === 401) {
                     errorMessage = "Identifiants invalides. Veuillez réessayer.";
                 } else if (status === 400) {
-                    // Bad request - usually validation errors
                     errorMessage = err.response.data?.message || "Données invalides. Vérifiez vos informations.";
                 } else {
                     errorMessage = `Erreur de serveur: ${status}`;
-                    // If you have specific error messages from the backend:
                     if (err.response.data && err.response.data.message) {
                         errorMessage = err.response.data.message;
                     }
                 }
             } else if (err.request) {
-                // No response received
                 errorMessage = 'Pas de réponse du serveur. Vérifiez votre connexion réseau.';
             } else {
-                // Something else happened
                 errorMessage = `Erreur: ${err.message}`;
             }
 
-            // Show error toast
             Toast.show({
                 type: 'error',
                 text1: 'Échec de la connexion',
@@ -199,7 +185,6 @@ const Login_section2 = () => {
                 disabled={loading}
             />
             
-            {/* Modal sections */}
             <Login_section3 
                 modalVisible={modalVisible}
                 closeModal={closeModal}

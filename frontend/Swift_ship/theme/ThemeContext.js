@@ -40,7 +40,7 @@ const darkTheme = {
   pagination: '#836EFE',
 };
 
-const ThemeContext = createContext();
+export const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(false);
@@ -49,7 +49,8 @@ export const ThemeProvider = ({ children }) => {
     fullName: '',
     email: '',
     phoneNumber: '',
-    profileImage: null // Ajout de la propriété profileImage pour stocker l'URI de l'image
+    profileImage: null,
+    role: '',
   });
 
   useEffect(() => {
@@ -68,10 +69,26 @@ export const ThemeProvider = ({ children }) => {
 
     const loadProfileData = async () => {
       try {
-        const storedProfileData = await AsyncStorage.getItem('profileData');
-        if (storedProfileData !== null) {
-          setProfileData(JSON.parse(storedProfileData));
+        const [storedEmail, storedUserInfo, storedProfileData] = await Promise.all([
+          AsyncStorage.getItem('userEmail'),
+          AsyncStorage.getItem('userInfo'),
+          AsyncStorage.getItem('profileData'),
+        ]);
+
+        let newProfileData = { ...profileData };
+        if (storedEmail) {
+          newProfileData.email = storedEmail;
         }
+        if (storedUserInfo) {
+          const userInfo = JSON.parse(storedUserInfo);
+          newProfileData = { ...newProfileData, ...userInfo };
+        }
+        if (storedProfileData) {
+          const parsedProfileData = JSON.parse(storedProfileData);
+          newProfileData = { ...newProfileData, ...parsedProfileData };
+        }
+
+        setProfileData(newProfileData);
       } catch (error) {
         console.error('Error loading profile data:', error);
       }
@@ -102,13 +119,9 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  // Ajout d'une fonction spécifique pour mettre à jour l'image de profil
   const updateProfileImage = async (imageUri) => {
     try {
-      const newProfileData = { 
-        ...profileData, 
-        profileImage: imageUri 
-      };
+      const newProfileData = { ...profileData, profileImage: imageUri };
       setProfileData(newProfileData);
       await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
     } catch (error) {
@@ -116,29 +129,27 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  // Ajout d'une fonction pour effacer toutes les données du profil
   const clearProfileData = async () => {
     try {
       const emptyProfile = {
         fullName: '',
         email: '',
         phoneNumber: '',
-        profileImage: null
+        profileImage: null,
+        role: '',
       };
       setProfileData(emptyProfile);
       await AsyncStorage.setItem('profileData', JSON.stringify(emptyProfile));
+      await AsyncStorage.removeItem('userEmail');
+      await AsyncStorage.removeItem('userInfo');
     } catch (error) {
       console.error('Error clearing profile data:', error);
     }
   };
 
-  // Nouvelle fonction pour réinitialiser uniquement l'image de profil
   const resetProfileImage = async () => {
     try {
-      const updatedProfileData = {
-        ...profileData,
-        profileImage: null
-      };
+      const updatedProfileData = { ...profileData, profileImage: null };
       setProfileData(updatedProfileData);
       await AsyncStorage.setItem('profileData', JSON.stringify(updatedProfileData));
     } catch (error) {
@@ -146,18 +157,18 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  // C'est ici que j'ai ajouté resetProfileImage dans l'objet value
   return (
-    <ThemeContext.Provider 
-      value={{ 
-        theme, 
-        darkMode, 
-        toggleTheme, 
-        profileData, 
+    <ThemeContext.Provider
+      value={{
+        theme,
+        darkMode,
+        toggleTheme,
+        profileData,
+        setProfileData,
         updateProfileData,
         updateProfileImage,
         clearProfileData,
-        resetProfileImage // Assurez-vous que cette ligne est présente
+        resetProfileImage,
       }}
     >
       {children}
