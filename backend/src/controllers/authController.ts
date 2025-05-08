@@ -178,7 +178,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
     // Handle both formats of data (direct or nested)
     const userData = req.body.user || req.body;
   
-    const { email, first_name, last_name, phone, countryCode, camp, role = 'parent' } = userData;
+    const { email, first_name, last_name, phone, countryCode, camp, role} = userData;
   
     // Required fields check
     if (!email || !camp || !role) {
@@ -193,9 +193,6 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
       return;
     }
   
-    // Generate verification code
-    const verificationCode = generateVerificationCode();
-  
     // Normalize undefined fields
     const sanitizedUserData = {
       email: email.trim().toLowerCase(),
@@ -205,9 +202,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
       countryCode: countryCode?.trim() || '',
       camp: camp.trim(),
       role: role.trim(),
-      verificationCode,
-      verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000), // Code expires in 10 minutes
-      isVerified: false,
+      lastUpdated: new Date().toISOString(),
     };
   
     try {
@@ -216,35 +211,71 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
         email: sanitizedUserData.email,
         camp: sanitizedUserData.camp,
       });
+      
       if (existingUser) {
-        res.status(400).json({
-          status: 'error',
-          message: 'User with this email and camp already exists.',
-          user: { email: existingUser.email, camp: existingUser.camp },
+        // Update existing user without changing verification status
+        const updatedUser = await UserModel.findOneAndUpdate(
+          { 
+            email: sanitizedUserData.email,
+            camp: sanitizedUserData.camp 
+          },
+          { 
+            $set: {
+              first_name: sanitizedUserData.first_name,
+              last_name: sanitizedUserData.last_name,
+              phone: sanitizedUserData.phone,
+              countryCode: sanitizedUserData.countryCode,
+              lastUpdated: sanitizedUserData.lastUpdated,
+              // Keep the original verification status and role
+              isVerified: true,// existingUser.isVerified,
+              role: existingUser.role 
+            }
+          },
+          { new: true } // Return the updated document
+        );
+        
+        res.status(200).json({
+          status: 'success',
+          message: 'User updated successfully.',
+          user: {
+            id: updatedUser?._id,
+            email: sanitizedUserData.email,
+            camp: sanitizedUserData.camp,
+            role: updatedUser?.role,
+            isVerified: updatedUser?.isVerified,
+          },
         });
         return;
       }
   
+      // For new users, generate verification code and set verification fields
+      const verificationCode = generateVerificationCode();
+      const newUserData = {
+        ...sanitizedUserData,
+        verificationCode,
+        verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000), // Code expires in 10 minutes
+        isVerified: false,
+      };
+  
       // Create and save new user
-      const newUser = new UserModel(sanitizedUserData);
+      const newUser = new UserModel(newUserData);
       await newUser.save();
   
-      // Send verification email
+      // Send verification email for new user
       try {
-        await sendVerificationEmail(sanitizedUserData.email, verificationCode, sanitizedUserData.first_name);
-        console.log(`Verification code sent to ${sanitizedUserData.email}: ${verificationCode}`);
+        await sendVerificationEmail(newUserData.email, verificationCode, newUserData.first_name);
+        console.log(`Verification code sent to ${newUserData.email}: ${verificationCode}`);
       } catch (emailError) {
         console.error('Error sending verification email:', emailError);
-        // Optionally inform the client to retry or contact support
         res.status(201).json({
           status: 'success',
           message:
             'User registered successfully, but there was an issue sending the verification email. Please use /resend-otp to request a new code.',
           user: {
             id: newUser._id,
-            email: sanitizedUserData.email,
-            camp: sanitizedUserData.camp,
-            role: sanitizedUserData.role,
+            email: newUserData.email,
+            camp: newUserData.camp,
+            role: newUserData.role,
           },
         });
         return;
@@ -255,15 +286,104 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
         message: 'User registered successfully. Please check your email for the verification code.',
         user: {
           id: newUser._id,
-          email: sanitizedUserData.email,
-          camp: sanitizedUserData.camp,
-          role: sanitizedUserData.role,
+          email: newUserData.email,
+          camp: newUserData.camp,
+          role: newUserData.role,
         },
       });
     } catch (error) {
-      console.error('Error registering user:', error);
+      console.error('Error registering/updating user:', error);
       res.status(500).json({ status: 'error', message: 'Internal server error.' });
     }
+    // // Handle both formats of data (direct or nested)
+    // const userData = req.body.user || req.body;
+  
+    // const { email, first_name, last_name, phone, countryCode, camp, role = 'parent' } = userData;
+  
+    // // Required fields check
+    // if (!email || !camp || !role) {
+    //   res.status(400).json({ status: 'error', message: 'Email, camp, and role are required.' });
+    //   return;
+    // }
+  
+    // // Validate email format
+    // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // if (!emailRegex.test(email)) {
+    //   res.status(400).json({ status: 'error', message: 'Invalid email format.' });
+    //   return;
+    // }
+  
+    // // Generate verification code
+    // const verificationCode = generateVerificationCode();
+  
+    // // Normalize undefined fields
+    // const sanitizedUserData = {
+    //   email: email.trim().toLowerCase(),
+    //   first_name: first_name?.trim() || '',
+    //   last_name: last_name?.trim() || '',
+    //   phone: phone?.trim() || '',
+    //   countryCode: countryCode?.trim() || '',
+    //   camp: camp.trim(),
+    //   role: role.trim(),
+    //   verificationCode,
+    //   verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000), // Code expires in 10 minutes
+    //   isVerified: false,
+    // };
+  
+    // try {
+    //   // Check if user already exists
+    //   const existingUser = await UserModel.findOne({
+    //     email: sanitizedUserData.email,
+    //     camp: sanitizedUserData.camp,
+    //   });
+    //   if (existingUser) {
+    //     res.status(400).json({
+    //       status: 'error',
+    //       message: 'User with this email and camp already exists.',
+    //       user: { email: existingUser.email, camp: existingUser.camp },
+    //     });
+    //     return;
+    //   }
+  
+    //   // Create and save new user
+    //   const newUser = new UserModel(sanitizedUserData);
+    //   await newUser.save();
+  
+    //   // Send verification email
+    //   try {
+    //     await sendVerificationEmail(sanitizedUserData.email, verificationCode, sanitizedUserData.first_name);
+    //     console.log(`Verification code sent to ${sanitizedUserData.email}: ${verificationCode}`);
+    //   } catch (emailError) {
+    //     console.error('Error sending verification email:', emailError);
+    //     // Optionally inform the client to retry or contact support
+    //     res.status(201).json({
+    //       status: 'success',
+    //       message:
+    //         'User registered successfully, but there was an issue sending the verification email. Please use /resend-otp to request a new code.',
+    //       user: {
+    //         id: newUser._id,
+    //         email: sanitizedUserData.email,
+    //         camp: sanitizedUserData.camp,
+    //         role: sanitizedUserData.role,
+    //       },
+    //     });
+    //     return;
+    //   }
+  
+    //   res.status(201).json({
+    //     status: 'success',
+    //     message: 'User registered successfully. Please check your email for the verification code.',
+    //     user: {
+    //       id: newUser._id,
+    //       email: sanitizedUserData.email,
+    //       camp: sanitizedUserData.camp,
+    //       role: sanitizedUserData.role,
+    //     },
+    //   });
+    // } catch (error) {
+    //   console.error('Error registering user:', error);
+    //   res.status(500).json({ status: 'error', message: 'Internal server error.' });
+    // }
   };
   export const verifyEmailHandler = async (req: Request, res: Response): Promise<void> => {
     const { userId, code } = req.body;

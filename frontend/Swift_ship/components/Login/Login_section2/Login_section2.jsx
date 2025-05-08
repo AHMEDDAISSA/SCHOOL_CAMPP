@@ -74,7 +74,7 @@ const Login_section2 = () => {
             });
             return;
         }
-
+    
         if (!validateEmail(email)) {
             Toast.show({
                 type: 'error',
@@ -85,37 +85,46 @@ const Login_section2 = () => {
             });
             return;
         }
-
+    
         setLoading(true);
-
+    
         try {
             const userData = await loginUser(email);
-
+    
             if (userData.status === "success" || userData.token) {
                 console.log('User logged in:', userData);
-
+    
                 if (userData.token) {
                     try {
                         await AsyncStorage.setItem('userToken', userData.token);
-                        await AsyncStorage.setItem('userEmail', email); // Store email
+                        await AsyncStorage.setItem('userEmail', email);
+                        
+                        // Store user info in AsyncStorage and update context
                         if (userData.user) {
                             await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
-                            // Update profileData in ThemeContext
                             setProfileData(prev => ({
                                 ...prev,
                                 email,
                                 ...userData.user,
                             }));
+                            
+                            // Get user role
+                            const userRole = userData.user.role;
+                            
+                            // Store user role for future use
+                            await AsyncStorage.setItem('userRole', userRole);
                         } else {
-                            // Update only email if no user data
                             setProfileData(prev => ({ ...prev, email }));
                         }
                         console.log('Token, email, and user info stored successfully');
                     } catch (storageError) {
                         console.error('Failed to store data:', storageError);
+                        throw new Error('Failed to store authentication data');
                     }
+                } else {
+                    throw new Error('No token received from server');
                 }
-
+    
                 Toast.show({
                     type: 'success',
                     text1: 'Connexion réussie',
@@ -123,9 +132,30 @@ const Login_section2 = () => {
                     visibilityTime: 3000,
                     topOffset: 50
                 });
-
+    
                 setTimeout(() => {
-                    router.push('/home');
+                    // Check if user has a role from userData
+                    if (userData.user && userData.user.role) {
+                        const userRole = userData.user.role;
+                        
+                        
+                        switch(userRole) {
+                            case 'exploitant':
+                                router.push('/exploitant');
+                                break;
+                            case 'admin':
+                                router.push('/admin');
+                                break;
+                            case 'parent':
+                                router.push('/home');
+                                break;
+                            default:
+                                router.push('/home');
+                        }
+                    } else {
+                        
+                        router.push('/home');
+                    }
                 }, 1000);
             } else {
                 throw new Error(userData.message || 'Response received but login failed');
@@ -152,7 +182,7 @@ const Login_section2 = () => {
             } else {
                 errorMessage = `Erreur: ${err.message}`;
             }
-
+    
             Toast.show({
                 type: 'error',
                 text1: 'Échec de la connexion',

@@ -8,7 +8,7 @@ import Button from '../../Button/Button';
 import { router } from "expo-router";
 import Toast from 'react-native-toast-message';
 
-const Signup_section4 = ({ modalVisible6, closeModal6 }) => {
+const Signup_section4 = ({ modalVisible6, closeModal6, email, userId }) => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
 
     
@@ -26,8 +26,8 @@ const Signup_section4 = ({ modalVisible6, closeModal6 }) => {
     }, [modalVisible6]);
 
     const handleContinue = () => {
-        closeModal6();
-        router.push('profile_setup');
+        closeModal6();        
+        router.push({ pathname: `profile_setup`, params: {email, userId} } );
     };
 
     return (

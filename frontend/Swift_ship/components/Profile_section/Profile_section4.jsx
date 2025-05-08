@@ -8,13 +8,11 @@ import Toast from 'react-native-toast-message';
 const Profile_section4 = () => {
   const [modalVisible, setModalVisible] = useState(false);
   
-  // Assurez-vous que le chemin d'importation est correct
+  
   const themeContext = useContext(ThemeContext);
   
-  // Vérifier si le contexte est défini avant d'y accéder
-  // Cette vérification peut aider à éviter l'erreur "Cannot read property 'theme' of undefined"
   if (!themeContext) {
-    // Vous pouvez afficher un placeholder ou retourner null si le contexte n'est pas disponible
+    
     return (
       <View style={styles.logout_container}>
         <Text>Chargement...</Text>
@@ -29,7 +27,7 @@ const Profile_section4 = () => {
   };
 
   const confirmLogout = () => {
-    // Vérifier que la fonction existe avant de l'appeler
+    
     if (typeof resetProfileImage === 'function') {
       resetProfileImage();
       

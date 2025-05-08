@@ -6,6 +6,7 @@ import ThemeContext from '../../theme/ThemeContext';
 import Button from '../../components/Button/Button';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { registerUser } from '../../services/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -118,7 +119,7 @@ const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
   );
 };
 
-const Profile_setup_section2 = () => {
+const Profile_setup_section2 = (data) => {  
   const { theme, updateProfileData } = useContext(ThemeContext);
   const phoneInput = useRef(null);
 
@@ -126,11 +127,12 @@ const Profile_setup_section2 = () => {
     first_name: '',
     last_name: '',
     nickName: '',
-    email: '',
+    email: data.email,
     phone: '',
     countryCode: '',
     role: '',
     camp: '507f1f77bcf86cd799439011',
+    userId: data.userId,
   });
 
   const [touchedFields, setTouchedFields] = useState({
@@ -224,10 +226,23 @@ const Profile_setup_section2 = () => {
     return true;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (validateForm()) {
       const fullName = `${formData.first_name} ${formData.last_name}`;
-      updateProfileData({
+      Toast.show({
+        type: 'success',
+        text1: 'Profil mis à jour',
+        text2: `Profil ${formData.role === 'parent' ? 'Parent' : 
+               formData.role === 'admin' ? 'Administrateur' : 
+               formData.role === 'exploitant' ? 'Exploitant' : ''} sélectionné`,
+        position: 'top',
+        visibilityTime: 3000,
+        autoHide: true,
+        topOffset: 70,
+      });
+
+      console.log("ff",{
+        userId: formData.userId,
         fullName: fullName,
         email: formData.email,
         phoneNumber: formData.phone,
@@ -236,8 +251,40 @@ const Profile_setup_section2 = () => {
         nickName: formData.nickName,
         countryCode: formData.countryCode,
         role: formData.role,
+        lastUpdated: new Date().toISOString(),
+        camp: formData.camp
       });
-      router.push('/login');
+      const response = await registerUser({
+        userId: formData.userId,
+        fullName: fullName,
+        email: formData.email,
+        phoneNumber: formData.phone,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        nickName: formData.nickName,
+        countryCode: formData.countryCode,
+        role: formData.role,
+        lastUpdated: new Date().toISOString(),
+        camp: formData.camp
+      });
+      if (response.status == "success") {
+        router.push('/login');
+      }else{
+        console.log("responsess error", response);
+      }
+      
+      
+      // updateProfileData({
+      //   fullName: fullName,
+      //   email: formData.email,
+      //   phoneNumber: formData.phone,
+      //   first_name: formData.first_name,
+      //   last_name: formData.last_name,
+      //   nickName: formData.nickName,
+      //   countryCode: formData.countryCode,
+      //   role: formData.role,
+      //   lastUpdated: new Date().toISOString(),
+      // });
     }
   };
 
@@ -295,7 +342,7 @@ const Profile_setup_section2 = () => {
               onBlur={() => handleInputBlur('first_name')}
             />
           </View>
-
+                {/* fazet il telifoun */}
           <View style={styles.form_section}>
             <RequiredLabel text="Téléphone" />
             {errors.phone && (

@@ -38,6 +38,8 @@ export default function AnnonceDetail() {
   const [condition, setCondition] = useState('');
   const [images, setImages] = useState([]);
   const [missingFields, setMissingFields] = useState([]);
+  const [email, setEmail] = useState('');
+  const [camp, setCamp] = useState('');
 
   // Catégories disponibles
   const categories = [
@@ -65,6 +67,10 @@ export default function AnnonceDetail() {
     Montserrat_500Medium,
   });
 
+  const campOptions = [
+    "Camp De Ski", "Camp Vert"
+  ];
+
   // Load annonce data
   useEffect(() => {
     if (annonces && id) {
@@ -87,13 +93,21 @@ export default function AnnonceDetail() {
         setDuration(foundAnnonce.duration || '');
         setPrice(foundAnnonce.price || '');
         setCondition(foundAnnonce.condition || '');
+        setCamp(foundAnnonce.camp || ''); // Ensure camp is initialized
+        setEmail(foundAnnonce.email || ''); // Ensure email is initialized
+         
         
+        const emailToUse = foundAnnonce.email || 
+                        (foundAnnonce.contact && foundAnnonce.contact.email) || 
+                        (profileData && profileData.email) || '';
+      setEmail(emailToUse);
+
         // Handle images array or single imageUrl
         const annonceImages = (foundAnnonce.images && foundAnnonce.images.length > 0) ? 
-                             foundAnnonce.images : 
-                             (foundAnnonce.imageUrl ? [foundAnnonce.imageUrl] : []);
+                          foundAnnonce.images : 
+                          (foundAnnonce.imageUrl ? [foundAnnonce.imageUrl] : []);
         setImages(annonceImages);
-        
+          
         setLoading(false);
       } else {
         console.log("Annonce not found");
@@ -102,6 +116,8 @@ export default function AnnonceDetail() {
       }
     }
   }, [annonces, id]);
+
+  
 
   const goBack = () => {
     if (isEditMode) {
@@ -246,6 +262,8 @@ export default function AnnonceDetail() {
     if (!description) missing.push('description');
     if (!category) missing.push('catégorie');
     if (!type) missing.push('type d\'objet');
+    if (!camp) missing.push('camp'); 
+    if (!email) missing.push('email'); // Added email validation
     if (images.length === 0) missing.push('photos');
     
     // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
@@ -289,7 +307,13 @@ export default function AnnonceDetail() {
         condition,
         price,
         duration,
-        images
+        images,
+        camp,
+        email,
+        contact: annonce.contact ? {
+          ...annonce.contact,
+          email: email
+        } : { email: email }
       };
       
       // Mettre à jour l'annonce via le contexte
@@ -451,6 +475,45 @@ export default function AnnonceDetail() {
                 onChangeText={setTitle}
                 maxLength={100}
               />
+            </View>
+
+            {/* Section camp */}
+            <View style={styles.formSection}>
+              <Text style={[styles.label, {color: theme.color}]}>
+                Camp<Text style={styles.requiredStar}>*</Text>
+              </Text>
+              <View style={[
+                styles.typeButtonsContainer, 
+                !camp && missingFields.includes('camp') ? styles.containerError : null
+              ]}>
+                {campOptions.map((campOption, index) => (
+                  <Pressable 
+                    key={index}
+                    style={({ pressed }) => [
+                      styles.typeButton,
+                      { 
+                        backgroundColor: darkMode 
+                          ? (camp === campOption ? '#5D5FEF' : (pressed ? '#4D4D4D' : '#363636'))
+                          : (camp === campOption ? '#39335E' : (pressed ? '#D0D0D0' : '#F0F0F0')),
+                        opacity: pressed ? 0.9 : 1,
+                      }
+                    ]}
+                    onPress={() => setCamp(campOption)}
+                  >
+                    <Text 
+                      style={[
+                        styles.typeText, 
+                        {color: camp === campOption 
+                          ? '#FFFFFF' 
+                          : (darkMode ? '#FFFFFF' : '#39335E')
+                        }
+                      ]}
+                    >
+                      {campOption}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
             
             {/* Section catégorie */}
@@ -621,6 +684,26 @@ export default function AnnonceDetail() {
                 textAlignVertical="top"
               />
             </View>
+
+            {/* Section Email */}
+            <View style={styles.formSection}>
+              <Text style={[styles.label, {color: theme.color}]}>
+                Email<Text style={styles.requiredStar}>*</Text>
+              </Text>
+              <TextInput
+                style={[
+                  styles.input, 
+                  {backgroundColor: theme.cardbg2 || '#F5F5F5', color: theme.color},
+                  !email && missingFields.includes('email') ? styles.inputError : null
+                ]}
+                placeholder="Votre email de contact"
+                placeholderTextColor="#A8A8A8"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
             
             {/* Section état */}
             <View style={styles.formSection}>
@@ -706,6 +789,7 @@ export default function AnnonceDetail() {
                 onPress={() => setIsEditMode(false)}
               >
                 <Ionicons name="close-circle-outline" size={24} color="white" />
+                <Text style={styles.cancelButtonText}></Text>
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               
@@ -801,6 +885,24 @@ export default function AnnonceDetail() {
                     <Ionicons name="shield-checkmark-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
                     <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
                       État: {annonce.condition}
+                    </Text>
+                  </View>
+                )}
+
+                {annonce.camp && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="flag-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+                    <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                      Camp: {annonce.camp}
+                    </Text>
+                  </View>
+                )}
+
+                {annonce.email && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="mail-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+                    <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                       : {annonce.email}
                     </Text>
                   </View>
                 )}

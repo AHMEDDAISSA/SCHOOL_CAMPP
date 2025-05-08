@@ -102,8 +102,8 @@ const Home = () => {
     ];
 
     const types = ['Tous', 'Vêtement', 'Équipement', 'Chaussures', 'Accessoire'];
-    const campTypes = ['Tous', 'Camp de ski', 'Camp vert'];
-    const sizes = ['Tous', 'XS', 'S', 'M', 'L', 'XL', '4-6 ans', '7-9 ans', '10-12 ans', '13-15 ans'];
+    const campTypes = ['Tous', 'Camp De Ski', 'Camp Vert'];
+    
 
     return (
       <View style={[styles.container, {backgroundColor: theme.background}]}> 
@@ -230,7 +230,7 @@ const Home = () => {
               </View>
             </ScrollView>
             
-            <Text style={styles.filterLabel}>Taille:</Text>
+            {/* <Text style={styles.filterLabel}>Taille:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.filterButtonsContainer}>
                 {sizes.map(size => (
@@ -251,7 +251,7 @@ const Home = () => {
                   </TouchableOpacity>
                 ))}
               </View>
-            </ScrollView>
+            </ScrollView> */}
           </View>
 
           <View style={styles.recentSection}>

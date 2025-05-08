@@ -7,19 +7,20 @@ import Profile from "../../assets/images/anny.jpg";
 import Edit from "../../assets/images/Edit.svg";
 import Profile_setup_section2 from '../../components/Profile_setup/Profile_setup_section2';
 import ThemeContext from '../../theme/ThemeContext';
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import Toast from 'react-native-toast-message';
 
 const { width, height } = Dimensions.get('window');
 
 const ProfileSetup = () => {
-  const { theme, darkMode, updateProfileImage, profileData } = useContext(ThemeContext);
-  const [image, setImage] = useState(profileData.profileImage || null);
+  const { email, userId } = useLocalSearchParams();
   
-  // Effet pour mettre à jour l'état local quand profileData change
-  useEffect(() => {
-    setImage(profileData.profileImage);
-  }, [profileData.profileImage]);
+  const { theme, darkMode, updateProfileImage, profileData } = useContext(ThemeContext);
+  // Initialiser l'image à null pour la réinitialiser à chaque montage du composant
+  const [image, setImage] = useState(null);
+  
+  // Supprimer useEffect qui met à jour l'image depuis profileData
+  // Cela empêche la persistance de l'image entre les utilisations
 
   const back = () => {
     router.push('signup');
@@ -46,6 +47,21 @@ const ProfileSetup = () => {
       updateProfileImage(imageUri);
     }
   };
+
+  // Fonction de réinitialisation qui pourrait être appelée à d'autres moments si nécessaire
+  const resetImage = () => {
+    setImage(null);
+    updateProfileImage(null); // Réinitialiser aussi dans le contexte
+  };
+
+  // Utiliser useEffect avec un tableau de dépendances vide pour réinitialiser à chaque montage
+  useEffect(() => {
+    resetImage();
+    // Cette fonction s'exécutera à chaque montage du composant
+    return () => {
+      // Vous pouvez aussi ajouter une logique de nettoyage ici si nécessaire
+    };
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -77,7 +93,7 @@ const ProfileSetup = () => {
         contentContainerStyle={{ flexGrow: 1 }}
         style={styles.scrollView}
       >
-        <Profile_setup_section2 />
+        <Profile_setup_section2 email={email} userId={userId} />
       </ScrollView>
       <Toast/>
     </View>
@@ -87,6 +103,7 @@ const ProfileSetup = () => {
 export default ProfileSetup;
 
 const styles = StyleSheet.create({
+  // Styles inchangés
   container: {
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? 50 : 35,

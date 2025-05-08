@@ -11,6 +11,19 @@ import { router } from 'expo-router';
 const Profile_section2 = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
 
+  const getRoleLabel = (roleId) => {
+    switch(roleId) {
+      case 'parent':
+        return 'Parent';
+      case 'admin':
+        return 'Administrateur';
+      case 'exploitant':
+        return 'Exploitant';
+      default:
+        return 'Non défini';
+    }
+  };
+
   return (
     <View>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -49,15 +62,27 @@ const Profile_section2 = () => {
           
           {profileData.role && (
             <View style={styles.roleContainer}>
-              <Text style={[styles.role, { color: theme.color4 }]}>
-                Profil:{' '}
-              </Text>
-              <Text style={[styles.roleValue]}>
-                {profileData.role === 'parent' ? 'Parent' : 
-                 profileData.role === 'admin' ? 'Administrateur' : 
-                 profileData.role === 'exploitant' ? 'Exploitant' : ''}
-              </Text>
-            </View>
+            <Text style={[styles.role, { color: theme.color4 }]}>
+              Profil:{' '}
+            </Text>
+            <Text style={[
+              styles.roleValue, 
+              { 
+                color: '#836EFE',
+                backgroundColor: profileData.role ? '#f0f0ff' : 'transparent',
+                paddingHorizontal: profileData.role ? 8 : 0,
+                paddingVertical: profileData.role ? 2 : 0,
+                borderRadius: 12
+              }
+            ]}>
+              {profileData.role ? getRoleLabel(profileData.role) : 'Non défini'}
+            </Text>
+          </View>
+          )}
+          {profileData.lastUpdated && (
+            <Text style={[styles.lastUpdated, { color: theme.color4 }]}>
+              Mis à jour le {new Date(profileData.lastUpdated).toLocaleDateString()}
+            </Text>
           )}
         </View>
         <Profile_section3 />

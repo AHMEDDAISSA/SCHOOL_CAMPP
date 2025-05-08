@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable } from 'react-native';
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect,useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Ajout d'AsyncStorage
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
 import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
@@ -9,13 +10,48 @@ import AnnonceContext from '../../contexts/AnnonceContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
+import PhoneInput from 'react-native-phone-number-input';
 import { createAd, uploadMultipleImages, sendEmailOTP, verifyOTP } from '../../services/api'; // Ajouté les fonctions d'API
 import Toast from 'react-native-toast-message';
 
 const PublierAnnonce = () => {
-  const { theme, darkMode } = useContext(ThemeContext);
+  const { theme, darkMode, profileData } = useContext(ThemeContext); 
   const { addAnnonce } = useContext(AnnonceContext);
+  const phoneInput = useRef(null);
   
+
+  const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFormattedText, containerStyle, textContainerStyle, textInputStyle, codeTextStyle, textInputProps, flagButtonStyle, hasError, theme }) => {
+    return (
+      <PhoneInput
+        defaultValue={defaultValue}
+        defaultCode={defaultCode}
+        layout="first"
+        onChangeText={onChangeText}
+        onChangeFormattedText={onChangeFormattedText}
+        containerStyle={[
+          containerStyle,
+          hasError && [styles.inputError, { borderColor: theme.log }]
+        ]}
+        textContainerStyle={[
+          textContainerStyle,
+          hasError && { backgroundColor: theme.background2 }
+        ]}
+        textInputStyle={textInputStyle}
+        codeTextStyle={codeTextStyle}
+        textInputProps={{
+          ...textInputProps,
+          placeholder: textInputProps.placeholder || 'Votre numéro de téléphone',
+        }}
+        flagButtonStyle={[
+          flagButtonStyle,
+          hasError && { backgroundColor: theme.background2 }
+        ]}
+        withDarkTheme={false}
+        withShadow={false}
+        autoFocus={false}
+      />
+    );
+  };
   // Load fonts
   const [fontsLoaded] = useFonts({
     Montserrat_700Bold,
@@ -33,6 +69,8 @@ const PublierAnnonce = () => {
   const [condition, setCondition] = useState('');
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [camp, setCamp] = useState(''); 
+  
   
   // Nouveaux champs pour les coordonnées et préférences de communication
   const [userName, setUserName] = useState('');
@@ -41,14 +79,30 @@ const PublierAnnonce = () => {
   const [showName, setShowName] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
   const [showEmail, setShowEmail] = useState(true);
-  const [preferredContact, setPreferredContact] = useState('email');
+  const [preferredContact, setPreferredContact] = useState('');
   const [isActive, setIsActive] = useState(true);
   
+
+  const handlePhoneChange = (text) => {
+    setPhoneNumber(text);
+  };
+  
+  const handleFormattedPhoneChange = (text) => {
+    const countryCode = phoneInput.current?.getCountryCode();
+    if (countryCode) {
+      setCountryCode(`+${countryCode}`);
+    }
+  };
+
+
+  const isPhoneRequired = preferredContact === 'phone';
+  const hasPhoneError = isPhoneRequired && !phoneNumber && missingFields.includes('numéro de téléphone');
+
   // États pour l'authentification par OTP
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Permet de passer la vérification OTP pour test
   
   // Champs obligatoires
   const [missingFields, setMissingFields] = useState([]);
@@ -72,6 +126,11 @@ const PublierAnnonce = () => {
   const itemConditions = [
     "Neuf", "Très bon état", "Bon état", "État moyen", "À réparer"
   ];
+
+  // Options de camps disponibles
+  const campOptions = [
+    "Camp De Ski", "Camp Vert"
+  ];
   
   // Moyens de communication
   const contactMethods = [
@@ -79,6 +138,25 @@ const PublierAnnonce = () => {
     { id: 'phone', name: 'Téléphone', icon: 'call-outline' },
     { id: 'app', name: 'Application', icon: 'chatbubble-outline' },
   ];
+  
+  // Récupérer l'email de l'utilisateur depuis AsyncStorage au chargement du composant
+  useEffect(() => {
+    const getStoredEmail = async () => {
+      try {
+        const storedEmail = await AsyncStorage.getItem('userEmail');
+        if (storedEmail) {
+          setEmail(storedEmail);
+        } else if (profileData && profileData.email) {
+          // Utiliser l'email du contexte si disponible
+          setEmail(profileData.email);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'email:", error);
+      }
+    };
+    
+    getStoredEmail();
+  }, [profileData]);
   
   // Fonction pour envoyer OTP
   const handleSendOTP = async () => {
@@ -226,6 +304,7 @@ const PublierAnnonce = () => {
     setDuration('');
     setPrice('');
     setCondition('');
+    setCamp(''); // Réinitialiser le camp
     setImages([]);
     setIsActive(true);
     setPreferredContact('email');
@@ -240,6 +319,7 @@ const PublierAnnonce = () => {
     if (!description) missing.push('description');
     if (!category) missing.push('catégorie');
     if (!type) missing.push('type d\'objet');
+    if (!camp) missing.push('camp'); // Vérification que le camp est bien renseigné
     if (images.length === 0) missing.push('photos');
     
     // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
@@ -289,17 +369,19 @@ const PublierAnnonce = () => {
     setLoading(true);
     
     try {
-      // Créer l'objet annonce
+      // Créer l'objet annonce avec le camp ajouté
       const nouvelleAnnonce = {
         title,
         description,
         category,
         type,
         condition,
+        camp, // Ajout du camp dans l'annonce
         price: category === 'Louer' || category === 'Acheter' ? price : '',
         duration: category === 'Louer' || category === 'Prêter' ? duration : '',
         images: images,
         isActive,
+        email: email,
         contact: {
           name: showName ? userName : '',
           phone: showPhone ? phoneNumber : '',
@@ -350,115 +432,6 @@ const PublierAnnonce = () => {
       <View style={[styles.loadingContainer, {backgroundColor: theme.background}]}>
         <ActivityIndicator size="large" color="#39335E" />
       </View>
-    );
-  }
-  
-  // Afficher le formulaire d'authentification si non authentifié
-  if (!isAuthenticated) {
-    return (
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.container, {backgroundColor: theme.background}]}
-      >
-        <StatusBar style={darkMode ? 'light' : 'dark'} />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={back}
-            accessible={true}
-            accessibilityLabel="Retour"
-            accessibilityHint="Retourner à l'écran précédent"
-            accessibilityRole="button"
-          >
-            {darkMode ? <Dark_back /> : <Back />}
-          </TouchableOpacity>
-          <Text style={[styles.heading, {color:theme.color}]}>Publication d'annonce</Text>
-          <View style={styles.headerRightPlaceholder} />
-        </View>
-        
-        <View style={styles.authContainer}>
-          <Text style={[styles.authTitle, {color: theme.color}]}>Authentification requise</Text>
-          <Text style={[styles.authDescription, {color: theme.color}]}>
-            Pour publier une annonce, veuillez vous authentifier avec votre adresse email.
-          </Text>
-          
-          {!otpSent ? (
-            <>
-              <View style={styles.formSection}>
-                <Text style={[styles.label, {color: theme.color}]}>Email<Text style={styles.requiredStar}>*</Text></Text>
-                <TextInput
-                  style={[styles.input, {backgroundColor: theme.cardbg2, color: theme.color}]}
-                  placeholder="Votre adresse email"
-                  placeholderTextColor="#A8A8A8"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-              
-              <TouchableOpacity 
-                style={[styles.submitButton, loading && styles.disabledButton]}
-                onPress={handleSendOTP}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Recevoir un code de vérification</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <View style={styles.formSection}>
-                <Text style={[styles.label, {color: theme.color}]}>Code de vérification<Text style={styles.requiredStar}>*</Text></Text>
-                <TextInput
-                  style={[
-                    styles.input, 
-                    {backgroundColor: theme.cardbg2, color: theme.color},
-                    otpError ? styles.inputError : null
-                  ]}
-                  placeholder="Entrez le code reçu par email"
-                  placeholderTextColor="#A8A8A8"
-                  value={otp}
-                  onChangeText={(text) => {
-                    setOtp(text);
-                    if (otpError) setOtpError('');
-                  }}
-                  keyboardType="number-pad"
-                />
-                {otpError ? <Text style={styles.errorText}>{otpError}</Text> : null}
-              </View>
-              
-              <TouchableOpacity 
-                style={[styles.submitButton, loading && styles.disabledButton]}
-                onPress={handleVerifyOTP}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Vérifier</Text>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.resendButton}
-                onPress={() => {
-                  setOtpSent(false);
-                  setOtp('');
-                  setOtpError('');
-                }}
-              >
-                <Text style={styles.resendButtonText}>Utiliser une autre adresse email</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-        <Toast />
-      </KeyboardAvoidingView>
     );
   }
   
@@ -513,6 +486,53 @@ const PublierAnnonce = () => {
             onChangeText={setTitle}
             maxLength={100}
           />
+        </View>
+        
+        {/* Section Camp (NOUVEAU) */}
+        <View style={styles.formSection}>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Camp<Text style={styles.requiredStar}>*</Text>
+          </Text>
+          <View style={[
+            styles.campButtonsContainer, 
+            !camp && missingFields.includes('camp') ? styles.containerError : null
+          ]}>
+            {campOptions.map((campOption, index) => (
+              <Pressable 
+                key={index}
+                style={({ pressed }) => [
+                  styles.campButton,
+                  { 
+                    backgroundColor: darkMode 
+                      ? (camp === campOption ? '#5D5FEF' : (pressed ? '#4D4D4D' : '#363636'))
+                      : (camp === campOption ? '#39335E' : (pressed ? '#D0D0D0' : '#F0F0F0')),
+                    opacity: pressed ? 0.9 : 1,
+                  }
+                ]}
+                onPress={() => setCamp(campOption)}
+              >
+                <Ionicons 
+                  name="flag" 
+                  size={18} 
+                  color={camp === campOption 
+                    ? '#FFFFFF' 
+                    : (darkMode ? '#FFFFFF' : '#39335E')} 
+                  style={styles.campIcon}
+                />
+                <Text 
+                  style={[
+                    styles.campText, 
+                    {color: camp === campOption 
+                      ? '#FFFFFF' 
+                      : (darkMode ? '#FFFFFF' : '#39335E')
+                    }
+                  ]}
+                >
+                  {campOption}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
         
         {/* Section catégorie */}
@@ -683,7 +703,7 @@ const PublierAnnonce = () => {
             textAlignVertical="top"
           />
         </View>
-        
+      
         {/* Section état */}
         <View style={styles.formSection}>
           <Text style={[styles.label, {color: theme.color}]}>État</Text>
@@ -765,11 +785,14 @@ const PublierAnnonce = () => {
         <View style={[styles.formSection, styles.sectionSeparator]}>
           <Text style={[styles.sectionTitle, {color: theme.color}]}>Informations de contact</Text>
           
-          {/* Email (déjà entré lors de l'authentification) */}
+          {/* Email (récupéré de l'utilisateur connecté) - NON MODIFIABLE */}
           <View style={styles.contactFieldRow}>
             <View style={styles.contactFieldLabel}>
               <Text style={[styles.label, {color: theme.color}]}>Email</Text>
               <Text style={[styles.fieldValue, {color: theme.color}]}>{email}</Text>
+              <Text style={[styles.fieldNote, {color: theme.darkGrey}]}>
+                (Email associé à votre compte)
+              </Text>
             </View>
             <View style={styles.switchContainer}>
               <Text style={{color: theme.color, fontSize: 14, marginRight: 8}}>Afficher</Text>
@@ -801,7 +824,52 @@ const PublierAnnonce = () => {
           </View>
           
           {/* Téléphone (facultatif) */}
+          
           <View style={styles.contactField}>
+        <View style={styles.contactFieldRow}>
+          <Text style={[styles.label, {color: theme.color}]}>
+            Téléphone {isPhoneRequired ? '' : '(facultatif)'}
+            {isPhoneRequired && <Text style={styles.requiredStar}>*</Text>}
+          </Text>
+          <Switch
+            value={showPhone}
+            onValueChange={setShowPhone}
+            trackColor={{ false: "#767577", true: "#39335E" }}
+          />
+        </View>
+        
+        {/* Remplacer le TextInput par CustomPhoneInput */}
+        <CustomPhoneInput
+          ref={phoneInput}
+          defaultValue={phoneNumber}
+          defaultCode="CH" // Ou le code du pays par défaut que vous souhaitez
+          onChangeText={handlePhoneChange}
+          onChangeFormattedText={handleFormattedPhoneChange}
+          containerStyle={[styles.phoneInputContainer, {
+            borderColor: theme.bordercolor,
+            backgroundColor: theme.cardbg,
+          }]}
+          textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: theme.cardbg }]}
+          textInputStyle={[styles.phoneInputText, { color: theme.color }]}
+          codeTextStyle={{ color: theme.color }}
+          textInputProps={{
+            placeholderTextColor: theme.color3 || "#A8A8A8",
+          }}
+          flagButtonStyle={{ backgroundColor: theme.background }}
+          hasError={hasPhoneError}
+          theme={theme}
+        />
+        
+        {hasPhoneError && (
+          <Text style={[styles.errorText, { color: theme.log || '#FF0000' }]}>
+            Ce champ est obligatoire
+          </Text>
+        )}
+      </View>
+
+          
+
+          {/* <View style={styles.contactField}>
             <View style={styles.contactFieldRow}>
               <Text style={[styles.label, {color: theme.color}]}>
                 Téléphone (facultatif)
@@ -825,8 +893,7 @@ const PublierAnnonce = () => {
               onChangeText={setPhoneNumber}
               keyboardType="phone-pad"
             />
-          </View>
-          
+          </View> */}
           {/* Moyen de communication préféré */}
           <View style={styles.formSection}>
             <Text style={[styles.label, {color: theme.color}]}>Moyen de communication préféré</Text>
@@ -1037,6 +1104,29 @@ const styles = StyleSheet.create({
   activeCategoryText: {
     color: '#FFFFFF',
   },
+  // Nouveaux styles pour la section Camp
+  campButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  campButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%', // Pour avoir 2 par ligne avec un petit espace entre
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    justifyContent: 'center',
+  },
+  campIcon: {
+    marginRight: 6,
+  },
+  campText: {
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 14,
+  },
   typeButtonsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1138,7 +1228,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   
-  // Nouvelles styles pour l'authentification
+  // Styles pour l'authentification
   authContainer: {
     flex: 1,
     padding: 20,
@@ -1166,7 +1256,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   
-  // Nouvelles styles pour les sections de contact
+  // Styles pour les sections de contact
   sectionSeparator: {
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
@@ -1194,6 +1284,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_500Medium',
     fontSize: 14,
   },
+  fieldNote: {
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
   switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1218,8 +1314,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginLeft: 6,
   },
-  
-  
   visibilityContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1234,5 +1328,48 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_500Medium',
     fontSize: 14,
     fontStyle: 'italic',
-  }
+  },
+  phoneInputContainer: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  phoneInputTextContainer: {
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    paddingVertical: 0,
+  },
+  phoneInputText: {
+    fontSize: 16,
+    paddingVertical: 0,
+    height: 40,
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: '#FF0000',
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    color: '#FF0000',
+  },
+  requiredStar: {
+    color: '#FF0000',
+    marginLeft: 2,
+  },
+  contactField: {
+    marginBottom: 16,
+  },
+  contactFieldRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });

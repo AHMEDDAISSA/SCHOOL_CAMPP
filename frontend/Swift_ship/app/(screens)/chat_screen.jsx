@@ -32,7 +32,7 @@ const getAdvertData = (advertId) => {
     title: "Gants de ski taille 8 ans",
     type: "Prêt",
     status: "Disponible",
-    image: require('../../assets/images/aa.jpg'),
+    image: require('../../assets/images/anny.jpg'),
   };
 };
 

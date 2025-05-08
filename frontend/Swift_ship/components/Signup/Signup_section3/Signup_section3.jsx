@@ -19,7 +19,7 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [countdown, setCountdown] = useState(180); // Changé: 3 minutes en secondes
+  const [countdown, setCountdown] = useState(90); // Changé: 3 minutes en secondes
   const [canResend, setCanResend] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
@@ -46,7 +46,7 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
   // Reset states when modal opens
   useEffect(() => {
     if (modalVisible5) {
-      setCountdown(180); // Changé: 3 minutes
+      setCountdown(90); // Changé: 3 minutes
       setCanResend(false);
       setOtpCode('');
       setAttempts(0);
@@ -174,7 +174,7 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
       const response = await resendOTP(userId, email);
       
       if (response && (response.status === 'success' || response.success)) {
-        setCountdown(180); // Reset à 3 minutes
+        setCountdown(90); // Reset à 3 minutes
         setCanResend(false);
         setOtpCode(''); // Efface le code précédent
         setAttempts(0); // Reset attempts
@@ -200,7 +200,7 @@ const Signup_section3 = ({ email, userId, closeModal5, modalVisible5 }) => {
           const fallbackResponse = await resendOTP(userId);
           
           if (fallbackResponse && (fallbackResponse.status === 'success' || fallbackResponse.success)) {
-            setCountdown(180); // Reset à 3 minutes
+            setCountdown(90); // Reset à 3 minutes
             setCanResend(false);
             setOtpCode(''); // Efface le code précédent
             setAttempts(0); // Reset attempts

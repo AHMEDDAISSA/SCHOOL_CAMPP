@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create an axios instance with timeout and base URL
 const api = axios.create({
-  baseURL: 'http://192.168.168.65:3001',
+  baseURL: 'http://192.168.1.17:3001',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +25,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => {
     console.log(`[Response] ${response.status}:`, response.data);
-    return response;
+    return response.data;
   },
   error => {
     if (error.code === 'ECONNABORTED') {
@@ -45,7 +45,7 @@ api.interceptors.response.use(
 export const loginUser = async (email) => {
   try {
     const response = await api.post('/auth/login', { email });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('loginUser error:', error.message);
     throw error;
@@ -56,7 +56,7 @@ export const loginUser = async (email) => {
 export const addUser = async (email) => {
   try {
     const response = await api.get('/user/add-user', { params: { email } });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('addUser error:', error.message);
     throw error;
@@ -67,7 +67,7 @@ export const addUser = async (email) => {
 export const createUser = async (email) => {
   try {
     const response = await api.post('/user', { email });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('createUser error:', error.message);
     throw error;
@@ -78,7 +78,7 @@ export const createUser = async (email) => {
 export const getUsers = async () => {
   try {
     const response = await api.post('/user/get-users');
-    return response.data;
+    return response;
   } catch (error) {
     console.error('getUsers error:', error.message);
     throw error;
@@ -91,18 +91,19 @@ export const getUser = async (token) => {
     const response = await api.post('/user/get-user', {}, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('getUser error:', error.message);
     throw error;
   }
 };
 
+// POST: Register user
 export const registerUser = async (userData) => {
   try {
     console.log('Registering user with data:', userData);
     const response = await api.post('/auth/register', { user: userData });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('registerUser error:', error);
     if (error.response) {
@@ -119,7 +120,7 @@ export const registerUser = async (userData) => {
 export const verifyOTP = async (userId, code) => {
   try {
     const response = await api.post('/auth/verify-email', { userId, code });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('verifyOTP error:', error.message);
     throw error;
@@ -131,15 +132,17 @@ export const resendOTP = async (userId, email = null) => {
   try {
     const payload = { userId };
     if (email) {
-      payload.email = email; // Include email only if provided
+      payload.email = email;
     }
     const response = await api.post('/auth/resend-verification', payload);
-    return response.data;
+    return response;
   } catch (error) {
     console.error('resendOTP error:', error.message);
     throw error;
   }
 };
+
+// === AD/LISTING METHODS ===
 
 // POST: Create a new ad/listing
 export const createAd = async (token, adData) => {
@@ -147,7 +150,7 @@ export const createAd = async (token, adData) => {
     const response = await api.post('/api/ads', adData, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('createAd error:', error.message);
     throw error;
@@ -177,7 +180,7 @@ export const uploadImage = async (token, imageUri, adId) => {
         'Content-Type': 'multipart/form-data'
       }
     });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('uploadImage error:', error.message);
     throw error;
@@ -201,7 +204,7 @@ export const uploadMultipleImages = async (token, imageUris, adId) => {
 export const getAds = async () => {
   try {
     const response = await api.get('/api/ads');
-    return response.data;
+    return response;
   } catch (error) {
     console.error('getAds error:', error.message);
     throw error;
@@ -212,7 +215,7 @@ export const getAds = async () => {
 export const getAdById = async (adId) => {
   try {
     const response = await api.get(`/api/ads/${adId}`);
-    return response.data;
+    return response;
   } catch (error) {
     console.error('getAdById error:', error.message);
     throw error;
@@ -225,9 +228,115 @@ export const getUserAds = async (token) => {
     const response = await api.get('/api/user/ads', {
       headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data;
+    return response;
   } catch (error) {
     console.error('getUserAds error:', error.message);
+    throw error;
+  }
+};
+
+// === ADMIN METHODS ===
+
+// GET: Fetch admin statistics
+export const fetchStatistics = async (token) => {
+  try {
+    const response = await api.get('/api/admin/statistics', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('fetchStatistics error:', error.message);
+    throw error;
+  }
+};
+
+// GET: Fetch listings (all or pending announcements)
+export const fetchListings = async (token) => {
+  try {
+    const response = await api.get('/api/admin/pending-announcements', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('fetchListings error:', error.message);
+    throw error;
+  }
+};
+
+// POST: Moderate a listing (approve/reject/reset)
+export const moderateListing = async (listingId, action, token) => {
+  try {
+    const response = await api.post(`/api/admin/listings/${listingId}/moderate`, { action }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('moderateListing error:', error.message);
+    throw error;
+  }
+};
+
+// GET: Fetch all users
+export const fetchUsers = async (token) => {
+  try {
+    const response = await api.get('/api/admin/users', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('fetchUsers error:', error.message);
+    throw error;
+  }
+};
+
+// PUT: Block or unblock a user
+export const blockUser = async (userId, isBlocked, token) => {
+  try {
+    const response = await api.put(`/api/admin/users/${userId}/toggle-status`, { isActive: !isBlocked }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('blockUser error:', error.message);
+    throw error;
+  }
+};
+
+// POST: Reset the system (annual reset)
+export const resetSystem = async (token) => {
+  try {
+    const response = await api.post('/api/admin/reset-system', {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('resetSystem error:', error.message);
+    throw error;
+  }
+};
+
+// GET: Get system settings
+export const getSystemSettings = async (token) => {
+  try {
+    const response = await api.get('/api/admin/settings', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('getSystemSettings error:', error.message);
+    throw error;
+  }
+};
+
+// PUT: Update system settings
+export const updateSystemSettings = async (token, settings) => {
+  try {
+    const response = await api.put('/api/admin/settings', settings, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('updateSystemSettings error:', error.message);
     throw error;
   }
 };
