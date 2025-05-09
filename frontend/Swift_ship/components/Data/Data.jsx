@@ -54,11 +54,13 @@ export const pages = [
         id: 1,
         image: ecole,
         heading: 'Bienvenue sur Brillaz Camp ! Achetez ou prêtez facilement le matériel pour votre aventure. ',
+        // heading: 'Bienvenue sur Brillaz Camp ! Achetez ou prêtez facilement le matériel pour votre aventure. ',
     },
     {
         id: 2,
         image: R,
         heading: 'Trouvez facilement le matériel de camp dont vous avez besoin, en quelques clics seulement.',
+        // heading: 'Trouvez facilement le matériel de camp dont vous avez besoin, en quelques clics seulement.',
         
     },
     {
@@ -66,6 +68,7 @@ export const pages = [
         image: freepik,
         heading: 'Votre camp, votre matériel, en toute simplicité. Appuyez sur Suivant pour en savoir plus !',
     },
+    // heading: 'Votre camp, votre matériel, en toute simplicité. Appuyez sur Suivant pour en savoir plus !',
 ];
 
 export const log_method = [
@@ -73,7 +76,7 @@ export const log_method = [
     {
         id: 2,
         icon: <Google />,
-        text: 'Continue With Google',
+        text: 'Continuer avec Google',
     }, 
     // {
     //     id: 1,

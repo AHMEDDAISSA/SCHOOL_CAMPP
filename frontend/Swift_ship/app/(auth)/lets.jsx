@@ -25,11 +25,11 @@ const lets = () => {
           <Text style={[styles.heading, { color: theme.color }]}>Accédez facilement</Text>
         </View>
         <Log_method />
-        <View style={styles.bottom_row}>
+        <View style={styles.bottom_row}> 
           <View style={styles.line}></View>
           <Text style={styles.or}>ou</Text>
           <View style={styles.line}></View>
-        </View>
+         </View>
         <Button buttonText="suivant" onPress={() => { router.push('signup') }} />
         <Text style={[styles.bottom_text, { color: theme.color3 }]}>
         Vous avez déjà un compte ? <Link href='/login' style={styles.link}> S'identifier</Link>

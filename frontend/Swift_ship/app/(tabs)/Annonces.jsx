@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform, Alert, TextInput} from 'react-native';
 import React, { useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
@@ -173,6 +173,7 @@ const getCategoryColor = (category) => {
   }
 };
 
+
 const formatDate = (dateString) => {
   // You can improve this with a date library like date-fns
   const today = new Date();
@@ -206,6 +207,36 @@ const Annonces = () => {
     updateNewStatus,
     deleteAnnonce
   } = useContext(AnnonceContext);
+
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+  if (searchQuery !== debouncedSearchTerm) {
+    setIsSearching(true);
+  }
+  
+  const timerId = setTimeout(() => {
+    setDebouncedSearchTerm(searchQuery);
+    setIsSearching(false);
+  }, 500); // 500ms de délai avant de déclencher la recherche
+
+  return () => {
+    clearTimeout(timerId);
+  };
+}, [searchQuery]);
+useEffect(() => {
+  // Vérifier si une recherche est active et si aucun résultat n'est trouvé
+  if (debouncedSearchTerm && filteredAnnonces.length === 0 && !loading) {
+    Toast.show({
+      type: 'info',
+      text1: 'Aucune annonce trouvée',
+      text2: 'Essayez avec d\'autres mots-clés',
+      position: 'bottom',
+      visibilityTime: 2000,
+    });
+  }
+}, [debouncedSearchTerm, filteredAnnonces, loading]);
+
   
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -217,6 +248,7 @@ const Annonces = () => {
     Montserrat_600SemiBold,
     Montserrat_500Medium,
   });
+  
   
   // Catégories de filtrage
   const categories = [
@@ -233,6 +265,7 @@ const Annonces = () => {
   const [activeFilter, setActiveFilter] = useState('0');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(''); 
   const [hasMore, setHasMore] = useState(true);
   
   // Initialisation et nettoyage
@@ -352,17 +385,18 @@ const Annonces = () => {
   
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
-    return annonces.filter(item => {
-      const matchesCategory = activeFilter === '0' || 
-        item.category === categories.find(cat => cat.id === activeFilter)?.name;
-      
-      const matchesSearch = !searchQuery || 
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        item.type.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      return matchesCategory && matchesSearch;
-    });
-  }, [annonces, activeFilter, searchQuery, categories]);
+  return annonces.filter(item => {
+    const matchesCategory = activeFilter === '0' || 
+      item.category === categories.find(cat => cat.id === activeFilter)?.name;
+    
+    const matchesSearch = !debouncedSearchTerm || 
+      item.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || 
+      item.type.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      (item.description && item.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase())); // Ajout de la recherche dans la description si elle existe
+    
+    return matchesCategory && matchesSearch;
+  });
+}, [annonces, activeFilter, debouncedSearchTerm, categories]);
   
   // Optimiser les fonctions de rendu pour la FlatList
   const keyExtractor = useCallback((item) => item.id, []);
@@ -410,18 +444,40 @@ const Annonces = () => {
         </View>
         
         {/* Barre de recherche */}
-        <TouchableOpacity 
-          style={[styles.input_container, {backgroundColor:theme.cardbg2}]} 
-          onPress={() => router.push('(screens)/recherche_annonce')}
-          accessible={true}
-          accessibilityLabel="Rechercher une annonce"
-          accessibilityHint="Appuyez pour ouvrir l'écran de recherche"
-          accessibilityRole="search"
-        >
-          <Search style={styles.search} />
-          <Text style={styles.placeholder}>Rechercher une annonce...</Text>
-          <Filter style={styles.filter} />
-        </TouchableOpacity>
+<View style={[styles.input_container, {backgroundColor:theme.cardbg2}]}>
+  <View style={styles.searchIconContainer}>
+    <Search width={20} height={20} />
+  </View>
+  
+  
+  <TextInput
+    style={[styles.searchInput, {color: theme.color}]}
+    placeholder="Rechercher une annonce..."
+    placeholderTextColor="#A8A8A8"
+    value={searchQuery}
+    onChangeText={setSearchQuery}
+    accessible={true}
+    accessibilityRole="search"
+  />
+  
+  {isSearching ? (
+    <ActivityIndicator size="small" color="#A8A8A8" style={styles.searchingIndicator} />
+  ) : searchQuery ? (
+    <TouchableOpacity 
+      onPress={() => setSearchQuery('')}
+      style={styles.clearButton}
+    >
+      <Ionicons name="close-circle" size={20} color="#A8A8A8" />
+    </TouchableOpacity>
+  ) : (
+    <TouchableOpacity 
+      onPress={() => setActiveFilter('0')}
+      style={styles.filterButton}
+    >
+      <Filter width={20} height={20} />
+    </TouchableOpacity>
+  )}
+</View>
         
         {/* Bouton Publier une annonce */}
         <TouchableOpacity 
@@ -527,7 +583,7 @@ const Annonces = () => {
         </View>
         
         {/* Bouton s'abonner aux notifications - Fixed at bottom */}
-        {filteredAnnonces.length > 0 && (
+        {/* {filteredAnnonces.length > 0 && (
           <View style={styles.subscribeButtonContainer}>
             <TouchableOpacity 
               style={styles.subscribeButton}
@@ -541,7 +597,7 @@ const Annonces = () => {
               <Text style={styles.subscribeButtonText}>S'abonner aux nouvelles annonces</Text>
             </TouchableOpacity>
           </View>
-        )}
+        )} */}
       </View>
     </SafeAreaView>
   );
@@ -859,4 +915,42 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_600SemiBold',
     marginLeft: 4,
   },
+  searchInput: {
+  flex: 1,
+  fontFamily: 'Montserrat_500Medium',
+  paddingLeft: 10,
+  paddingRight: 10,
+},
+clearButton: {
+  padding: 5,
+  marginRight: 5,
+},
+input_container: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderRadius: 10,
+  paddingVertical: 12,
+  paddingHorizontal: 15,
+  marginBottom: 15,
+},
+searchIconContainer: {
+  marginRight: 10,
+},
+searchInput: {
+  flex: 1,
+  fontFamily: 'Montserrat_500Medium',
+  fontSize: 14,
+  includeFontPadding: false,
+},
+clearButton: {
+  marginLeft: 10,
+  padding: 4,
+},
+filterButton: {
+  marginLeft: 10,
+  padding: 4,
+},
+searchingIndicator: {
+  marginHorizontal: 10,
+},
 });
