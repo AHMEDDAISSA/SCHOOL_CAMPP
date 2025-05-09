@@ -94,9 +94,30 @@ const PublierAnnonce = () => {
     }
   };
 
+  const handleContactMethodChange = (methodId) => {
+  setPreferredContact(methodId);
+  
+  // Réinitialisez les erreurs de validation liées au téléphone
+  if (methodId === 'phone' && !phoneNumber) {
+    // Assurez-vous que missingFields est bien un tableau avant de modifier
+    setMissingFields(prevFields => {
+      const updatedFields = Array.isArray(prevFields) ? [...prevFields] : [];
+      if (!updatedFields.includes('numéro de téléphone')) {
+        updatedFields.push('numéro de téléphone');
+      }
+      return updatedFields;
+    });
+  } else {
+    // Retirez l'erreur du téléphone si une autre méthode est sélectionnée
+    setMissingFields(prevFields => {
+      if (!Array.isArray(prevFields)) return [];
+      return prevFields.filter(field => field !== 'numéro de téléphone');
+    });
+  }
+};
 
   const isPhoneRequired = preferredContact === 'phone';
-  const hasPhoneError = isPhoneRequired && !phoneNumber && missingFields.includes('numéro de téléphone');
+  const hasPhoneError = isPhoneRequired && !phoneNumber && Array.isArray(missingFields) && missingFields.includes('numéro de téléphone');
 
   // États pour l'authentification par OTP
   const [otpSent, setOtpSent] = useState(false);
@@ -315,35 +336,54 @@ const PublierAnnonce = () => {
   const validateForm = () => {
     const missing = [];
     
-    if (!title) missing.push('titre');
-    if (!description) missing.push('description');
-    if (!category) missing.push('catégorie');
-    if (!type) missing.push('type d\'objet');
-    if (!camp) missing.push('camp'); // Vérification que le camp est bien renseigné
-    if (images.length === 0) missing.push('photos');
-    
-    // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
-    if ((category === 'Louer' || category === 'Acheter') && !price) {
-      missing.push('prix');
-    }
-    
-    // Vérifier la durée si la catégorie est "Louer"
-    if (category === 'Louer' && !duration) {
-      missing.push('durée');
-    }
-    
-    // Vérifier le moyen de communication préféré
-    if (preferredContact === 'phone' && !phoneNumber) {
-      missing.push('numéro de téléphone');
-    }
-    
-    setMissingFields(missing);
-    return missing.length === 0;
-  };
+     if (!title) missing.push('titre');
+  if (!description) missing.push('description');
+  if (!category) missing.push('catégorie');
+  if (!type) missing.push('type d\'objet');
+  if (!camp) missing.push('camp');
+  if (images.length === 0) missing.push('photos');
+  
+  if ((category === 'Louer' || category === 'Acheter') && !price) {
+    missing.push('prix');
+  }
+  
+  if (category === 'Louer' && !duration) {
+    missing.push('durée');
+  }
+  
+  // Vérifier explicitement le moyen de communication préféré
+  if (preferredContact === 'phone' && !phoneNumber) {
+    missing.push('numéro de téléphone');
+  }
+  
+  setMissingFields(missing);
+  return missing.length === 0;
+};
   
   // Soumission du formulaire
   const handleSubmit = () => {
-    // Vérifier l'authentification
+    
+    if (preferredContact === 'phone' && !phoneNumber) {
+    setMissingFields(prevFields => {
+      if (!prevFields.includes('numéro de téléphone')) {
+        return [...prevFields, 'numéro de téléphone'];
+      }
+      return prevFields;
+    });
+    
+    Toast.show({
+      type: 'error',
+      text1: 'Numéro de téléphone requis',
+      text2: 'Veuillez saisir votre numéro de téléphone pour le moyen de contact préféré.',
+      position: 'bottom',
+      visibilityTime: 3000
+    });
+    return;
+  }
+
+
+
+
     if (!isAuthenticated) {
       Toast.show({
         type: 'error',
@@ -840,15 +880,19 @@ const PublierAnnonce = () => {
         
         {/* Remplacer le TextInput par CustomPhoneInput */}
         <CustomPhoneInput
-          ref={phoneInput}
-          defaultValue={phoneNumber}
-          defaultCode="CH" // Ou le code du pays par défaut que vous souhaitez
-          onChangeText={handlePhoneChange}
-          onChangeFormattedText={handleFormattedPhoneChange}
-          containerStyle={[styles.phoneInputContainer, {
-            borderColor: theme.bordercolor,
-            backgroundColor: theme.cardbg,
-          }]}
+            ref={phoneInput}
+            defaultValue={phoneNumber}
+            defaultCode="CH"
+            onChangeText={handlePhoneChange}
+            onChangeFormattedText={handleFormattedPhoneChange}
+            containerStyle={[
+              styles.phoneInputContainer, 
+              {
+                borderColor: theme.bordercolor,
+                backgroundColor: theme.cardbg,
+              },
+             hasPhoneError && styles.phoneInputError,
+           ]}
           textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: theme.cardbg }]}
           textInputStyle={[styles.phoneInputText, { color: theme.color }]}
           codeTextStyle={{ color: theme.color }}
@@ -861,10 +905,10 @@ const PublierAnnonce = () => {
         />
         
         {hasPhoneError && (
-          <Text style={[styles.errorText, { color: theme.log || '#FF0000' }]}>
-            Ce champ est obligatoire
-          </Text>
-        )}
+  <Text style={styles.phoneErrorMessage}>
+    Le numéro de téléphone facultatif est obligatoire pour ce moyen de contact
+  </Text>
+)}
       </View>
 
           
@@ -898,39 +942,39 @@ const PublierAnnonce = () => {
           <View style={styles.formSection}>
             <Text style={[styles.label, {color: theme.color}]}>Moyen de communication préféré</Text>
             <View style={styles.contactMethodsContainer}>
-              {contactMethods.map(method => (
-                <TouchableOpacity 
-                  key={method.id}
-                  style={[
-                    styles.contactMethodButton, 
-                    { backgroundColor: darkMode 
-                      ? (preferredContact === method.id ? '#5D5FEF' : '#363636') 
-                      : (preferredContact === method.id ? '#39335E' : '#F0F0F0') 
-                    }
-                  ]}
-                  onPress={() => setPreferredContact(method.id)}
-                >
-                  <Ionicons 
-                    name={method.icon} 
-                    size={20} 
-                    color={preferredContact === method.id 
-                      ? '#FFFFFF' 
-                      : (darkMode ? '#FFFFFF' : '#39335E')
-                    } 
-                  />
-                  <Text 
-                    style={[
-                      styles.contactMethodText, 
-                      {color: preferredContact === method.id 
-                        ? '#FFFFFF' 
-                        : (darkMode ? '#FFFFFF' : '#39335E')
-                      }
-                    ]}
-                  >
-                    {method.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+             {contactMethods.map(method => (
+  <TouchableOpacity 
+    key={method.id}
+    style={[
+      styles.contactMethodButton, 
+      { backgroundColor: darkMode 
+        ? (preferredContact === method.id ? '#5D5FEF' : '#363636') 
+        : (preferredContact === method.id ? '#39335E' : '#F0F0F0') 
+      }
+    ]}
+    onPress={() => handleContactMethodChange(method.id)}
+  >
+    <Ionicons 
+      name={method.icon} 
+      size={20} 
+      color={preferredContact === method.id 
+        ? '#FFFFFF' 
+        : (darkMode ? '#FFFFFF' : '#39335E')
+      } 
+    />
+    <Text 
+      style={[
+        styles.contactMethodText, 
+        {color: preferredContact === method.id 
+          ? '#FFFFFF' 
+          : (darkMode ? '#FFFFFF' : '#39335E')
+        }
+      ]}
+    >
+      {method.name}
+    </Text>
+  </TouchableOpacity>
+))}
             </View>
           </View>
         </View>
@@ -1371,5 +1415,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  phoneInputError: {
+    borderWidth: 2,
+    borderColor: '#EB001B',
+    backgroundColor: 'rgba(235, 0, 27, 0.05)',
+  },
+  phoneErrorMessage: {
+    color: '#EB001B',
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 12,
+    marginTop: 5,
+    marginBottom: 10,
   },
 });
