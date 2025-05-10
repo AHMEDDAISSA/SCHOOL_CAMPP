@@ -1,1612 +1,1529 @@
-import React, { useState, useEffect, useContext, useCallback, useReducer, memo } from 'react';
-import {StyleSheet,Text,View,ScrollView,TouchableOpacity,Modal,ActivityIndicator,Image,Alert,FlatList,RefreshControl,Platform,StatusBar} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Dimensions, Alert, Switch, BackHandler, FlatList, RefreshControl, TextInput } from 'react-native';
+import React, { useContext, useState, useEffect, useMemo, useCallback  } from 'react';
+import Notification from "../../assets/images/notification.svg";
+import Dark_Notification from "../../assets/images/dark_notification.svg";
+import { router } from "expo-router";
 import ThemeContext from '../../theme/ThemeContext';
-import Button from '../../components/Button/Button';
-import { Feather, MaterialIcons, Ionicons, FontAwesome } from '@expo/vector-icons';
+import ProtectedRoute from '../../components/ProtectedRoute/ProtectedRoute';
+import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import AnnonceContext from '../../contexts/AnnonceContext';
+import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
+import { useNavigation } from '@react-navigation/native';
+import { LineChart, PieChart } from 'react-native-chart-kit';
 
-// Mock API functions - replace with your actual API calls
-import { 
-  fetchStatistics, 
-  fetchListings, 
-  moderateListing, 
-  resetSystem,
-  fetchUsers,
-  blockUser
-} from '../../services/api';
+const AnnonceCard = React.memo(({ item, darkMode, onPress, onDelete }) => (
+  <TouchableOpacity 
+    style={[
+      styles.announceCard,
+      { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }
+    ]}
+    onPress={onPress}
+    accessible={true}
+    accessibilityLabel={`Annonce: ${item.title}`}
+    accessibilityHint="Appuyez pour voir les détails de l'annonce"
+    accessibilityRole="button"
+  >
+    <View style={[
+      styles.cardImageContainer,
+      { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }
+    ]}>
+      {(item.imageUrl || (item.images && item.images.length > 0)) ? (
+        <Image 
+          source={{ uri: item.imageUrl || item.images[0] }} 
+          style={styles.cardImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.placeholderImageContainer}>
+          <Ionicons 
+            name={getCategoryIcon(item.category)} 
+            size={30} 
+            color={darkMode ? '#666666' : '#CCCCCC'} 
+          />
+        </View>
+      )}
+      <View style={[
+        styles.categoryBadgeContainer, 
+        {backgroundColor: getCategoryColor(item.category)}
+      ]}>
+        <Text style={styles.categoryBadge}>{item.category}</Text>
+      </View>
+    </View>
+    <View style={styles.cardContent}>
+      <Text style={[
+        styles.cardTitle, 
+        { color: darkMode ? '#FFFFFF' : '#39335E' }
+      ]} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={[
+        styles.cardType, 
+        { color: darkMode ? '#AAAAAA' : '#666666' }
+      ]}>
+        {item.type}
+      </Text>
+      <View style={styles.cardFooter}>
+        <Text style={[
+          styles.cardDate, 
+          { color: darkMode ? '#AAAAAA' : '#666666' }
+        ]}>
+          {formatDate(item.date)}
+        </Text>
+        
+        {/* Bouton de suppression */}
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={(e) => {
+            e.stopPropagation(); // Empêcher la propagation vers la carte
+            onDelete(item.id);
+          }}
+          accessible={true}
+          accessibilityLabel="Supprimer l'annonce"
+          accessibilityHint="Appuyez pour supprimer cette annonce"
+          accessibilityRole="button"
+        >
+          <Ionicons name="trash-outline" size={14} color="white" />
+          <Text style={styles.deleteButtonText}>Effacer</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </TouchableOpacity>
+));
 
-// Custom hooks
-const useAuth = () => {
-  const handleLogout = useCallback(async () => {
-    try {
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userRole');
-      Toast.show({
-        type: 'success',
-        text1: 'Déconnexion réussie',
-        visibilityTime: 2000,
-        topOffset: 50
-      });
-      setTimeout(() => router.push('/login'), 500);
-    } catch (error) {
-      console.error('Error during logout:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Problème lors de la déconnexion',
-        visibilityTime: 3000
-      });
-    }
-  }, []);
-
-  return { handleLogout };
-};
-
-// State reducer for dashboard
-const dashboardReducer = (state, action) => {
-  switch (action.type) {
-    case 'FETCH_START':
-      return { ...state, loading: true, error: null };
-    case 'FETCH_SUCCESS':
-      return { 
-        ...state, 
-        loading: false, 
-        statistics: action.payload.statistics || state.statistics,
-        listings: action.payload.listings || state.listings,
-        users: action.payload.users || state.users,
-        error: null,
-        refreshing: false
-      };
-    case 'FETCH_ERROR':
-      return { 
-        ...state, 
-        loading: false, 
-        error: action.payload, 
-        refreshing: false 
-      };
-    case 'SET_REFRESHING':
-      return { ...state, refreshing: true };
-    case 'SET_FILTER_STATUS':
-      return { ...state, filterStatus: action.payload };
-    case 'UPDATE_LISTING_STATUS':
-      return {
-        ...state,
-        listings: state.listings.map(listing => 
-          listing.id === action.payload.id 
-            ? { ...listing, status: action.payload.status } 
-            : listing
-        )
-      };
-    case 'UPDATE_USER_STATUS':
-      return {
-        ...state,
-        users: state.users.map(user => 
-          user.id === action.payload.id 
-            ? { ...user, isBlocked: action.payload.isBlocked } 
-            : user
-        )
-      };
-    default:
-      return state;
+// Fonctions utilitaires pour les annonces
+const getCategoryIcon = (category) => {
+  switch(category) {
+    case 'Donner': return 'gift-outline';
+    case 'Prêter': return 'swap-horizontal-outline';
+    case 'Emprunter': return 'hand-left-outline';
+    case 'Louer': return 'cash-outline';
+    case 'Acheter': return 'cart-outline';
+    case 'Échanger': return 'repeat-outline';
+    default: return 'document-outline';
   }
 };
 
-// Memoized components
-const StatCard = memo(({ value, label, backgroundColor, valueColor, labelColor }) => (
-  <View style={[styles.statCard, { backgroundColor }]}>
-    <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
-    <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
-  </View>
-));
+const getCategoryColor = (category) => {
+  switch(category) {
+    case 'Donner': return '#4CAF50';
+    case 'Prêter': return '#2196F3';
+    case 'Emprunter': return '#FF9800';
+    case 'Louer': return '#9C27B0';
+    case 'Acheter': return '#F44336';
+    case 'Échanger': return '#009688';
+    default: return '#39335E';
+  }
+};
 
-const ActionButton = memo(({ icon, text, color, onPress }) => (
-  <TouchableOpacity 
-    style={[styles.actionButton, { backgroundColor: color }]}
-    onPress={onPress}
-    activeOpacity={0.8}
-    accessibilityRole="button"
-    accessibilityLabel={text}
-  >
-    {icon}
-    <Text style={styles.actionButtonText}>{text}</Text>
-  </TouchableOpacity>
-));
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+  
+  // Vérifier si le format est correct
+  const today = new Date();
+  const date = new Date(dateString.split('/').reverse().join('-'));
+  
+  // Check if it's today
+  if (date.toDateString() === today.toDateString()) {
+    return "Aujourd'hui";
+  }
+  
+  // Check if it's yesterday
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Hier";
+  }
+  
+  // Otherwise return the original format
+  return dateString;
+};
 
-const ActivityItem = memo(({ item, onView, theme }) => (
-  <View style={[styles.activityItem, { backgroundColor: theme.cardBackground }]}>
-    <View style={styles.activityContent}>
-      <Text style={[styles.activityTitle, { color: theme.textColor }]} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={[styles.activityMeta, { color: theme.textSecondary }]}>
-        {item.userName} • {new Date(item.createdAt).toLocaleDateString()}
-      </Text>
-      <Text 
-        style={[
-          styles.activityStatus, 
-          { 
-            color: item.status === 'pending' ? '#FFA500' : 
-                  item.status === 'approved' ? '#4CAF50' : '#FF6347' 
-          }
-        ]}
-      >
-        {item.status === 'pending' ? 'En attente' : 
-         item.status === 'approved' ? 'Approuvé' : 'Rejeté'}
-      </Text>
-    </View>
-    <TouchableOpacity 
-      style={styles.viewButton}
-      onPress={() => onView(item)}
-      activeOpacity={0.8}
-      accessibilityRole="button"
-      accessibilityLabel="Voir détails"
-    >
-      <Text style={styles.viewButtonText}>Voir</Text>
-    </TouchableOpacity>
-  </View>
-));
-
-const ListingItem = memo(({ 
-  item, 
-  onView, 
-  onModerate, 
-  theme 
-}) => (
-  <View style={[styles.listingItem, { backgroundColor: theme.cardBackground }]}>
-    <View style={styles.listingItemHeader}>
-      <Text style={[styles.listingTitle, { color: theme.textColor }]} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text 
-        style={[
-          styles.listingStatus, 
-          { 
-            color: item.status === 'pending' ? '#FFA500' : 
-                  item.status === 'approved' ? '#4CAF50' : '#FF6347' 
-          }
-        ]}
-      >
-        {item.status === 'pending' ? 'En attente' : 
-         item.status === 'approved' ? 'Approuvé' : 'Rejeté'}
-      </Text>
-    </View>
-    
-    <Text style={[styles.listingMeta, { color: theme.textSecondary }]}>
-      Par: {item.userName} • {new Date(item.createdAt).toLocaleDateString()}
-    </Text>
-    
-    <Text 
-      numberOfLines={2} 
-      style={[styles.listingDescription, { color: theme.textColor }]}
-    >
-      {item.description}
-    </Text>
-    
-    <View style={styles.listingCategory}>
-      <Text style={[styles.categoryLabel, { color: theme.textSecondary }]}>
-        Catégorie: 
-      </Text>
-      <Text style={[styles.categoryValue, { color: theme.textColor }]}>
-        {item.category}
-      </Text>
-      <Text style={[styles.categoryLabel, { color: theme.textSecondary, marginLeft: 10 }]}>
-        Type: 
-      </Text>
-      <Text style={[styles.categoryValue, { color: theme.textColor }]}>
-        {item.type}
-      </Text>
-    </View>
-    
-    <View style={styles.listingActions}>
-      <TouchableOpacity 
-        style={[styles.actionButtonSmall, styles.viewActionButton]}
-        onPress={() => onView(item)}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel="Voir détails"
-      >
-        <Feather name="eye" size={16} color="#FFFFFF" />
-        <Text style={styles.actionButtonSmallText}>Voir</Text>
-      </TouchableOpacity>
-      
-      {item.status === 'pending' && (
-        <>
-          <TouchableOpacity 
-            style={[styles.actionButtonSmall, styles.approveActionButton]}
-            onPress={() => onModerate(item.id, 'approve')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Approuver"
-          >
-            <Feather name="check" size={16} color="#FFFFFF" />
-            <Text style={styles.actionButtonSmallText}>Approuver</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionButtonSmall, styles.rejectActionButton]}
-            onPress={() => onModerate(item.id, 'reject')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Rejeter"
-          >
-            <Feather name="x" size={16} color="#FFFFFF" />
-            <Text style={styles.actionButtonSmallText}>Rejeter</Text>
-          </TouchableOpacity>
-        </>
-      )}
-      
-      {item.status !== 'pending' && (
-        <TouchableOpacity 
-          style={[styles.actionButtonSmall, styles.resetActionButton]}
-          onPress={() => onModerate(item.id, 'reset')}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Réinitialiser"
-        >
-          <Feather name="refresh-cw" size={16} color="#FFFFFF" />
-          <Text style={styles.actionButtonSmallText}>Réinitialiser</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-));
-
-const UserItem = memo(({ 
-  item, 
-  onBlockToggle, 
-  onRoleChange, 
-  theme 
-}) => (
-  <View style={[styles.userItem, { backgroundColor: theme.cardBackground }]}>
-    <View style={styles.userItemContent}>
-      <View style={styles.userAvatar}>
-        <Text style={styles.userInitials}>
-          {item.name.substring(0, 2).toUpperCase()}
-        </Text>
-      </View>
-      
-      <View style={styles.userInfo}>
-        <Text style={[styles.userName, { color: theme.textColor }]}>
-          {item.name}
-        </Text>
-        <Text style={[styles.userEmail, { color: theme.textSecondary }]}>
-          {item.email}
-        </Text>
-        <View style={styles.userDetailRow}>
-          <Text style={[styles.userDetailLabel, { color: theme.textSecondary }]}>
-            Rôle:
-          </Text>
-          <Text style={[styles.userDetailValue, { color: theme.textColor }]}>
-            {item.role === 'admin' ? 'Administrateur' : 
-             item.role === 'parent' ? 'Parent' : 'Exploitant'}
-          </Text>
-        </View>
-        <View style={styles.userDetailRow}>
-          <Text style={[styles.userDetailLabel, { color: theme.textSecondary }]}>
-            Statut:
-          </Text>
-          <Text 
-            style={[
-              styles.userDetailValue, 
-              { color: item.isBlocked ? '#FF6347' : '#4CAF50' }
-            ]}
-          >
-            {item.isBlocked ? 'Bloqué' : 'Actif'}
-          </Text>
-        </View>
-      </View>
-    </View>
-    
-    <View style={styles.userActions}>
-      <TouchableOpacity 
-        style={[
-          styles.userActionButton,
-          { backgroundColor: item.isBlocked ? '#4CAF50' : '#FF6347' }
-        ]}
-        onPress={() => onBlockToggle(item.id, item.isBlocked)}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={item.isBlocked ? "Débloquer" : "Bloquer"}
-      >
-        <Feather 
-          name={item.isBlocked ? 'unlock' : 'lock'} 
-          size={16} 
-          color="#FFFFFF" 
-        />
-        <Text style={styles.userActionButtonText}>
-          {item.isBlocked ? 'Débloquer' : 'Bloquer'}
-        </Text>
-      </TouchableOpacity>
-      
-      {item.role !== 'admin' && (
-        <TouchableOpacity 
-          style={[styles.userActionButton, { backgroundColor: '#53C1DE' }]}
-          onPress={() => onRoleChange(item)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Modifier rôle"
-        >
-          <Feather name="edit-2" size={16} color="#FFFFFF" />
-          <Text style={styles.userActionButtonText}>
-            Modifier rôle
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-));
-
-const NavItem = memo(({ 
-  icon, 
-  label, 
-  isActive, 
-  onPress, 
-  activeColor, 
-  inactiveColor 
-}) => (
-  <TouchableOpacity 
-    style={styles.navItem} 
-    onPress={onPress}
-    activeOpacity={0.7}
-    accessibilityRole="tab"
-    accessibilityLabel={label}
-    accessibilityState={{ selected: isActive }}
-  >
-    {icon(isActive ? activeColor : inactiveColor)}
-    <Text 
-      style={[
-        styles.navLabel, 
-        { color: isActive ? activeColor : inactiveColor }
-      ]}
-    >
-      {label}
-    </Text>
-  </TouchableOpacity>
-));
-
-const FilterButton = memo(({ 
-  label, 
-  isActive, 
-  onPress 
-}) => (
-  <TouchableOpacity 
-    style={[
-      styles.filterButton, 
-      isActive && styles.filterButtonActive
-    ]}
-    onPress={onPress}
-    activeOpacity={0.7}
-    accessibilityRole="button"
-    accessibilityLabel={`Filtrer par ${label}`}
-    accessibilityState={{ selected: isActive }}
-  >
-    <Text style={[
-      styles.filterText,
-      isActive && styles.filterTextActive
-    ]}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-));
-
-// Main component
 const AdminDashboard = () => {
-  const { theme, darkMode } = useContext(ThemeContext);
-  const { handleLogout } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedListing, setSelectedListing] = useState(null);
-  const [listingModalVisible, setListingModalVisible] = useState(false);
-  const [resetConfirmModalVisible, setResetConfirmModalVisible] = useState(false);
-
-  const [adminInfo, setAdminInfo] = useState({
-    name: 'Ahmed Aissa',
-    email: 'aahmedaissa@isima.u-monastir.tn',
-    role: 'Administrateur système',
-    lastLogin: new Date().toLocaleDateString(),
-    avatar: null
-  });
-
-  // Use reducer for complex state management
-  const [state, dispatch] = useReducer(dashboardReducer, {
-    loading: true,
-    refreshing: false,
-    statistics: null,
-    listings: [],
-    users: [],
-    filterStatus: 'all',
-    error: null
-  });
-
-  // Extract variables from state for cleaner code
-  const { 
-    loading, 
-    refreshing, 
-    statistics, 
-    listings, 
-    users, 
-    filterStatus, 
-    error 
-  } = state;
-
-  // Load initial data
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Load data function
-  const loadData = useCallback(async () => {
-    dispatch({ type: 'FETCH_START' });
-    try {
-      // Load dashboard data in parallel for better performance
-      const [stats, listingsData, usersData] = await Promise.all([
-        fetchStatistics(),
-        fetchListings(),
-        fetchUsers()
-      ]);
-      
-      dispatch({ 
-        type: 'FETCH_SUCCESS', 
-        payload: { 
-          statistics: stats, 
-          listings: listingsData, 
-          users: usersData 
-        } 
-      });
-    } catch (error) {
-      console.error('Error loading admin data:', error);
-      dispatch({ type: 'FETCH_ERROR', payload: error.message });
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur de chargement',
-        text2: 'Impossible de charger les données',
-        visibilityTime: 3000,
-        topOffset: 50
-      });
-    }
-  }, []);
-
-  // Refresh function
-  const onRefresh = useCallback(() => {
-    dispatch({ type: 'SET_REFRESHING' });
-    loadData();
-  }, [loadData]);
-
-  // Filter listings handler
-  const handleFilterChange = useCallback((status) => {
-    dispatch({ type: 'SET_FILTER_STATUS', payload: status });
-  }, []);
-
-  // View listing details
-  const handleViewListing = useCallback((listing) => {
-    setSelectedListing(listing);
-    setListingModalVisible(true);
-  }, []);
-
-  // Moderate listing
-  const handleModerateListing = useCallback(async (id, action) => {
-    dispatch({ type: 'FETCH_START' });
-    try {
-      await moderateListing(id, action);
-      
-      // Update listing status
-      dispatch({ 
-        type: 'UPDATE_LISTING_STATUS', 
-        payload: { 
-          id,
-          status: action === 'approve' ? 'approved' : 
-                 action === 'reject' ? 'rejected' : 'pending'
-        } 
-      });
-      
-      setListingModalVisible(false);
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Action effectuée',
-        text2: action === 'approve' ? 'Annonce approuvée' : 
-               action === 'reject' ? 'Annonce rejetée' : 'Annonce réinitialisée',
-        visibilityTime: 2000,
-        topOffset: 50
-      });
-    } catch (error) {
-      console.error('Error moderating listing:', error);
-      dispatch({ type: 'FETCH_ERROR', payload: error.message });
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Une erreur est survenue lors de la modération',
-        visibilityTime: 3000,
-        topOffset: 50
-      });
-    }
-  }, []);
-
-  // Block/unblock user
-  const handleBlockUser = useCallback(async (userId, isBlocked) => {
-    try {
-      await blockUser(userId, !isBlocked);
-      
-      // Update user status
-      dispatch({ 
-        type: 'UPDATE_USER_STATUS', 
-        payload: { 
-          id: userId,
-          isBlocked: !isBlocked
-        } 
-      });
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Action effectuée',
-        text2: isBlocked ? 'Utilisateur débloqué' : 'Utilisateur bloqué',
-        visibilityTime: 2000,
-        topOffset: 50
-      });
-    } catch (error) {
-      console.error('Error toggling user block status:', error);
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Une erreur est survenue',
-        visibilityTime: 3000,
-        topOffset: 50
-      });
-    }
-  }, []);
-
-  // Handle user role change
-  const handleRoleChange = useCallback((user) => {
+  const { theme, darkMode, profileData } = useContext(ThemeContext);
+  const { annonces, loading, refreshAnnonces, deleteAnnonce, cleanOldAnnonces, updateNewStatus } = useContext(AnnonceContext);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'annonces', 'users', 'settings'
+  const [announcesModalVisible, setAnnouncesModalVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('0'); // Catégorie sélectionnée
+  const [searchQuery, setSearchQuery] = useState('');
+  const screenWidth = Dimensions.get('window').width - 32;
+    
+  // Navigation hook inside the component
+  const navigation = useNavigation();
+    
+  // Logout handler
+  const handleLogout = () => {
     Alert.alert(
-      'Confirmation',
-      `Voulez-vous modifier le rôle de ${user.name} ?`,
+      "Déconnexion",
+      "Êtes-vous sûr de vouloir vous déconnecter? Toutes vos données seront effacées de cet appareil.",
       [
-        { text: 'Annuler', style: 'cancel' },
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        {
+          text: "Déconnexion",
+          style: "destructive",
+          onPress: async () => {
+            const success = await logout();
+            if (success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Déconnecté avec succès',
+                text2: 'À bientôt!',
+                visibilityTime: 3000
+              });
+              router.replace('/login');
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Erreur de déconnexion',
+                text2: 'Veuillez réessayer',
+                visibilityTime: 3000
+              });
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Load fonts
+  const [fontsLoaded] = useFonts({
+    Montserrat_700Bold,
+    Montserrat_600SemiBold,
+    Montserrat_500Medium,
+  });
+    
+  useEffect(() => {
+    const backAction = () => {
+      Alert.alert(
+        "Confirmation", 
+        "Voulez-vous vraiment quitter et retourner à la page précédente ?",
+        [
+          {
+            text: "Annuler",
+            onPress: () => null,
+            style: "cancel"
+          },
+          { 
+            text: "Oui", 
+            onPress: () => router.back() 
+          }
+        ]
+      );
+      return true; 
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
+  const [categoryStats, setCategoryStats] = useState([
+    { name: 'Donner', count: 15, color: '#4CAF50' },
+    { name: 'Prêter', count: 12, color: '#2196F3' },
+    { name: 'Emprunter', count: 8, color: '#FF9800' },
+    { name: 'Louer', count: 4, color: '#9C27B0' },
+    { name: 'Acheter', count: 2, color: '#F44336' },
+    { name: 'Échanger', count: 1, color: '#009688' }
+  ]);
+
+  useEffect(() => {
+    if (annonces && annonces.length > 0) {
+      // Initialiser un objet pour compter les annonces par catégorie
+      const categoryCounts = {
+        'Donner': 0,
+        'Prêter': 0,
+        'Emprunter': 0,
+        'Louer': 0,
+        'Acheter': 0,
+        'Échanger': 0
+      };
+      
+      // Compter les annonces par catégorie
+      annonces.forEach(annonce => {
+        if (categoryCounts.hasOwnProperty(annonce.category)) {
+          categoryCounts[annonce.category]++;
+        }
+      });
+      const updatedCategoryStats = [
+        { name: 'Donner', count: categoryCounts['Donner'], color: '#4CAF50' },
+        { name: 'Prêter', count: categoryCounts['Prêter'], color: '#2196F3' },
+        { name: 'Emprunter', count: categoryCounts['Emprunter'], color: '#FF9800' },
+        { name: 'Louer', count: categoryCounts['Louer'], color: '#9C27B0' },
+        { name: 'Acheter', count: categoryCounts['Acheter'], color: '#F44336' },
+        { name: 'Échanger', count: categoryCounts['Échanger'], color: '#009688' }
+      ];
+      
+      // Filtrer pour n'afficher que les catégories qui ont au moins une annonce
+      const filteredStats = updatedCategoryStats.filter(cat => cat.count > 0);
+      
+      // Mettre à jour l'état
+      setCategoryStats(filteredStats.length > 0 ? filteredStats : updatedCategoryStats);
+    }
+  }, [annonces]);
+
+  const [visitStats, setVisitStats] = useState([13]);
+
+  useEffect(() => {
+    // Créer des données de visites basées sur le nombre d'annonces
+    if (annonces && annonces.length > 0) {
+      const baseVisits = Math.max(5, Math.floor(annonces.length / 2));
+      const visitVariation = () => Math.floor(Math.random() * baseVisits);
+      
+      const weekVisits = [
+        baseVisits + visitVariation(),
+        baseVisits + visitVariation(),
+        baseVisits + visitVariation(),
+        baseVisits + 2 * visitVariation(),
+        baseVisits + 2 * visitVariation(),
+        baseVisits - Math.floor(visitVariation() / 2),
+        baseVisits - Math.floor(visitVariation() / 2)
+      ];
+      
+      setVisitStats(weekVisits);
+    }
+  }, [annonces]);
+
+  const [flaggedAnnounces, setFlaggedAnnounces] = useState(0);
+  const [annoncesToModerate, setAnnoncesToModerate] = useState([
+    {
+      id: 'm1',
+      title: 'Pantalon de ski Rouge',
+      category: 'Prêter',
+      reason: 'Contact externe',
+      date: '04/05/2025',
+      type: 'Vêtement',
+      campType: 'Camp De Ski',
+      size: '10-12 ans',
+      imageUrl: null
+    },
+    {
+      id: 'm2',
+      title: 'Bottes de randonnée',
+      category: 'Donner',
+      reason: 'Contenu inapproprié',
+      date: '01/05/2025',
+      
+      type: 'Chaussures',
+      campType: 'Camp Vert',
+      imageUrl: null
+    },
+    {
+      id: 'm3',
+      title: 'Bonnet et gants de ski',
+      category: 'Vendre',
+      reason: 'Prix excessif',
+      date: '30/04/2025',
+      
+      type: 'Accessoire',
+      campType: 'Camp De Ski',
+      imageUrl: null
+    },
+  ]);
+
+  // Mettez à jour cet état quand les annonces à modérer changent
+  useEffect(() => {
+    if (annoncesToModerate) {
+      setFlaggedAnnounces(annoncesToModerate.length);
+    }
+  }, [annoncesToModerate]);
+
+  // Initialisation et récupération des données
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Mettre à jour le statut "nouveau" des annonces
+        await updateNewStatus();
+        
+        // Nettoyer les anciennes annonces (plus de 30 jours)
+        const deletedCount = await cleanOldAnnonces(30);
+        if (deletedCount > 0) {
+          console.log(`${deletedCount} anciennes annonces supprimées`);
+        }
+        
+        // Rafraîchir les annonces
+        await refreshAnnonces();
+      } catch (error) {
+        console.error('Erreur d\'initialisation:', error);
+      }
+    };
+    
+    initializeData();
+  }, []);
+
+  const [statsPeriod, setStatsPeriod] = useState('week'); // 'week', 'month', 'year'
+  
+  // Catégories de filtrage
+  const categories = [
+    { id: '0', name: 'Tous' },
+    { id: '1', name: 'Donner', icon: 'gift-outline' },
+    { id: '2', name: 'Prêter', icon: 'swap-horizontal-outline' },
+    { id: '3', name: 'Emprunter', icon: 'hand-left-outline' },
+    { id: '4', name: 'Louer', icon: 'cash-outline' },
+    { id: '5', name: 'Acheter', icon: 'cart-outline' },
+    { id: '6', name: 'Échanger', icon: 'repeat-outline' }
+  ];
+
+  // États pour les données d'administration
+  const [pendingUsers, setPendingUsers] = useState(7);
+  const [totalUsers, setTotalUsers] = useState(4);
+  
+  // États pour les utilisateurs en attente de validation
+  const [pendingUsersList, setPendingUsersList] = useState([
+    { id: 'u1', name: 'Thomas Leroux', email: 'thomas.l@gmail.com', date: '04/05/2025', status: 'En attente' },
+    { id: 'u2', name: 'Claire Fontaine', email: 'claire.f@gmail.com', date: '03/05/2025', status: 'En attente' },
+    { id: 'u3', name: 'Marc Dubois', email: 'marc.d@gmail.com', date: '02/05/2025', status: 'En attente' },
+    { id: 'u4', name: 'Julie Moreau', email: 'julie.m@gmail.com', date: '01/05/2025', status: 'En attente' },
+    { id: 'u5', name: 'Luc Bernard', email: 'luc.b@gmail.com', date: '30/04/2025', status: 'En attente' },
+    { id: 'u6', name: 'Sophie Moreau', email: 'sophie.m@gmail.com', date: '29/04/2025', status: 'En attente' },
+    { id: 'u7', name: 'Paul Girard', email: 'paul.g@gmail.com', date: '28/04/2025', status: 'En attente' },
+  ]);
+    
+  
+  // Fonction pour rafraîchir les données
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshAnnonces();
+      await updateNewStatus();
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshAnnonces, updateNewStatus]);
+    
+  // Nombre total d'annonces
+  const [totalAnnounces, setTotalAnnounces] = useState(0);
+    
+  // Actualiser le nombre total d'annonces
+  useEffect(() => {
+    if (annonces) {
+      setTotalAnnounces(annonces.length);
+    }
+  }, [annonces]);
+    
+  const profileImage = profileData && profileData.profileImage 
+    ? { uri: profileData.profileImage } 
+    : require('../../assets/images/placeholder.png');
+
+  const adminName = profileData && profileData.fullName 
+    ? profileData.fullName 
+    : 'Administrateur';
+    
+  // Filter annonces based on category and search
+  const filteredAnnonces = useMemo(() => {
+    return annonces.filter(item => {
+      const matchesCategory = selectedCategory === '0' || 
+        item.category === categories.find(cat => cat.id === selectedCategory)?.name;
+      
+      const matchesSearch = !searchQuery || 
+        item.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        item.type?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      return matchesCategory && matchesSearch;
+    });
+  }, [annonces, selectedCategory, searchQuery, categories]);
+    
+  // Fonction pour approuver un utilisateur
+  const approveUser = (userId) => {
+    Alert.alert(
+      "Confirmer l'approbation",
+      "Voulez-vous vraiment approuver cet utilisateur ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
         { 
-          text: 'Confirmer',
+          text: "Approuver", 
           onPress: () => {
-            // Implementation for role change
+            // Logique d'approbation
+            const updatedUsers = pendingUsersList.filter(user => user.id !== userId);
+            setPendingUsersList(updatedUsers);
+            setPendingUsers(pendingUsers - 1);
+            setTotalUsers(totalUsers + 1);
             Toast.show({
               type: 'success',
-              text1: 'Rôle modifié',
+              text1: 'Utilisateur approuvé',
               visibilityTime: 2000,
-              topOffset: 50
             });
           }
         }
       ]
     );
-  }, []);
-
-  // System reset
-  const handleSystemReset = useCallback(async () => {
-    setResetConfirmModalVisible(false);
-    dispatch({ type: 'FETCH_START' });
+  };
     
-    try {
-      await resetSystem();
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Système réinitialisé',
-        text2: 'Les données ont été effacées pour la nouvelle année',
-        visibilityTime: 3000,
-        topOffset: 50
-      });
-      
-      // Reload data after reset
-      await loadData();
-    } catch (error) {
-      console.error('Error resetting system:', error);
-      dispatch({ type: 'FETCH_ERROR', payload: error.message });
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Impossible de réinitialiser le système',
-        visibilityTime: 3000,
-        topOffset: 50
-      });
-    }
-  }, [loadData]);
-
-  // Filter listings based on selected status
-  const filteredListings = useCallback(() => {
-    return filterStatus === 'all' 
-      ? listings 
-      : listings.filter(listing => listing.status === filterStatus);
-  }, [listings, filterStatus]);
-
-  // Moved renderSettings inside AdminDashboard
-  const renderSettings = useCallback(() => {
+  // Fonction pour rejeter un utilisateur
+  const rejectUser = (userId) => {
+    Alert.alert(
+      "Confirmer le rejet",
+      "Voulez-vous vraiment rejeter cet utilisateur ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        { 
+          text: "Rejeter", 
+          onPress: () => {
+            // Logique de rejet
+            const updatedUsers = pendingUsersList.filter(user => user.id !== userId);
+            setPendingUsersList(updatedUsers);
+            setPendingUsers(pendingUsers - 1);
+            Toast.show({
+              type: 'success',
+              text1: 'Utilisateur rejeté',
+              visibilityTime: 2000,
+            });
+          }
+        }
+      ]
+    );
+  };
+    
+  // Fonction pour approuver une annonce
+  const approveAnnounce = (announceId) => {
+    Alert.alert(
+      "Approuver l'annonce",
+      "Cette annonce sera approuvée et restera visible. Continuer ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        { 
+          text: "Approuver", 
+          onPress: () => {
+            const updatedAnnounces = annoncesToModerate.filter(announce => announce.id !== announceId);
+            setAnnoncesToModerate(updatedAnnounces);
+            setFlaggedAnnounces(flaggedAnnounces - 1);
+            Toast.show({
+              type: 'success',
+              text1: 'Annonce approuvée',
+              visibilityTime: 2000,
+            });
+          }
+        }
+      ]
+    );
+  };
+    
+  // Fonction pour rejeter une annonce
+  const rejectAnnounce = (announceId) => {
+    Alert.alert(
+      "Rejeter l'annonce",
+      "Cette annonce sera supprimée définitivement. Continuer ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        { 
+          text: "Supprimer", 
+          onPress: () => {
+            const updatedAnnounces = annoncesToModerate.filter(announce => announce.id !== announceId);
+            setAnnoncesToModerate(updatedAnnounces);
+            setFlaggedAnnounces(flaggedAnnounces - 1);
+            setTotalAnnounces(totalAnnounces - 1);
+            Toast.show({
+              type: 'success',
+              text1: 'Annonce supprimée',
+              visibilityTime: 2000,
+            });
+          }
+        }
+      ]
+    );
+  };
+    
+  // Fonction pour supprimer une annonce
+  const handleDeleteAnnonce = useCallback((id) => {
+    Alert.alert(
+      "Confirmation de suppression",
+      "Êtes-vous sûr de vouloir supprimer cette annonce ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            // Appeler la fonction de suppression du contexte
+            const success = await deleteAnnonce(id);
+            
+            // Afficher un message de succès ou d'erreur
+            if (success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Annonce supprimée avec succès',
+                visibilityTime: 2000,
+              });
+              
+              // Mettre à jour le nombre total d'annonces
+              setTotalAnnounces(prev => prev - 1);
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Erreur lors de la suppression',
+                text2: 'Veuillez réessayer',
+                visibilityTime: 2000,
+              });
+            }
+          }
+        }
+      ]
+    );
+  }, [deleteAnnonce]);
+    
+  // Fonction pour réinitialiser le système
+  const resetSystem = () => {
+    Alert.alert(
+      "Réinitialisation du système",
+      "Cette action supprimera toutes les annonces et réinitialisera les statistiques. Cette action est irréversible et devrait être effectuée une fois par année scolaire. Voulez-vous continuer ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        { 
+          text: "Réinitialiser", 
+          onPress: () => {
+            Alert.alert(
+              "Confirmation finale",
+              "Dernière vérification : êtes-vous absolument sûr de vouloir réinitialiser le système ?",
+              [
+                {
+                  text: "Annuler",
+                  style: "cancel"
+                },
+                {
+                  text: "Réinitialiser",
+                  onPress: () => {
+                    // Réinitialisation des données
+                    setTotalAnnounces(0);
+                    setAnnoncesToModerate([]);
+                    setVisitStats([0, 0, 0, 0, 0, 0, 0]);
+                    setCategoryStats([
+                      { name: 'Donner', count: 0, color: '#4CAF50' },
+                      { name: 'Prêter', count: 0, color: '#2196F3' },
+                      { name: 'Emprunter', count: 0, color: '#FF9800' },
+                      { name: 'Louer', count: 0, color: '#9C27B0' },
+                      { name: 'Acheter', count: 0, color: '#F44336' },
+                      { name: 'Échanger', count: 0, color: '#009688' }
+                    ]);
+                    setFlaggedAnnounces(0);
+                    // On garde les utilisateurs validés
+                    Toast.show({
+                      type: 'success',
+                      text1: 'Système réinitialisé pour la nouvelle année',
+                      visibilityTime: 3000,
+                    });
+                  }
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  };
+    
+  const toggleSetting = (setting) => {
+    setSecuritySettings({
+      ...securitySettings,
+      [setting]: !securitySettings[setting]
+    });
+  };
+    
+  // Optimiser les fonctions de rendu pour la FlatList
+  const keyExtractor = useCallback((item) => item.id.toString(), []);
+    
+  const renderItem = useCallback(({ item }) => (
+    <AnnonceCard 
+      item={item}
+      darkMode={darkMode}
+      onPress={() => router.push(`/annonce/${item.id}`)}
+      onDelete={handleDeleteAnnonce}
+    />
+  ), [darkMode, handleDeleteAnnonce]);
+    
+  // Show loading indicator when fonts are loading or data is loading
+  if (!fontsLoaded) {
     return (
-      <View style={styles.contentContainer}>
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => setActiveTab('dashboard')}
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
+      <View style={[styles.loadingContainer, {backgroundColor: theme.background}]}>
+        <ActivityIndicator size="large" color="#39335E" />
+      </View>
+    );
+  }
+
+  // Fonction de rendu des onglets
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'annonces':
+        return (
+          <View style={styles.tabContent}>
+            {/* En-tête avec filtre et recherche */}
+            <View style={styles.announcesHeader}>
+              <Text style={[styles.sectionTitle, {color: theme.color}]}>Liste des annonces</Text>
+              <Text style={[styles.announcesCount, {color: theme.secondaryText}]}>
+                {filteredAnnonces.length} annonce{filteredAnnonces.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            
+            {/* Filtres par catégorie */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              style={styles.categoriesContainer}
+              contentContainerStyle={styles.categoriesContentContainer}
+            >
+              {categories.map(category => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.categoryButton, 
+                    selectedCategory === category.id && styles.activeCategoryButton,
+                    { backgroundColor: darkMode ? '#363636' : '#F0F0F0' }
+                  ]}
+                  onPress={() => setSelectedCategory(category.id)}
+                >
+                  {category.icon && (
+                    <View style={[
+                      styles.categoryIconContainer,
+                      { backgroundColor: selectedCategory === category.id 
+                        ? (darkMode ? '#ffffff' : '#39335E')
+                        : (darkMode ? '#5D5FEF' : '#E6E6FA') 
+                      }
+                    ]}>
+                      <Ionicons 
+                        name={category.icon} 
+                        size={20} 
+                        color={selectedCategory === category.id 
+                          ? (darkMode ? '#363636' : '#ffffff')
+                          : (darkMode ? '#FFFFFF' : '#5D5FEF')
+                        } 
+                      />
+                    </View>
+                  )}
+                  <Text 
+                    style={[
+                      styles.categoryText, 
+                      selectedCategory === category.id && styles.activeCategoryText,
+                      {color: selectedCategory === category.id 
+                        ? '#FFFFFF' 
+                        : (darkMode ? '#FFFFFF' : '#39335E')
+                      }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {/* Barre de recherche */}
+            <View style={[styles.searchContainer, {backgroundColor: theme.cardbg2 || (darkMode ? '#2A2A2A' : '#F0F0F0')}]}>
+              <Ionicons name="search" size={22} color={darkMode ? '#888888' : '#666666'} />
+              <TextInput
+                style={[styles.searchInput, {color: theme.color}]}
+                placeholder="Rechercher une annonce..."
+                placeholderTextColor={darkMode ? '#888888' : '#A8A8A8'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={22} color={darkMode ? '#888888' : '#666666'} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            
+            {/* Liste des annonces */}
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#39335E" />
+              </View>
+               ) : filteredAnnonces.length === 0 ? (
+              <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                <Ionicons name="alert-circle" size={48} color="#FF9800" />
+                <Text style={[styles.emptyText, {color: theme.color}]}>
+                  Aucune annonce trouvée
+                </Text>
+                <Text style={[styles.emptySubtext, {color: theme.secondaryText}]}>
+                  Essayez de modifier vos filtres ou publiez une annonce
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredAnnonces}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.announcesListContainer}
+                refreshControl={
+                  <RefreshControl 
+                    refreshing={refreshing} 
+                    onRefresh={onRefresh}
+                    colors={['#39335E', '#EB001B']}
+                    tintColor={darkMode ? '#FFFFFF' : '#39335E'}
+                  />
+                }
+              />
+            )}
+          </View>
+        );
+          
+      case 'users':
+        return (
+          <View style={styles.tabContent}>
+            {/* Section validation utilisateurs */}
+            <View style={styles.usersSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>Validation utilisateurs</Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>{pendingUsers} utilisateur(s) en attente</Text>
+              </View>
+              
+              {pendingUsersList.length > 0 ? (
+                pendingUsersList.map(user => (
+                  <View 
+                    key={user.id} 
+                    style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+                  >
+                    <View style={styles.userInfo}>
+                      <Text style={[styles.userName, {color: theme.color}]}>{user.name}</Text>
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>{user.email}</Text>
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>Demande le {user.date}</Text>
+                    </View>
+                    
+                    <View style={styles.userActions}>
+                      <TouchableOpacity 
+                        style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
+                        onPress={() => approveUser(user.id)}
+                      >
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        <Text style={styles.approveUserButtonText}>Approuver</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
+                        onPress={() => rejectUser(user.id)}
+                      >
+                        <Ionicons name="close" size={16} color="#FFFFFF" />
+                        <Text style={styles.rejectUserButtonText}>Rejeter</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                  <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
+                  <Text style={[styles.emptyText, {color: theme.color}]}>
+                    Aucun utilisateur en attente
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+          
+      case 'settings':
+        return (
+          <View style={styles.tabContent}>
+            
+            {/* Section maintenance */}
+            <View style={styles.maintenanceSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, {color: theme.color}]}>Maintenance système</Text>
+              </View>
+              
+              <View style={[styles.maintenanceCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                <View style={styles.maintenanceIconContainer}>
+                  <Ionicons name="refresh-circle" size={48} color="#FF9800" />
+                </View>
+                <Text style={[styles.maintenanceTitle, {color: theme.color}]}>Réinitialisation annuelle</Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                  Cette action supprimera toutes les annonces et réinitialisera les statistiques pour la nouvelle année scolaire.
+                  Cette opération est irréversible et ne devrait être effectuée qu'une fois par an.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.resetButton, {backgroundColor: '#FF9800',marginTop: 20}]}
+                  onPress={resetSystem}
+                >
+                  <Ionicons name="refresh" size={18} color="#FFFFFF" />
+                  <Text style={styles.resetButtonText}>Réinitialiser le système</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={[styles.maintenanceCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                <View style={styles.maintenanceIconContainer}>
+                  <Ionicons name="cloud-download" size={48} color="#2196F3" />
+                </View>
+                <Text style={[styles.maintenanceTitle, {color: theme.color}]}>Sauvegarde des données</Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                  Téléchargez une sauvegarde complète des données utilisateurs et des annonces avant
+                  la réinitialisation du système.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.backupButton, {backgroundColor: '#2196F3', marginTop: 20}]}
+                >
+                  <Ionicons name="download" size={18} color="#FFFFFF" />
+                  <Text style={styles.backupButtonText}>Télécharger la sauvegarde</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.logoutSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, {color: theme.color}]}>Session utilisateur</Text>
+              </View>
+              
+              <View style={[styles.maintenanceCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                <View style={styles.maintenanceIconContainer}>
+                  <Ionicons name="log-out" size={48} color="#E53935" />
+                </View>
+                <Text style={[styles.maintenanceTitle, {color: theme.color}]}>Déconnexion</Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                  Déconnectez-vous de votre compte et retournez à la page de connexion. 
+                  Toutes vos données resteront sauvegardées.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.logoutButton, {backgroundColor: '#E53935', marginTop: 20}]}
+                  onPress={handleLogout}
+                >
+                  <Ionicons name="exit-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.logoutButtonText}>Se déconnecter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        );
+      
+      default:
+        // Dashboard par défaut
+        return (
+          <View style={styles.tabContent}>
+            
+            {/* Section modération */}
+            <View style={styles.moderationSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, {color: theme.color}]}>Modération</Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>{annoncesToModerate.length} annonce(s) à modérer</Text>
+              </View>
+              
+              {annoncesToModerate.length > 0 ? (
+                annoncesToModerate.map(item => (
+                  <View 
+                    key={item.id} 
+                    style={[styles.moderationCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+                  >
+                    <View style={styles.moderationHeader}>
+                      <View style={styles.moderationTitleContainer}>
+                        <Text style={[styles.moderationTitle, {color: theme.color}]}>{item.title}</Text>
+                      </View>
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Publié le {item.date}</Text>
+                      {/* <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>
+                        <Text style={{fontWeight: '600'}}>Motif du signalement:</Text> {item.reason}
+                      </Text> */}
+                      {/* <Text style={[styles.moderationReporter, {color: theme.color}]}>
+                        <Text style={{fontWeight: '600'}}>Signalé par:</Text> {item.reporter}
+                      </Text> */}
+                    </View>
+                    
+                    <View style={styles.moderationDetails}>
+                      <View style={styles.moderationDetail}>
+                        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Catégorie:</Text>
+                        <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.category}</Text>
+                      </View>
+                      <View style={styles.moderationDetail}>
+                        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Type:</Text>
+                        <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.type}</Text>
+                      </View>
+                      <View style={styles.moderationDetail}>
+                        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Camp:</Text>
+                        <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.campType}</Text>
+                      </View>
+                      {/* {item.size && (
+                        <View style={styles.moderationDetail}>
+                          <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Taille:</Text>
+                          <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.size}</Text>
+                        </View>
+                      )} */}
+                    </View>
+                    
+                    <View style={styles.moderationActions}>
+                      <TouchableOpacity 
+                        style={[styles.viewButton, {backgroundColor: '#2196F3'}]}
+                        onPress={() => router.push(`/annonce/${item.id}`)}  
+                      >
+                        <Ionicons name="eye" size={16} color="#FFFFFF" />
+                        <Text style={styles.viewButtonText}>Voir</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.approveButton, {backgroundColor: '#4CAF50'}]}
+                        onPress={() => approveAnnounce(item.id)}
+                      >
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        <Text style={styles.approveButtonText}>Approuver</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.rejectButton, {backgroundColor: '#F44336'}]}
+                        onPress={() => rejectAnnounce(item.id)}
+                      >
+                        <Ionicons name="close" size={16} color="#FFFFFF" />
+                        <Text style={styles.rejectButtonText}>Rejeter</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                  <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
+                  <Text style={[styles.emptyText, {color: theme.color}]}>
+                    Aucune annonce à modérer
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+    }
+  };
+
+  // Composant principal de l'interface
+  return (
+    <View style={[styles.container, {backgroundColor: theme.background}]}> 
+      <StatusBar translucent backgroundColor="transparent" barStyle={darkMode ? "light-content" : 'dark-content'} />
+
+      {/* En-tête avec profil */}
+      <View style={styles.header}>
+        <View style={styles.header_left}>
+          <Image source={profileImage} style={styles.profile} />
+          <View style={styles.content}>
+            <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText,  fontSize: 18}]}>Tableau de bord Admin</Text>
+            <Text style={[styles.heading, {color: theme.color}]}>{adminName}</Text>
+          </View>
+        </View>
+        {/* <TouchableOpacity style={styles.notification_box} onPress={() => {}}>
+          {darkMode ? <Dark_Notification style={styles.notification} /> : <Notification style={styles.notification} />}
+          <View style={styles.circle}>
+            <Text style={styles.notification_count}>{flaggedAnnounces + pendingUsers}</Text>
+          </View>
+        </TouchableOpacity> */}
+      </View> 
+
+      {/* Navigation entre les onglets */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'dashboard' && styles.activeTab,
+            { backgroundColor: activeTab === 'dashboard' ? (darkMode ? '#2A2A2A' : '#FFFFFF') : 'transparent' }
+          ]}
+          onPress={() => setActiveTab('dashboard')}
+        >
+          <Ionicons
+  name="shield-checkmark"
+  size={20}
+  color={activeTab === 'dashboard' ? '#5D5FEF' : (darkMode ? '#888888' : '#666666')}
+/>
+<Text
+  style={[
+    styles.tabText,
+    activeTab === 'dashboard' && styles.activeTabText,
+    { color: activeTab === 'dashboard' ? '#5D5FEF' : (darkMode ? '#AAAAAA' : '#666666') }
+  ]}
+>
+  Modération
+</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'annonces' && styles.activeTab,
+            { backgroundColor: activeTab === 'annonces' ? (darkMode ? '#2A2A2A' : '#FFFFFF') : 'transparent' }
+          ]}
+          onPress={() => setActiveTab('annonces')}
+        >
+          <Ionicons
+            name="document-text"
+            size={20}
+            color={activeTab === 'annonces' ? '#5D5FEF' : (darkMode ? '#888888' : '#666666')}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'annonces' && styles.activeTabText,
+              { color: activeTab === 'annonces' ? '#5D5FEF' : (darkMode ? '#AAAAAA' : '#666666') }
+            ]}
           >
-            <Ionicons name="arrow-back" size={24} color={theme.textColor} />
-          </TouchableOpacity>
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
+            Annonces
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'users' && styles.activeTab,
+            { backgroundColor: activeTab === 'users' ? (darkMode ? '#2A2A2A' : '#FFFFFF') : 'transparent' }
+          ]}
+          onPress={() => setActiveTab('users')}
+        >
+          <Ionicons
+            name="people"
+            size={19}
+            color={activeTab === 'users' ? '#5D5FEF' : (darkMode ? '#888888' : '#666666')}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'users' && styles.activeTabText,
+              { color: activeTab === 'users' ? '#5D5FEF' : (darkMode ? '#AAAAAA' : '#666666') }
+            ]}
+          >
+            Utilisateurs
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'settings' && styles.activeTab,
+            { backgroundColor: activeTab === 'settings' ? (darkMode ? '#2A2A2A' : '#FFFFFF') : 'transparent' }
+          ]}
+          onPress={() => setActiveTab('settings')}
+        >
+          <Ionicons
+            name="settings"
+            size={19}
+            color={activeTab === 'settings' ? '#5D5FEF' : (darkMode ? '#888888' : '#666666')}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'settings' && styles.activeTabText,
+              { color: activeTab === 'settings' ? '#5D5FEF' : (darkMode ? '#AAAAAA' : '#666666') }
+            ]}
+          >
             Paramètres
           </Text>
-        </View>
-
-        {/* Profil Administrateur */}
-        <View style={[styles.settingsSection, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.settingsSectionTitle, { color: theme.textColor }]}>
-            Profil Administrateur
-          </Text>
-          <View style={styles.adminProfileContainer}>
-            <View style={styles.adminAvatarContainer}>
-              <View style={styles.adminAvatar}>
-                <Text style={styles.adminAvatarText}>
-                  {adminInfo.name.substring(0, 2).toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.adminInfoContainer}>
-              <Text style={[styles.adminName, { color: theme.textColor }]}>
-                {adminInfo.name}
-              </Text>
-              <Text style={[styles.adminEmail, { color: theme.textSecondary }]}>
-                {adminInfo.email}
-              </Text>
-              <View style={styles.adminDetailRow}>
-                <Text style={[styles.adminDetailLabel, { color: theme.textSecondary }]}>
-                  Rôle:
-                </Text>
-                <Text style={[styles.adminDetailValue, { color: theme.textColor }]}>
-                  {adminInfo.role}
-                </Text>
-              </View>
-              <View style={styles.adminDetailRow}>
-                <Text style={[styles.adminDetailLabel, { color: theme.textSecondary }]}>
-                  Dernière connexion:
-                </Text>
-                <Text style={[styles.adminDetailValue, { color: theme.textColor }]}>
-                  {adminInfo.lastLogin}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Autres options de paramètres */}
-        <View style={[styles.settingsSection, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.settingsSectionTitle, { color: theme.textColor }]}>
-            Options générales
-          </Text>
-          
-          <TouchableOpacity style={styles.settingsOption}>
-            <View style={styles.settingsOptionContent}>
-              <Feather name="shield" size={20} color={theme.textColor} />
-              <Text style={[styles.settingsOptionText, { color: theme.textColor }]}>
-                Sécurité et confidentialité
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingsOption}>
-            <View style={styles.settingsOptionContent}>
-              <Feather name="bell" size={20} color={theme.textColor} />
-              <Text style={[styles.settingsOptionText, { color: theme.textColor }]}>
-                Notifications
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingsOption}>
-            <View style={styles.settingsOptionContent}>
-              <Feather name="moon" size={20} color={theme.textColor} />
-              <Text style={[styles.settingsOptionText, { color: theme.textColor }]}>
-                Mode sombre
-              </Text>
-            </View>
-            <View style={styles.switchContainer}>
-              <Text style={{ color: theme.textSecondary, marginRight: 10 }}>
-                {darkMode ? 'Activé' : 'Désactivé'}
-              </Text>
-              {/* Ici vous pouvez ajouter un Switch pour le thème sombre */}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Bouton de déconnexion */}
-        <View style={styles.logoutButtonContainer}>
-          <TouchableOpacity 
-            style={styles.logoutFullButton}
-            onPress={handleLogout}
-            accessibilityRole="button"
-            accessibilityLabel="Se déconnecter"
-          >
-            <Feather name="log-out" size={20} color="#FFFFFF" />
-            <Text style={styles.logoutFullButtonText}>
-              Se déconnecter
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }, [adminInfo, theme, darkMode, handleLogout]);
-
-  // Dashboard view
-  const renderDashboard = useCallback(() => (
-    <View style={styles.contentContainer}>
-      <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-        Tableau de bord administrateur
-      </Text>
-      
-      {statistics ? (
-        <View style={styles.statsContainer}>
-          <StatCard 
-            value={statistics.totalUsers} 
-            label="Utilisateurs"
-            backgroundColor={theme.cardBackground}
-            valueColor={theme.primaryColor}
-            labelColor={theme.textSecondary}
-          />
-          
-          <StatCard 
-            value={statistics.activeListings} 
-            label="Annonces actives"
-            backgroundColor={theme.cardBackground}
-            valueColor={theme.primaryColor}
-            labelColor={theme.textSecondary}
-          />
-          
-          <StatCard 
-            value={statistics.pendingModeration} 
-            label="En attente de modération"
-            backgroundColor={theme.cardBackground}
-            valueColor={theme.primaryColor}
-            labelColor={theme.textSecondary}
-          />
-          
-          <StatCard 
-            value={statistics.exchangesCompleted} 
-            label="Échanges complétés"
-            backgroundColor={theme.cardBackground}
-            valueColor={theme.primaryColor}
-            labelColor={theme.textSecondary}
-          />
-        </View>
-      ) : (
-        <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
-          Chargement des statistiques...
-        </Text>
-      )}
-
-      <View style={styles.actionButtonsContainer}>
-        <ActionButton 
-          icon={<MaterialIcons name="list-alt" size={24} color="#FFFFFF" />}
-          text="Gérer les annonces"
-          color="#836EFE"
-          onPress={() => setActiveTab('listings')}
-        />
-        
-        <ActionButton 
-          icon={<Feather name="users" size={24} color="#FFFFFF" />}
-          text="Gérer les utilisateurs"
-          color="#53C1DE"
-          onPress={() => setActiveTab('users')}
-        />
-        
-        <ActionButton 
-          icon={<Ionicons name="refresh-circle" size={24} color="#FFFFFF" />}
-          text="Réinitialiser le système"
-          color="#FF6347"
-          onPress={() => setResetConfirmModalVisible(true)}
-        />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.recentActivityContainer}>
-        <Text style={[styles.sectionSubtitle, { color: theme.textColor }]}>
-          Activité récente
-        </Text>
-        
-        {listings && listings.length > 0 ? (
-          <FlatList
-            data={listings.slice(0, 3)}
-            keyExtractor={(item) => item.id.toString()}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <ActivityItem 
-                item={item} 
-                onView={handleViewListing}
-                theme={theme}
-              />
-            )}
+      {/* Contenu principal qui change selon l'onglet sélectionné */}
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={['#39335E', '#EB001B']}
+            tintColor={darkMode ? '#FFFFFF' : '#39335E'}
           />
-        ) : (
-          <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
-            Aucune activité récente
-          </Text>
-        )}
-      </View>
+        }
+      >
+       <View style={styles.adminHeader}>
+  <Text style={[styles.adminTitle, { color: theme.color, textAlign: 'center' }]}>
+    Bourse au prêt - Administration
+  </Text>
+</View>
+        {/* Contenu de l'onglet actif */}
+        {renderTabContent()}
+      </ScrollView>
     </View>
-  ), [statistics, listings, theme, handleViewListing]);
-
-  // Listings view
-  const renderListings = useCallback(() => {
-    const listingsToDisplay = filteredListings();
-      
-    return (
-      <View style={styles.contentContainer}>
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => setActiveTab('dashboard')}
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.textColor} />
-          </TouchableOpacity>
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            Gestion des annonces
-          </Text>
-        </View>
-
-        <View style={styles.filterContainer}>
-          <FilterButton 
-            label="Toutes"
-            isActive={filterStatus === 'all'}
-            onPress={() => handleFilterChange('all')}
-          />
-          
-          <FilterButton 
-            label="En attente"
-            isActive={filterStatus === 'pending'}
-            onPress={() => handleFilterChange('pending')}
-          />
-          
-          <FilterButton 
-            label="Approuvées"
-            isActive={filterStatus === 'approved'}
-            onPress={() => handleFilterChange('approved')}
-          />
-          
-          <FilterButton 
-            label="Rejetées"
-            isActive={filterStatus === 'rejected'}
-            onPress={() => handleFilterChange('rejected')}
-          />
-        </View>
-
-        {listingsToDisplay && listingsToDisplay.length > 0 ? (
-          <FlatList
-            data={listingsToDisplay}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <ListingItem 
-                item={item}
-                onView={handleViewListing}
-                onModerate={handleModerateListing}
-                theme={theme}
-              />
-            )}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={['#836EFE']}
-                tintColor={theme.primaryColor}
-              />
-            }
-            contentContainerStyle={
-              listingsToDisplay.length === 0 ? { flex: 1 } : null
-            }
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.noDataContainer}>
-            <MaterialIcons name="inbox" size={48} color={theme.textSecondary} />
-            <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
-              Aucune annonce trouvée
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  }, [
-    filteredListings, 
-    filterStatus, 
-    refreshing, 
-    theme, 
-    handleFilterChange, 
-    handleViewListing, 
-    handleModerateListing, 
-    onRefresh
-  ]);
-
-  // Users view
-  const renderUsers = useCallback(() => {
-    return (
-      <View style={styles.contentContainer}>
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => setActiveTab('dashboard')}
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.textColor} />
-          </TouchableOpacity>
-          <Text style={[styles.sectionTitle, { color: theme.textColor }]}>
-            Gestion des utilisateurs
-          </Text>
-        </View>
-
-        {users && users.length > 0 ? (
-          <FlatList
-            data={users}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <UserItem 
-                item={item}
-                onBlockToggle={handleBlockUser}
-                onRoleChange={handleRoleChange}
-                theme={theme}
-              />
-            )}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={['#836EFE']}
-                tintColor={theme.primaryColor}
-              />
-            }
-            contentContainerStyle={
-              users.length === 0 ? { flex: 1 } : null
-            }
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.noDataContainer}>
-            <MaterialIcons name="person-outline" size={48} color={theme.textSecondary} />
-            <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
-              Aucun utilisateur trouvé
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  }, [
-    users, 
-    refreshing, 
-    theme, 
-    handleBlockUser, 
-    handleRoleChange, 
-    onRefresh
-  ]);
-
-  return (
-    <SafeAreaView 
-      style={[styles.container, { backgroundColor: theme.backgroundColor }]}
-      edges={['top', 'left', 'right']}
-    >
-      {Platform.OS === 'android' && (
-        <StatusBar
-          backgroundColor={theme.backgroundColor}
-          barStyle={darkMode ? 'light-content' : 'dark-content'}
-        />
-      )}
-      <View style={[styles.header, { borderBottomColor: theme.borderColor }]}>
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: theme.textColor }]}>
-            Tableau de bord admin
-          </Text>
-          <TouchableOpacity 
-            style={styles.logoutButton} 
-            onPress={handleLogout}
-            accessibilityRole="button"
-            accessibilityLabel="Se déconnecter"
-          >
-            <Feather name="log-out" size={20} color={theme.textColor} />
-          </TouchableOpacity>
-        </View>
-      </View>
-      <View style={styles.mainContent}>
-        {loading && !refreshing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#836EFE" />
-            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-              Chargement...
-            </Text>
-          </View>
-        ) : (
-          <>
-            {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'listings' && renderListings()}
-            {activeTab === 'users' && renderUsers()}
-            {activeTab === 'settings' && renderSettings()}
-          </>
-        )}
-      </View>
-
-      {/* Bottom Navigation */}
-      <View style={[styles.bottomNav, { 
-        backgroundColor: theme.cardBackground,
-        borderTopColor: theme.borderColor 
-      }]}>
-        <NavItem 
-          icon={(color) => (
-            <MaterialIcons name="dashboard" size={24} color={color} />
-          )}
-          label="Tableau"
-          isActive={activeTab === 'dashboard'}
-          onPress={() => setActiveTab('dashboard')}
-          activeColor="#836EFE"
-          inactiveColor={theme.textSecondary}
-        />
-        
-        <NavItem 
-          icon={(color) => (
-            <MaterialIcons name="list-alt" size={24} color={color} />
-          )}
-          label="Annonces"
-          isActive={activeTab === 'listings'}
-          onPress={() => setActiveTab('listings')}
-          activeColor="#836EFE"
-          inactiveColor={theme.textSecondary}
-        />
-        
-        <NavItem 
-          icon={(color) => (
-            <Feather name="users" size={24} color={color} />
-          )}
-          label="Utilisateurs"
-          isActive={activeTab === 'users'}
-          onPress={() => setActiveTab('users')}
-          activeColor="#836EFE"
-          inactiveColor={theme.textSecondary}
-        />
-        
-        <NavItem 
-          icon={(color) => (
-            <Feather name="settings" size={24} color={color} />
-          )}
-          label="Paramètres"
-          isActive={activeTab === 'settings'}
-          onPress={() => setActiveTab('settings')}
-          activeColor="#836EFE"
-          inactiveColor={theme.textSecondary}
-        />
-      </View>
-
-      {/* Listing Detail Modal */}
-      <Modal
-        visible={listingModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setListingModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { 
-            backgroundColor: theme.cardBackground,
-            borderColor: theme.borderColor 
-          }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.borderColor }]}>
-              <Text style={[styles.modalTitle, { color: theme.textColor }]}>
-                Détails de l'annonce
-              </Text>
-              <TouchableOpacity 
-                onPress={() => setListingModalVisible(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Fermer"
-              >
-                <Feather name="x" size={24} color={theme.textColor} />
-              </TouchableOpacity>
-            </View>
-            
-            {selectedListing && (
-              <ScrollView 
-                style={styles.modalBody}
-                showsVerticalScrollIndicator={false}
-              >
-                <Text style={[styles.listingDetailTitle, { color: theme.textColor }]}>
-                  {selectedListing.title}
-                </Text>
-                
-                <View style={styles.listingDetailMeta}>
-                  <View style={[
-                    styles.listingStatusBadge,
-                    { 
-                      backgroundColor: 
-                        selectedListing.status === 'pending' ? '#FFA500' : 
-                        selectedListing.status === 'approved' ? '#4CAF50' : '#FF6347'
-                    }
-                  ]}>
-                    <Text style={styles.listingStatusBadgeText}>
-                      {selectedListing.status === 'pending' ? 'En attente' : 
-                       selectedListing.status === 'approved' ? 'Approuvé' : 'Rejeté'}
-                    </Text>
-                  </View>
-                  <Text style={[styles.listingDetailDate, { color: theme.textSecondary }]}>
-                    {new Date(selectedListing.createdAt).toLocaleDateString()}
-                  </Text>
-                </View>
-                
-                <View style={styles.listingDetailSection}>
-                  <Text style={[styles.listingDetailSectionTitle, { color: theme.textColor }]}>
-                    Informations du posteur
-                  </Text>
-                  <View style={[styles.listingDetailCard, { backgroundColor: theme.backgroundColor }]}>
-                    <Text style={[styles.listingDetailUser, { color: theme.textColor }]}>
-                      {selectedListing.userName}
-                    </Text>
-                    <Text style={[styles.listingDetailEmail, { color: theme.textSecondary }]}>
-                      {selectedListing.userEmail}
-                    </Text>
-                    <Text style={[styles.listingDetailPhone, { color: theme.textSecondary }]}>
-                      {selectedListing.userPhone || 'Pas de téléphone renseigné'}
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.listingDetailSection}>
-                  <Text style={[styles.listingDetailSectionTitle, { color: theme.textColor }]}>
-                    Description
-                  </Text>
-                  <Text style={[styles.listingDetailDescription, { color: theme.textColor }]}>
-                    {selectedListing.description}
-                  </Text>
-                </View>
-                
-                <View style={styles.listingDetailSection}>
-                  <Text style={[styles.listingDetailSectionTitle, { color: theme.textColor }]}>
-                    Catégorie et type
-                  </Text>
-                  <View style={styles.listingDetailTags}>
-                    <View style={styles.listingDetailTag}>
-                      <Text style={styles.listingDetailTagText}>
-                        {selectedListing.category}
-                      </Text>
-                    </View>
-                    <View style={styles.listingDetailTag}>
-                      <Text style={styles.listingDetailTagText}>
-                        {selectedListing.type}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                
-                <View style={styles.listingDetailSection}>
-                  <Text style={[styles.listingDetailSectionTitle, { color: theme.textColor }]}>
-                    Images
-                  </Text>
-                  {selectedListing.images && selectedListing.images.length > 0 ? (
-                    <FlatList 
-                      horizontal 
-                      data={selectedListing.images}
-                      keyExtractor={(item, index) => `image-${index}`}
-                      showsHorizontalScrollIndicator={false}
-                      renderItem={({ item }) => (
-                        <Image 
-                          source={{ uri: item }} 
-                          style={styles.listingDetailImage}
-                          resizeMode="cover"
-                        />
-                      )}
-                      contentContainerStyle={styles.listingImagesContainer}
-                    />
-                  ) : (
-                    <Text style={[styles.noImagesText, { color: theme.textSecondary }]}>
-                      Aucune image disponible
-                    </Text>
-                  )}
-                </View>
-                
-                <View style={styles.modalActions}>
-                  {selectedListing.status === 'pending' ? (
-                    <>
-                      <Button
-                        buttonText="Approuver"
-                        onPress={() => handleModerateListing(selectedListing.id, 'approve')}
-                        disabled={loading}
-                        buttonStyle={styles.approveButton}
-                        accessibilityLabel="Approuver l'annonce"
-                      />
-                      <Button
-                        buttonText="Rejeter"
-                        onPress={() => handleModerateListing(selectedListing.id, 'reject')}
-                        disabled={loading}
-                        buttonStyle={styles.rejectButton}
-                        textStyle={styles.rejectButtonText}
-                        accessibilityLabel="Rejeter l'annonce"
-                      />
-                    </>
-                  ) : (
-                    <Button
-                      buttonText="Réinitialiser l'état"
-                      onPress={() => handleModerateListing(selectedListing.id, 'reset')}
-                      disabled={loading}
-                      buttonStyle={styles.resetButton}
-                      accessibilityLabel="Réinitialiser l'état de l'annonce"
-                    />
-                  )}
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Reset Confirmation Modal */}
-      <Modal
-        visible={resetConfirmModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setResetConfirmModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={[styles.confirmModalContent, { backgroundColor: theme.cardBackground }]}>
-            <View style={styles.warningIconContainer}>
-              <MaterialIcons name="warning" size={50} color="#FFA500" />
-            </View>
-            
-            <Text style={[styles.confirmModalTitle, { color: theme.textColor }]}>
-              Réinitialiser le système
-            </Text>
-            
-            <Text style={[styles.confirmModalText, { color: theme.textSecondary }]}>
-              Cette action réinitialisera toutes les données pour la nouvelle année scolaire. Toutes les annonces et les interactions passées seront archivées et non accessibles aux utilisateurs.
-            </Text>
-            <Text style={[styles.confirmModalText, { color: theme.textSecondary }]}>
-              Êtes-vous sûr de vouloir continuer?
-            </Text>
-            
-            <View style={styles.confirmModalActions}>
-              <TouchableOpacity 
-                style={[styles.confirmModalButton, styles.cancelButton]}
-                onPress={() => setResetConfirmModalVisible(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Annuler"
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.confirmModalButton, styles.confirmButton]}
-                onPress={handleSystemReset}
-                accessibilityRole="button"
-                accessibilityLabel="Confirmer la réinitialisation"
-              >
-                <Text style={styles.confirmButtonText}>Confirmer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Loading Overlay */}
-      {loading && !refreshing && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-        </View>
-      )}
-    </SafeAreaView>
   );
 };
+
+export default AdminDashboard;
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    fontFamily: 'Montserrat_700Bold',
-  },
-  logoutButton: {
-    padding: 8,
-  },
-  mainContent: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  contentContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    fontFamily: 'Montserrat_700Bold',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  statCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    fontFamily: 'Montserrat_700Bold',
-  },
-  statLabel: {
-    fontSize: 14,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  actionButtonsContainer: {
-    marginBottom: 20,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  recentActivityContainer: {
-    marginTop: 10,
-  },
-  sectionSubtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  activityMeta: {
-    fontSize: 13,
-    marginBottom: 2,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  activityStatus: {
-    fontSize: 14,
-    fontWeight: '500',
-    fontFamily: 'SourceSansPro_600SemiBold',
-  },
-  viewButton: {
-    backgroundColor: '#836EFE',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginLeft: 10,
-  },
-  viewButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    fontFamily: 'Montserrat_500Medium',
-  },
-  noDataText: {
-    textAlign: 'center',
-    fontSize: 16,
-    padding: 20,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingVertical: 15,
     marginBottom: 20,
   },
-  backButton: {
-    padding: 8,
-    marginRight: 10,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    flexWrap: 'wrap',
-  },
-  filterButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 10,
-    marginBottom: 8,
-    backgroundColor: 'rgba(131, 110, 254, 0.1)',
-  },
-  filterButtonActive: {
-    backgroundColor: '#836EFE',
-  },
-  filterText: {
-    color: '#836EFE',
-    fontSize: 14,
-    fontFamily: 'SourceSansPro_600SemiBold',
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
-  },
-  listingItem: {
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  listingItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  listingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  listingStatus: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 10,
-    fontFamily: 'SourceSansPro_600SemiBold',
-  },
-  listingMeta: {
-    fontSize: 13,
-    marginBottom: 8,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingDescription: {
-    fontSize: 14,
-    marginBottom: 8,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingCategory: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  categoryLabel: {
-    fontSize: 14,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  categoryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'SourceSansPro_600SemiBold',
-  },
-  listingActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    flexWrap: 'wrap',
-  },
-  actionButtonSmall: {
+  header_left: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginRight: 10,
-    marginBottom: 8,
   },
-  viewActionButton: {
-    backgroundColor: '#836EFE',
-  },
-  approveActionButton: {
-    backgroundColor: '#4CAF50',
-  },
-  rejectActionButton: {
-    backgroundColor: '#FF6347',
-  },
-  resetActionButton: {
-    backgroundColor: '#FFA500',
-  },
-  actionButtonSmallText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 5,
-    fontFamily: 'Montserrat_500Medium',
-  },
-  noDataContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-  },
-  userItem: {
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  userItemContent: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  userAvatar: {
+  profile: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#836EFE',
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#5D5FEF',
+  },
+  content: {
+    justifyContent: 'center',
+  },
+  heading_text: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: 'Montserrat_700Bold',
+  },
+  // notification_box: {
+  //   position: 'relative',
+  //   width: 44,
+  //   height: 44,
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   backgroundColor: '#F0F2F5',
+  //   borderRadius: 12,
+  // },
+  notification: {
+    width: 24,
+    height: 24,
+  },
+  circle: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#F44336',
+    borderRadius: 12,
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
-  userInitials: {
+  notification_count: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: 'bold',
+  },
+  adminHeader: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  adminTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
     fontFamily: 'Montserrat_700Bold',
+  },
+  adminSubtitle: {
+    fontSize: 16,
+    fontWeight: '400',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  // Styles pour les onglets
+  tabsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 5,
+    backgroundColor: 'rgba(200, 200, 200, 0.1)',
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tabText: {
+    marginLeft: 6,
+    fontSize: 10,
+    marginLeft: 1,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  activeTabText: {
+    fontFamily: 'Montserrat_700Bold',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  // Styles pour le tableau de bord
+  statsContainer: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '600',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  statsCards: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  statsCard: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statsNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginVertical: 8,
+    fontFamily: 'Montserrat_700Bold',
+  },
+  statsLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  chartContainer: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  chartPlaceholder: {
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F2F5',
+    borderRadius: 8,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  exportButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  // Styles pour la section de modération
+  moderationSection: {
+    marginBottom: 32,
+  },
+  moderationCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  moderationCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  moderationHeader: {
+    marginBottom: 12,
+  },
+  moderationTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  moderationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  moderationDate: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginBottom: 8,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  moderationReason: {
+    fontSize: 14,
+    marginBottom: 4,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  moderationDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  moderationDetail: {
+    width: '50%',
+    marginBottom: 8,
+  },
+  moderationDetailLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  moderationDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  moderationActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  viewButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  viewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  approveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  approveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  rejectButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  rejectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  emptyContainer: {
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 12,
+    textAlign: 'center',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  // Styles pour la section users
+  usersSection: {
+    marginBottom: 32,
+  },
+  usersCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  userCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   userInfo: {
     flex: 1,
@@ -1619,393 +1536,338 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: 14,
-    marginBottom: 6,
-    fontFamily: 'SourceSansPro_400Regular',
+    fontWeight: '400',
+    marginBottom: 4,
+    fontFamily: 'Montserrat_500Medium',
   },
-  userDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  userDetailLabel: {
+  userDate: {
     fontSize: 14,
-    marginRight: 5,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  userDetailValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    fontFamily: 'SourceSansPro_600SemiBold',
+    fontWeight: '400',
+    fontFamily: 'Montserrat_500Medium',
   },
   userActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    flexWrap: 'wrap',
   },
-  userActionButton: {
+  approveUserButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    padding: 12,
     borderRadius: 8,
-    marginRight: 10,
-    marginBottom: 8,
+    marginRight: 8,
   },
-  userActionButtonText: {
+  approveUserButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 5,
-    fontFamily: 'Montserrat_500Medium',
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    height: 60,
-    borderTopWidth: 1,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  navItem: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navLabel: {
-    fontSize: 12,
-    marginTop: 3,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 20,
-  },
-  modalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 10,
-    padding: 20,
-    borderWidth: 1,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Montserrat_700Bold',
-  },
-  modalBody: {
-    marginBottom: 20,
-  },
-  listingDetailTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    fontFamily: 'Montserrat_700Bold',
-  },
-  listingDetailMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  listingStatusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  listingStatusBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    fontFamily: 'Montserrat_500Medium',
-  },
-  listingDetailDate: {
     fontSize: 14,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingDetailSection: {
-    marginBottom: 20,
-  },
-  listingDetailSectionTitle: {
-    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
+    marginLeft: 8,
     fontFamily: 'Montserrat_600SemiBold',
   },
-  listingDetailCard: {
+  rejectUserButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 12,
     borderRadius: 8,
   },
-  listingDetailUser: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 4,
-    fontFamily: 'Montserrat_500Medium',
-  },
-  listingDetailEmail: {
-    fontSize: 14,
-    marginBottom: 4,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingDetailPhone: {
-    fontSize: 14,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingDetailDescription: {
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingDetailTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  listingDetailTag: {
-    backgroundColor: '#836EFE',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  listingDetailTagText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  listingImagesContainer: {
-    paddingRight: 10,
-  },
-  listingDetailImage: {
-    width: 200,
-    height: 150,
-    marginRight: 10,
-    borderRadius: 8,
-  },
-  noImagesText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginBottom: 10,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  modalActions: {
-    marginTop: 10,
-  },
-  approveButton: {
-    backgroundColor: '#4CAF50',
-    marginBottom: 10,
-  },
-  rejectButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#FF6347',
-    marginBottom: 10,
-  },
-  rejectButtonText: {
-    color: '#FF6347',
-  },
-  resetButton: {
-    backgroundColor: '#FFA500',
-  },
-  confirmModalContent: {
-    width: '90%',
-    borderRadius: 10,
-    padding: 20,
-    alignItems: 'center',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  warningIconContainer: {
-    marginBottom: 15,
-  },
-  confirmModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    fontFamily: 'Montserrat_700Bold',
-  },
-  confirmModalText: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 10,
-    lineHeight: 22,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  confirmModalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 20,
-  },
-  confirmModalButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    width: '48%',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F2F2F2',
-  },
-  cancelButtonText: {
-    color: '#333333',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  confirmButton: {
-    backgroundColor: '#FF6347',
-  },
-  confirmButtonText: {
+  rejectUserButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+    marginLeft: 8,
     fontFamily: 'Montserrat_600SemiBold',
   },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
+  // Styles pour la section security
+  securitySection: {
+    marginBottom: 32,
   },
-  settingsSection: {
-    borderRadius: 10,
-    marginBottom: 20,
+  securityCard: {
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
+    borderRadius: 12,
+    elevation: 4,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  settingsSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 15,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  adminProfileContainer: {
+  settingItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  adminAvatarContainer: {
-    marginRight: 15,
-  },
-  adminAvatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#836EFE',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  adminAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    fontFamily: 'Montserrat_700Bold',
-  },
-  adminInfoContainer: {
-    flex: 1,
-  },
-  adminName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 5,
-    fontFamily: 'Montserrat_600SemiBold',
-  },
-  adminEmail: {
-    fontSize: 14,
-    marginBottom: 8,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  adminDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  adminDetailLabel: {
-    fontSize: 14,
-    marginRight: 6,
-    fontFamily: 'SourceSansPro_400Regular',
-  },
-  adminDetailValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    fontFamily: 'SourceSansPro_600SemiBold',
-  },
-  settingsOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    borderBottomColor: '#E0E0E0',
   },
-  settingsOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  settingTextContainer: {
+    flex: 1,
+    marginRight: 12,
   },
-  settingsOptionText: {
+  settingTitle: {
     fontSize: 16,
-    marginLeft: 12,
-    fontFamily: 'SourceSansPro_400Regular',
+    fontWeight: '600',
+    marginBottom: 4,
+    fontFamily: 'Montserrat_600SemiBold',
   },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  settingDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    fontFamily: 'Montserrat_500Medium',
   },
-  logoutButtonContainer: {
-    marginTop: 10,
-    marginBottom: 30,
+  // Styles pour la section maintenance
+  maintenanceSection: {
+    marginBottom: 32,
   },
-  logoutFullButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FF6347',
-    padding: 15,
-    borderRadius: 10,
-    elevation: 2,
-    shadowColor: '#000',
+  maintenanceCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 4,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    alignItems: 'center',
   },
-  logoutFullButtonText: {
+  maintenanceIconContainer: {
+    marginBottom: 12,
+  },
+  maintenanceTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  maintenanceDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    width: '80%',
+  },
+  resetButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
     fontFamily: 'Montserrat_600SemiBold',
   },
+  backupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    width: '80%',
+  },
+  backupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  // Styles pour les annonces
+  announceCard: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    overflow: 'hidden',
+  },
+  cardImageContainer: {
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryBadgeContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  categoryBadge: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  cardContent: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  cardType: {
+    fontSize: 14,
+    marginBottom: 8,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardDate: {
+    fontSize: 12,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F44336',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    marginLeft: 4,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  // Styles pour annonces list
+  announcesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  announcesCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  categoriesContainer: {
+    marginBottom: 16,
+  },
+  categoriesContentContainer: {
+    paddingRight: 16,
+  },
+  categoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  activeCategoryButton: {
+    backgroundColor: '#5D5FEF',
+  },
+  categoryIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  activeCategoryText: {
+    fontWeight: '600',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+    fontFamily: 'Montserrat_500Medium',
+  },
+  announcesListContainer: {
+    paddingBottom: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  logoutSection: {
+    marginBottom: 20,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 15,
+  },
+  logoutButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  pieChartContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+periodFilterContainer: {
+  flexDirection: 'row',
+  marginBottom: 12,
+  alignSelf: 'center',
+},
+periodButton: {
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 20,
+  marginHorizontal: 4,
+  backgroundColor: '#F0F0F0',
+},
+activePeriodButton: {
+  backgroundColor: '#5D5FEF',
+},
+periodButtonText: {
+  fontSize: 14,
+  color: '#666666',
+  fontFamily: 'Montserrat_500Medium',
+},
+activePeriodButtonText: {
+  color: '#FFFFFF',
+  fontFamily: 'Montserrat_600SemiBold',
+},
+  
 });
-
-export default AdminDashboard;
