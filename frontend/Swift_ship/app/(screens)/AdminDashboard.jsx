@@ -11,6 +11,12 @@ import AnnonceContext from '../../contexts/AnnonceContext';
 import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
+import { AuthContext } from '../../services/AuthContext';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
+
 
 const AnnonceCard = React.memo(({ item, darkMode, onPress, onDelete }) => (
   <TouchableOpacity 
@@ -141,6 +147,7 @@ const formatDate = (dateString) => {
 
 const AdminDashboard = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
+   const { logout } = useContext(AuthContext);
   const { annonces, loading, refreshAnnonces, deleteAnnonce, cleanOldAnnonces, updateNewStatus } = useContext(AnnonceContext);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'annonces', 'users', 'settings'
@@ -152,42 +159,312 @@ const AdminDashboard = () => {
   // Navigation hook inside the component
   const navigation = useNavigation();
     
-  // Logout handler
+const [isLoggingOut, setIsLoggingOut] = useState(false);
   const handleLogout = () => {
-    Alert.alert(
-      "Déconnexion",
-      "Êtes-vous sûr de vouloir vous déconnecter? Toutes vos données seront effacées de cet appareil.",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        {
-          text: "Déconnexion",
-          style: "destructive",
-          onPress: async () => {
+  Alert.alert(
+    "Déconnexion",
+    "Êtes-vous sûr de vouloir vous déconnecter?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      {
+        text: "Déconnexion", 
+        onPress: async () => {
+          try {
             const success = await logout();
             if (success) {
+              router.replace('/login');
               Toast.show({
                 type: 'success',
-                text1: 'Déconnecté avec succès',
-                text2: 'À bientôt!',
-                visibilityTime: 3000
-              });
-              router.replace('/login');
-            } else {
-              Toast.show({
-                type: 'error',
-                text1: 'Erreur de déconnexion',
-                text2: 'Veuillez réessayer',
-                visibilityTime: 3000
+                text1: 'Déconnexion réussie',
+                visibilityTime: 2000
               });
             }
+          } catch (error) {
+            Toast.show({
+              type: 'error',
+              text1: 'Erreur de déconnexion',
+              text2: error.message,
+              visibilityTime: 3000
+            });
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
+const generatePDF = async () => {
+  // Afficher le chargement
+  Toast.show({
+    type: 'info',
+    text1: 'Génération du PDF en cours...',
+    visibilityTime: 2000,
+  });
+
+  try {
+    // Date pour le nom du fichier
+    const today = new Date();
+    const dateString = today.toISOString().split('T')[0];
+    
+    // Création du contenu HTML pour le PDF
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Bourse au prêt - Sauvegarde des données</title>
+          <style>
+            body {
+              font-family: 'Helvetica', Arial, sans-serif;
+              color: #333;
+              margin: 0;
+              padding: 20px;
+            }
+            h1 {
+              color: #39335E;
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            h2 {
+              color: #5D5FEF;
+              margin-top: 30px;
+              border-bottom: 1px solid #ddd;
+              padding-bottom: 5px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 30px;
+            }
+            th, td {
+              text-align: left;
+              padding: 8px;
+              border-bottom: 1px solid #ddd;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .category {
+              font-weight: bold;
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 4px;
+              color: white;
+            }
+            .category-donner { background-color: #4CAF50; }
+            .category-preter { background-color: #2196F3; }
+            .category-emprunter { background-color: #FF9800; }
+            .category-louer { background-color: #9C27B0; }
+            .category-acheter { background-color: #F44336; }
+            .category-echanger { background-color: #009688; }
+            .footer {
+              text-align: center;
+              margin-top: 40px;
+              font-size: 12px;
+              color: #666;
+            }
+            .stats-container {
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: space-around;
+              margin-bottom: 20px;
+            }
+            .stat-box {
+              width: 45%;
+              padding: 10px;
+              margin-bottom: 15px;
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              text-align: center;
+            }
+            .stat-number {
+              font-size: 24px;
+              font-weight: bold;
+              color: #5D5FEF;
+              margin: 5px 0;
+            }
+            .stat-label {
+              font-size: 14px;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Bourse au prêt - Sauvegarde des données</h1>
+          <p><strong>Date:</strong> ${today.toLocaleDateString()}</p>
+          
+          <h2>Statistiques générales</h2>
+          <div class="stats-container">
+            <div class="stat-box">
+              <div class="stat-number">${totalAnnounces}</div>
+              <div class="stat-label">Annonces totales</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">${flaggedAnnounces}</div>
+              <div class="stat-label">Annonces à modérer</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">${totalUsers}</div>
+              <div class="stat-label">Utilisateurs validés</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">${pendingUsers}</div>
+              <div class="stat-label">Utilisateurs en attente</div>
+            </div>
+          </div>
+
+          <h2>Distribution par catégorie</h2>
+          <table>
+            <tr>
+              <th>Catégorie</th>
+              <th>Nombre d'annonces</th>
+            </tr>
+            ${categoryStats.map(stat => `
+              <tr>
+                <td><span class="category category-${stat.name.toLowerCase()}">${stat.name}</span></td>
+                <td>${stat.count}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <h2>Liste des annonces</h2>
+          <table>
+            <tr>
+              <th>Titre</th>
+              <th>Catégorie</th>
+              <th>Type</th>
+              <th>Date</th>
+            </tr>
+            ${annonces.map(item => `
+              <tr>
+                <td>${item.title}</td>
+                <td>${item.category}</td>
+                <td>${item.type || 'N/A'}</td>
+                <td>${item.date || 'N/A'}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <h2>Utilisateurs en attente de validation</h2>
+          <table>
+            <tr>
+              <th>Nom</th>
+              <th>Email</th>
+              <th>Date d'inscription</th>
+            </tr>
+            ${pendingUsersList.map(user => `
+              <tr>
+                <td>${user.name}</td>
+                <td>${user.email}</td>
+                <td>${user.date}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <h2>Annonces à modérer</h2>
+          <table>
+            <tr>
+              <th>Titre</th>
+              <th>Catégorie</th>
+              <th>Raison de signalement</th>
+            </tr>
+            ${annoncesToModerate.map(item => `
+              <tr>
+                <td>${item.title}</td>
+                <td>${item.category}</td>
+                <td>${item.reason}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <div class="footer">
+            <p>Document généré automatiquement le ${today.toLocaleDateString()} à ${today.toLocaleTimeString()}</p>
+            <p>Bourse au prêt - Système d'administration</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    if (Platform.OS === 'web') {
+      // Pour le web, on utilise une méthode différente pour créer et télécharger le PDF
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bourse_au_pret_sauvegarde_${dateString}.html`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Sauvegarde générée',
+        text2: 'Le fichier a été téléchargé avec succès.',
+        visibilityTime: 2000,
+      });
+    } else {
+      // Pour les plateformes mobiles
+      // Option 1: Utiliser react-native-print pour afficher directement le PDF
+      try {
+        await Print.printAsync({
+          html: htmlContent,
+        });
+        
+        Toast.show({
+          type: 'success',
+          text1: 'PDF généré',
+          text2: 'Vous pouvez maintenant l\'enregistrer ou le partager',
+          visibilityTime: 3000,
+        });
+      } 
+      // Option 2: Si Print ne fonctionne pas, utiliser RNHTMLtoPDF
+      catch (printError) {
+        console.log('Print failed, falling back to PDF generation', printError);
+        
+        const options = {
+          html: htmlContent,
+          fileName: `bourse_au_pret_sauvegarde_${dateString}`,
+          directory: 'Documents',
+        };
+
+        const file = await RNHTMLtoPDF.convert(options);
+        
+        if (file.filePath) {
+          // Partager le fichier PDF
+          await Share.open({
+            url: `file://${file.filePath}`,
+            title: 'Sauvegarde des données Bourse au prêt',
+            message: 'Voici la sauvegarde des données de l\'application Bourse au prêt.',
+            type: 'application/pdf',
+          });
+          
+          Toast.show({
+            type: 'success',
+            text1: 'PDF généré avec succès',
+            text2: `Sauvegardé dans: ${file.filePath}`,
+            visibilityTime: 3000,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erreur lors de la génération du PDF:', error);
+    
+    Toast.show({
+      type: 'error',
+      text1: 'Erreur de génération du PDF',
+      text2: error.message || 'Une erreur est survenue',
+      visibilityTime: 3000,
+    });
+  }
+};
 
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -874,11 +1151,12 @@ const AdminDashboard = () => {
                   la réinitialisation du système.
                 </Text>
                 <TouchableOpacity
-                  style={[styles.backupButton, {backgroundColor: '#2196F3', marginTop: 20}]}
-                >
-                  <Ionicons name="download" size={18} color="#FFFFFF" />
-                  <Text style={styles.backupButtonText}>Télécharger la sauvegarde</Text>
-                </TouchableOpacity>
+  style={[styles.backupButton, {backgroundColor: '#2196F3', marginTop: 20}]}
+  onPress={generatePDF}
+>
+  <Ionicons name="download" size={18} color="#FFFFFF" />
+  <Text style={styles.backupButtonText}>Télécharger la sauvegarde</Text>
+</TouchableOpacity>
               </View>
             </View>
 

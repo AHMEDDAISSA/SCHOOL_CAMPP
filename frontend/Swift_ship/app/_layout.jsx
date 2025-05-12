@@ -5,6 +5,7 @@ import { ThemeProvider } from '../theme/ThemeContext';
 import { MessageProvider } from '../message_context';
 import { AnnonceProvider } from '../contexts/AnnonceContext';
 import Toast, { BaseToast } from 'react-native-toast-message';
+import { AuthProvider } from '../services/AuthContext';
 
 const toastConfig = {
   success: ({ text1, text2, ...rest }) => (
@@ -48,6 +49,7 @@ const toastConfig = {
 const RootLayout = () => {
   return (
     <MessageProvider>
+      <AuthProvider>
       <ThemeProvider>
         <AnnonceProvider>
           <Stack screenOptions={{ headerShown: false }}>
@@ -74,6 +76,7 @@ const RootLayout = () => {
           <Toast config={toastConfig}/> 
         </AnnonceProvider>
       </ThemeProvider>
+      </AuthProvider>
     </MessageProvider>
   );
 };
