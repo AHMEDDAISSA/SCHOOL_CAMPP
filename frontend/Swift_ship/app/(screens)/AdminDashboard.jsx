@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Dimensions, Alert, Switch, BackHandler, FlatList, RefreshControl, TextInput } from 'react-native';
-import React, { useContext, useState, useEffect, useMemo, useCallback  } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import Notification from "../../assets/images/notification.svg";
 import Dark_Notification from "../../assets/images/dark_notification.svg";
 import { router } from "expo-router";
@@ -155,6 +155,10 @@ const AdminDashboard = () => {
   const [selectedCategory, setSelectedCategory] = useState('0'); // Catégorie sélectionnée
   const [searchQuery, setSearchQuery] = useState('');
   const screenWidth = Dimensions.get('window').width - 32;
+  
+
+
+  
     
   // Navigation hook inside the component
   const navigation = useNavigation();

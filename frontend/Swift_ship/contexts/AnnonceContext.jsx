@@ -35,6 +35,46 @@ export const AnnonceProvider = ({ children }) => {
       console.error('Erreur lors de la sauvegarde des annonces:', error);
     }
   };
+  const approveAnnounce = async (announceId) => {
+  try {
+    // Update the announcement in your database
+    const updatedAnnonce = { ...annonces.find(a => a.id === announceId), needsModeration: false, status: 'approved' };
+    // Call your API endpoint or database update function here
+    
+    // Update local state
+    const updatedAnnounces = annonces.map(a => a.id === announceId ? updatedAnnonce : a);
+    setAnnonces(updatedAnnounces);
+    
+    // Update the moderation list
+    const updatedModerateList = annoncesToModerate.filter(a => a.id !== announceId);
+    setAnnoncesToModerate(updatedModerateList);
+    setFlaggedAnnounces(updatedModerateList.length);
+    
+    return true;
+  } catch (error) {
+    console.error('Error approving announcement:', error);
+    return false;
+  }
+};
+
+const rejectAnnounce = async (announceId) => {
+  try {
+    // Call your delete function or API endpoint
+    const success = await deleteAnnonce(announceId);
+    
+    if (success) {
+      // Update the moderation list
+      const updatedModerateList = annoncesToModerate.filter(a => a.id !== announceId);
+      setAnnoncesToModerate(updatedModerateList);
+      setFlaggedAnnounces(updatedModerateList.length);
+    }
+    
+    return success;
+  } catch (error) {
+    console.error('Error rejecting announcement:', error);
+    return false;
+  }
+};
   
   // Ajouter une nouvelle annonce
   const addAnnonce = async (newAnnonce) => {
