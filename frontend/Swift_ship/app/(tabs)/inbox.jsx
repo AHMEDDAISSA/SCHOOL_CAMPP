@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, TextInput } from 'react-native';
 import React, { useContext, useState } from 'react';
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";

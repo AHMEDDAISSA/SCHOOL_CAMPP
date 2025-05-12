@@ -228,7 +228,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
               lastUpdated: sanitizedUserData.lastUpdated,
               // Keep the original verification status and role
               isVerified: true,// existingUser.isVerified,
-              role: existingUser.role 
+              role: sanitizedUserData.role 
             }
           },
           { new: true } // Return the updated document

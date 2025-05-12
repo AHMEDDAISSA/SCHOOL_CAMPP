@@ -1,16 +1,16 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Create an axios instance with timeout and base URL
+
 const api = axios.create({
-  baseURL: 'http://192.168.1.17:3001',
+  baseURL: 'http://192.168.168.65:3001',
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000, // 10 seconds timeout
 });
 
-// Request interceptor for logging
+
 api.interceptors.request.use(
   config => {
     console.log(`[Request] ${config.method?.toUpperCase()} ${config.url}`);
@@ -55,7 +55,7 @@ export const loginUser = async (email) => {
 // GET: Authenticate or add user
 export const addUser = async (email) => {
   try {
-    const response = await api.get('/user/add-user', { params: { email } });
+    const response = await api.post('/user/add-user', { params: { email } });
     return response;
   } catch (error) {
     console.error('addUser error:', error.message);
@@ -337,6 +337,30 @@ export const updateSystemSettings = async (token, settings) => {
     return response;
   } catch (error) {
     console.error('updateSystemSettings error:', error.message);
+    throw error;
+  }
+};
+
+// POST: Create new user
+export const createAnnounce = async (payload) => {
+  const apiPayload = { 
+    "email": payload.contactEmail, 
+    "title": payload.title, 
+    "description": payload.description, 
+    "category": payload.category, 
+    // "published_by": ObjectId('681db7e65e92e6e77b1d352b'),
+    "camp": payload.camp,
+    "is_published": true,
+    "contact_info": payload.contactPhone,
+    "type": payload.type 
+  }
+  
+  try {
+    const response = await api.post('/post/add', apiPayload);
+    console.log('jaweb', response);
+    return response;
+  } catch (error) {
+    console.error('createAnnounce error:', error.message);
     throw error;
   }
 };

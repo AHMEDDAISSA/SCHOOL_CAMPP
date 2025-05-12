@@ -258,7 +258,7 @@ const Profile_setup_section2 = (data) => {
         userId: formData.userId,
         fullName: fullName,
         email: formData.email,
-        phoneNumber: formData.phone,
+        phone: formData.phone,
         first_name: formData.first_name,
         last_name: formData.last_name,
         nickName: formData.nickName,
@@ -357,6 +357,7 @@ const Profile_setup_section2 = (data) => {
                 const countryCode = phoneInput.current?.getCountryCode();
                 if (countryCode) {
                   handleInputChange('countryCode', `+${countryCode}`);
+                  handleInputChange('phone', text);
                 }
               }}
               containerStyle={[styles.phoneInputContainer, {

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Dimensions, Alert } from 'react-native';
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 import Notification from "../../assets/images/notification.svg";
 import Dark_Notification from "../../assets/images/dark_notification.svg";
@@ -7,6 +7,7 @@ import ThemeContext from '../../theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import AnnonceContext from '../../contexts/AnnonceContext';
+import * as Linking from 'expo-linking'; // Ajout de l'import Linking pour ouvrir les applications externes
 
 const Home = () => {
     const { theme, darkMode, profileData } = useContext(ThemeContext);
@@ -62,6 +63,129 @@ const Home = () => {
       updateNewStatus();
     }, []);
 
+    // Nouvelle fonction pour gérer les contacts selon le moyen préféré
+    const handleContact = (item) => {
+      const contactMethod = item.preferredContact || 'app';
+      
+      switch(contactMethod) {
+        case 'email':
+          // Ouvrir l'application email
+          const emailSubject = `À propos de votre annonce: ${item.title}`;
+          const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\nEst-ce toujours disponible?\n\nCordialement.`;
+          const emailUrl = `mailto:${item.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+          
+          Linking.canOpenURL(emailUrl)
+            .then(supported => {
+              if (supported) {
+                return Linking.openURL(emailUrl);
+              } else {
+                Alert.alert(
+                  'Erreur',
+                  "Impossible d'ouvrir l'application email",
+                  [{ text: 'OK' }]
+                );
+              }
+            })
+            .catch(err => {
+              console.error('Erreur lors de l\'ouverture de l\'email:', err);
+              Alert.alert(
+                'Erreur',
+                "Une erreur est survenue lors de l'ouverture de l'application email",
+                [{ text: 'OK' }]
+              );
+            });
+          break;
+        
+        case 'phone':
+          // Afficher un dialogue pour choisir entre appeler ou WhatsApp
+          Alert.alert(
+            'Contacter par téléphone',
+            'Comment souhaitez-vous contacter cette personne?',
+            [
+              {
+                text: 'Appeler',
+                onPress: () => {
+                  const phoneUrl = `tel:${item.contactPhone}`;
+                  Linking.canOpenURL(phoneUrl)
+                    .then(supported => {
+                      if (supported) {
+                        return Linking.openURL(phoneUrl);
+                      } else {
+                        Alert.alert(
+                          'Erreur',
+                          "Impossible d'ouvrir l'application téléphone",
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    })
+                    .catch(err => {
+                      console.error('Erreur lors de l\'appel:', err);
+                      Alert.alert(
+                        'Erreur',
+                        "Une erreur est survenue lors de l'ouverture de l'application téléphone",
+                        [{ text: 'OK' }]
+                      );
+                    });
+                }
+              },
+              {
+                text: 'WhatsApp',
+                onPress: () => {
+                  // Formater le numéro pour WhatsApp (enlever les espaces, etc.)
+                  let whatsappNumber = item.contactPhone?.replace(/\s+/g, '') || '';
+                  
+                  // Ajouter le code pays si nécessaire
+                  if (whatsappNumber.startsWith('0')) {
+                    whatsappNumber = `41${whatsappNumber.substring(1)}`;
+                  }
+                  
+                  const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`)}`;
+                  
+                  Linking.canOpenURL(whatsappUrl)
+                    .then(supported => {
+                      if (supported) {
+                        return Linking.openURL(whatsappUrl);
+                      } else {
+                        Alert.alert(
+                          'Erreur',
+                          "WhatsApp n'est pas installé sur votre appareil",
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    })
+                    .catch(err => {
+                      console.error('Erreur lors de l\'ouverture de WhatsApp:', err);
+                      Alert.alert(
+                        'Erreur',
+                        "Une erreur est survenue lors de l'ouverture de WhatsApp",
+                        [{ text: 'OK' }]
+                      );
+                    });
+                }
+              },
+              {
+                text: 'Annuler',
+                style: 'cancel'
+              }
+            ]
+          );
+          break;
+        
+        case 'app':
+        default:
+          // Ouvrir la conversation dans l'application
+          router.push({
+            pathname: '(screens)/chat_screen',
+            params: { 
+              id: Date.now(),
+              advertId: item.id,
+              name: item.ownerName || 'Propriétaire'
+            }
+          });
+          break;
+      }
+    };
+
     const getCategoryColor = (category) => {
       switch(category) {
         case 'Donner': return '#4CAF50';
@@ -104,6 +228,15 @@ const Home = () => {
     const types = ['Tous', 'Vêtement', 'Équipement', 'Chaussures', 'Accessoire'];
     const campTypes = ['Tous', 'Camp De Ski', 'Camp Vert'];
     
+    // Fonction pour obtenir l'icône du moyen de communication
+    const getContactIcon = (contactMethod) => {
+      switch(contactMethod) {
+        case 'email': return 'mail';
+        case 'phone': return 'call';
+        case 'app': 
+        default: return 'chatbubble';
+      }
+    };
 
     return (
       <View style={[styles.container, {backgroundColor: theme.background}]}> 
@@ -229,29 +362,6 @@ const Home = () => {
                 ))}
               </View>
             </ScrollView>
-            
-            {/* <Text style={styles.filterLabel}>Taille:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.filterButtonsContainer}>
-                {sizes.map(size => (
-                  <TouchableOpacity 
-                    key={size} 
-                    style={[
-                      styles.filterButton, 
-                      selectedSize === size ? { backgroundColor: '#39335E' } : null
-                    ]}
-                    onPress={() => setSelectedSize(size)}
-                  >
-                    <Text style={[
-                      styles.filterButtonText, 
-                      selectedSize === size ? { color: '#FFFFFF' } : null
-                    ]}>
-                      {size}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView> */}
           </View>
 
           <View style={styles.recentSection}>
@@ -310,12 +420,13 @@ const Home = () => {
                       <Text style={[styles.cardType, { color: darkMode ? '#B0B0B0' : '#727272' }]}>{item.type}</Text>
                       <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{formatDate(item.date)}</Text>
                       
+                      {/* Bouton de contact modifié pour utiliser la fonction handleContact */}
                       <TouchableOpacity 
                         style={styles.contactButton} 
-                        onPress={() => router.push(`/contact/${item.id}`)}
+                        onPress={() => handleContact(item)}
                       >
                         <Ionicons 
-                          name={item.preferredContact === 'email' ? 'mail' : 'call'} 
+                          name={getContactIcon(item.preferredContact)} 
                           size={14} 
                           color="white" 
                           style={{marginRight: 4}} 
@@ -668,7 +779,7 @@ const styles = StyleSheet.create({
   },
   cardImage: {
       width: '100%',
-      height: '100%',
+       height: '100%',
       borderTopLeftRadius: 10,
       borderBottomLeftRadius: 10,
   },
@@ -781,13 +892,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_700Bold',
     color: '#39335E',
     marginBottom: 15,
-},
-infoStep: {
+  },
+  infoStep: {
     flexDirection: 'row',
     marginBottom: 15,
     alignItems: 'flex-start',
-},
-infoStepNumber: {
+  },
+  infoStepNumber: {
     width: 30,
     height: 30,
     borderRadius: 15,
@@ -796,25 +907,25 @@ infoStepNumber: {
     justifyContent: 'center',
     marginRight: 15,
     marginTop: 3,
-},
-infoStepNumberText: {
+  },
+  infoStepNumberText: {
     color: '#FFFFFF',
     fontFamily: 'Montserrat_700Bold',
     fontSize: 16,
-},
-infoStepContent: {
+  },
+  infoStepContent: {
     flex: 1,
-},
-infoStepTitle: {
+  },
+  infoStepTitle: {
     fontSize: 16,
     fontFamily: 'Montserrat_600SemiBold',
     color: '#39335E',
     marginBottom: 3,
-},
-infoStepDesc: {
+  },
+  infoStepDesc: {
     fontSize: 14,
     fontFamily: 'Montserrat_500Medium',
     color: '#727272',
     lineHeight: 20,
-},
+  },
 });

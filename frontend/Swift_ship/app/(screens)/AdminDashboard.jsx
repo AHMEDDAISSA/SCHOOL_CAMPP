@@ -674,7 +674,7 @@ const AdminDashboard = () => {
             {/* En-tête avec filtre et recherche */}
             <View style={styles.announcesHeader}>
               <Text style={[styles.sectionTitle, {color: theme.color}]}>Liste des annonces</Text>
-              <Text style={[styles.announcesCount, {color: theme.secondaryText}]}>
+              <Text style={[styles.announcesCount, {color: darkMode ? '#888888' : theme.secondaryText}]}>
                 {filteredAnnonces.length} annonce{filteredAnnonces.length !== 1 ? 's' : ''}
               </Text>
             </View>

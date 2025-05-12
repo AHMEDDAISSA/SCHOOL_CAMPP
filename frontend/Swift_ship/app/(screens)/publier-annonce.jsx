@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert } from 'react-native';
 import React, { useContext, useState, useEffect,useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Ajout d'AsyncStorage
 import Back from "../../assets/images/back.svg";
@@ -13,10 +13,11 @@ import * as ImagePicker from 'expo-image-picker';
 import PhoneInput from 'react-native-phone-number-input';
 import { createAd, uploadMultipleImages, sendEmailOTP, verifyOTP } from '../../services/api'; // Ajouté les fonctions d'API
 import Toast from 'react-native-toast-message';
+import { createAnnounce } from '../../services/api'; 
 
 const PublierAnnonce = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext); 
-  const { addAnnonce } = useContext(AnnonceContext);
+  // const { addAnnonce } = useContext(AnnonceContext);
   const phoneInput = useRef(null);
   
 
@@ -361,7 +362,7 @@ const PublierAnnonce = () => {
 };
   
   // Soumission du formulaire
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     
     if (preferredContact === 'phone' && !phoneNumber) {
     setMissingFields(prevFields => {
@@ -381,9 +382,6 @@ const PublierAnnonce = () => {
     return;
   }
 
-
-
-
     if (!isAuthenticated) {
       Toast.show({
         type: 'error',
@@ -394,7 +392,7 @@ const PublierAnnonce = () => {
       return;
     }
     
-    // Validation de base
+    
     if (!validateForm()) {
       Toast.show({
         type: 'error',
@@ -409,30 +407,32 @@ const PublierAnnonce = () => {
     setLoading(true);
     
     try {
-      // Créer l'objet annonce avec le camp ajouté
+      
       const nouvelleAnnonce = {
         title,
         description,
         category,
         type,
         condition,
-        camp, // Ajout du camp dans l'annonce
+        camp, 
         price: category === 'Louer' || category === 'Acheter' ? price : '',
         duration: category === 'Louer' || category === 'Prêter' ? duration : '',
         images: images,
         isActive,
-        email: email,
-        contact: {
-          name: showName ? userName : '',
-          phone: showPhone ? phoneNumber : '',
-          email: showEmail ? email : '',
-          preferredMethod: preferredContact
-        },
+         // Informations de contact importantes:
+        contactEmail: email,
+        contactPhone: phoneNumber,
+        contactName: userName,
+        showEmail: showEmail,
+        showPhone: showPhone,
+        showName: showName,
+        preferredContact: preferredContact, // IMPORTANT: cette propriété sera utilisée dans Inbox
         createdAt: new Date().toISOString()
       };
       
+      
       // Ajouter l'annonce via le contexte
-      const annonceAjoutee = addAnnonce(nouvelleAnnonce);
+      const annonceAjoutee = createAnnounce(nouvelleAnnonce);      
       
       // Réinitialiser le formulaire
       resetForm();
@@ -511,7 +511,7 @@ const PublierAnnonce = () => {
         
         {/* Section titre */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>
+          <Text style={[styles.label, {color: theme.color, marginBottom: 10}]}>
             Titre de l'annonce<Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
@@ -530,7 +530,7 @@ const PublierAnnonce = () => {
         
         {/* Section Camp (NOUVEAU) */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>
+          <Text style={[styles.label, {color: theme.color, marginBottom: 10}]}>
             Camp<Text style={styles.requiredStar}>*</Text>
           </Text>
           <View style={[
@@ -577,7 +577,7 @@ const PublierAnnonce = () => {
         
         {/* Section catégorie */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>
+          <Text style={[styles.label, {color: theme.color, marginBottom: 10}]}>
             Catégorie<Text style={styles.requiredStar}>*</Text>
           </Text>
           <ScrollView 
@@ -595,15 +595,15 @@ const PublierAnnonce = () => {
                 style={[
                   styles.categoryButton, 
                   { backgroundColor: darkMode 
-                    ? (category === cat.name ? '#5D5FEF' : '#363636') 
-                    : (category === cat.name ? '#39335E' : '#F0F0F0') 
+                    ? (category === cat.id ? '#5D5FEF' : '#363636') 
+                    : (category === cat.id ? '#39335E' : '#F0F0F0') 
                   }
                 ]}
-                onPress={() => setCategory(cat.name)}
+                onPress={() => setCategory(cat.id)}
               >
                 <View style={[
                   styles.categoryIconContainer,
-                  { backgroundColor: category === cat.name 
+                  { backgroundColor: category === cat.id 
                     ? (darkMode ? '#ffffff' : '#39335E')
                     : (darkMode ? '#5D5FEF' : '#E6E6FA') 
                   }
@@ -611,7 +611,7 @@ const PublierAnnonce = () => {
                   <Ionicons 
                     name={cat.icon} 
                     size={20} 
-                    color={category === cat.name 
+                    color={category === cat.id 
                       ? (darkMode ? '#363636' : '#ffffff')
                       : (darkMode ? '#FFFFFF' : '#5D5FEF')
                     } 
@@ -620,7 +620,7 @@ const PublierAnnonce = () => {
                 <Text 
                   style={[
                     styles.categoryText, 
-                    {color: category === cat.name 
+                    {color: category === cat.id 
                       ? '#FFFFFF' 
                       : (darkMode ? '#FFFFFF' : '#39335E')
                     }
@@ -635,7 +635,7 @@ const PublierAnnonce = () => {
         
         {/* Section Type */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>
+          <Text style={[styles.label, {color: theme.color, marginBottom: 10}]}>
             Type d'objet<Text style={styles.requiredStar}>*</Text>
           </Text>
           <View style={[
@@ -674,7 +674,7 @@ const PublierAnnonce = () => {
         
         {/* Section Photos */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>
+          <Text style={[styles.label, {color: theme.color, marginBottom: 10}]}>
             Photos (max 4)<Text style={styles.requiredStar}>*</Text>
           </Text>
           <View style={[
@@ -725,7 +725,7 @@ const PublierAnnonce = () => {
         
         {/* Section Description */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>
+          <Text style={[styles.label, {color: theme.color,marginBottom: 12}]}>
             Description<Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
@@ -746,7 +746,7 @@ const PublierAnnonce = () => {
       
         {/* Section état */}
         <View style={styles.formSection}>
-          <Text style={[styles.label, {color: theme.color}]}>État</Text>
+          <Text style={[styles.label, {color: theme.color,marginBottom: 10}]}>État</Text>
           <View style={styles.conditionButtonsContainer}>
             {itemConditions.map((itemCondition, index) => (
               <Pressable 
@@ -830,18 +830,18 @@ const PublierAnnonce = () => {
             <View style={styles.contactFieldLabel}>
               <Text style={[styles.label, {color: theme.color}]}>Email</Text>
               <Text style={[styles.fieldValue, {color: theme.color}]}>{email}</Text>
-              <Text style={[styles.fieldNote, {color: theme.darkGrey}]}>
+              <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>
                 (Email associé à votre compte)
               </Text>
             </View>
-            <View style={styles.switchContainer}>
+            {/* <View style={styles.switchContainer}>
               <Text style={{color: theme.color, fontSize: 14, marginRight: 8}}>Afficher</Text>
               <Switch
                 value={showEmail}
                 onValueChange={setShowEmail}
                 trackColor={{ false: "#767577", true: "#39335E" }}
               />
-            </View>
+            </View> */}
           </View>
           
           {/* Nom (facultatif) */}
@@ -940,7 +940,7 @@ const PublierAnnonce = () => {
           </View> */}
           {/* Moyen de communication préféré */}
           <View style={styles.formSection}>
-            <Text style={[styles.label, {color: theme.color}]}>Moyen de communication préféré</Text>
+            <Text style={[styles.label, {color: theme.color, marginBottom: 20}]}>Moyen de communication préféré</Text>
             <View style={styles.contactMethodsContainer}>
              {contactMethods.map(method => (
   <TouchableOpacity 
@@ -997,7 +997,7 @@ const PublierAnnonce = () => {
             </View>
           </View>
           
-          <Text style={[styles.visibilityDescription, {color: theme.darkGrey}]}>
+          <Text style={[styles.visibilityDescription, {color: darkMode ? '#888888' : theme.secondaryText}]}>
             Si désactivée, votre annonce ne sera pas visible par les autres utilisateurs mais restera dans votre compte.
           </Text>
         </View>

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Alert } from 'react-native';
 import React, { useContext, useEffect, useState } from 'react';
 import { router } from "expo-router";
 import { Montserrat_500Medium, Montserrat_700Bold } from '@expo-google-fonts/montserrat';
@@ -6,6 +6,7 @@ import ThemeContext from '../../../theme/ThemeContext';
 import AnnonceContext from '../../../contexts/AnnonceContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking'; // Import Linking pour ouvrir les applications
 
 const Inbox_section3 = () => {
   const { theme, darkMode } = useContext(ThemeContext);
@@ -44,7 +45,7 @@ const Inbox_section3 = () => {
           'Chloé Moreau', 'Louis Girard', 'Inès Robert'
         ];
         
-        // Convertir les nouvelles annonces en messages
+        // Convertir TOUTES les annonces en messages
         const newMessages = annonces.map((annonce, index) => {
           // Vérifier si le message existe déjà
           const existingMessage = existingMessages.find(msg => msg.advertId === annonce.id);
@@ -54,23 +55,25 @@ const Inbox_section3 = () => {
           const randomNameIndex = Math.floor(Math.random() * randomNames.length);
           const senderName = randomNames[randomNameIndex];
           
-          // Choix aléatoire d'un mode de contact préféré
-          const contactModes = ['app', 'phone', 'email'];
-          const randomContactMode = contactModes[Math.floor(Math.random() * contactModes.length)];
+          // Récupérer le moyen de communication préféré de l'annonce
+          const preferredMethod = annonce.preferredContact || 'app';
           
           // Créer un nouveau message pour cette annonce
           return {
             id: Date.now() + index,
             advertId: annonce.id,
-            advertTitle: annonce.title,
+            advertTitle: annonce.title || 'Annonce sans titre',
             advertType: annonce.category || 'Offre',
-            lastMessage: `Bonjour, je suis intéressé(e) par votre annonce "${annonce.title}". Est-ce toujours disponible?`,
+            lastMessage: `Bonjour, je suis intéressé(e) par votre annonce "${annonce.title || 'Annonce'}". Est-ce toujours disponible?`,
             unread: true,
             date: 'Aujourd\'hui',
             sender: {
               name: senderName,
-              preferred_contact: randomContactMode,
-              // Pas d'image spécifique, nous utiliserons des avatars générés
+              preferred_contact: preferredMethod,
+              contactInfo: {
+                email: annonce.contactEmail || '',
+                phone: annonce.contactPhone || ''
+              }
             },
             item_image: annonce.imageUrl ? { uri: annonce.imageUrl } : 
                          (annonce.images && annonce.images.length > 0) ? 
@@ -78,17 +81,8 @@ const Inbox_section3 = () => {
           };
         });
         
-        // Combiner avec les messages existants en évitant les doublons
-        const allMessages = [...existingMessages];
-        
-        // Ajouter uniquement les nouveaux messages
-        newMessages.forEach(newMsg => {
-          if (!existingMessages.some(msg => msg.advertId === newMsg.advertId)) {
-            allMessages.push(newMsg);
-          }
-        });
-        
-        // Sauvegarder et mettre à jour l'état
+        // Mettre à jour tous les messages
+        const allMessages = [...newMessages];
         await AsyncStorage.setItem('inbox_messages', JSON.stringify(allMessages));
         setMessageData(allMessages);
         
@@ -97,19 +91,132 @@ const Inbox_section3 = () => {
       }
     };
     
-    // Exécuter la conversion
+    // Exécuter la conversion pour toutes les annonces
     convertAnnouncesToMessages();
   }, [annonces]);
   
-  const openChat = (messageItem) => {
-    router.push({
-      pathname: '(screens)/chat_screen',
-      params: { 
-        id: messageItem.id,
-        advertId: messageItem.advertId,
-        name: messageItem.sender.name
-      }
-    });
+  // Fonction pour ouvrir l'application correspondante au moyen de communication
+  const openContactApp = (item) => {
+    const contactMethod = item.sender.preferred_contact;
+    const contactInfo = item.sender.contactInfo || {};
+    
+    switch(contactMethod) {
+      case 'email':
+        // Ouvrir l'application email
+        const emailSubject = `À propos de votre annonce: ${item.advertTitle}`;
+        const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.advertTitle}".\nEst-ce toujours disponible?\n\nCordialement.`;
+        const emailUrl = `mailto:${contactInfo.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+        
+        Linking.canOpenURL(emailUrl)
+          .then(supported => {
+            if (supported) {
+              return Linking.openURL(emailUrl);
+            } else {
+              Alert.alert(
+                'Erreur',
+                "Impossible d'ouvrir l'application email",
+                [{ text: 'OK' }]
+              );
+            }
+          })
+          .catch(err => {
+            console.error('Erreur lors de l\'ouverture de l\'email:', err);
+            Alert.alert(
+              'Erreur',
+              "Une erreur est survenue lors de l'ouverture de l'application email",
+              [{ text: 'OK' }]
+            );
+          });
+        break;
+      
+      case 'phone':
+        // Afficher un dialogue pour choisir entre appeler ou WhatsApp
+        Alert.alert(
+          'Contacter par téléphone',
+          'Comment souhaitez-vous contacter cette personne?',
+          [
+            {
+              text: 'Appeler',
+              onPress: () => {
+                const phoneUrl = `tel:${contactInfo.phone}`;
+                Linking.canOpenURL(phoneUrl)
+                  .then(supported => {
+                    if (supported) {
+                      return Linking.openURL(phoneUrl);
+                    } else {
+                      Alert.alert(
+                        'Erreur',
+                        "Impossible d'ouvrir l'application téléphone",
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Erreur lors de l\'appel:', err);
+                    Alert.alert(
+                      'Erreur',
+                      "Une erreur est survenue lors de l'ouverture de l'application téléphone",
+                      [{ text: 'OK' }]
+                    );
+                  });
+              }
+            },
+            {
+              text: 'WhatsApp',
+              onPress: () => {
+                // Formater le numéro pour WhatsApp (enlever les espaces, etc.)
+                let whatsappNumber = contactInfo.phone?.replace(/\s+/g, '') || '';
+                
+                // Ajouter le code pays si nécessaire
+                if (whatsappNumber.startsWith('0')) {
+                  whatsappNumber = `41${whatsappNumber.substring(1)}`;
+                }
+                
+                const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.advertTitle}". Est-ce toujours disponible?`)}`;
+                
+                Linking.canOpenURL(whatsappUrl)
+                  .then(supported => {
+                    if (supported) {
+                      return Linking.openURL(whatsappUrl);
+                    } else {
+                      Alert.alert(
+                        'Erreur',
+                        "WhatsApp n'est pas installé sur votre appareil",
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Erreur lors de l\'ouverture de WhatsApp:', err);
+                    Alert.alert(
+                      'Erreur',
+                      "Une erreur est survenue lors de l'ouverture de WhatsApp",
+                      [{ text: 'OK' }]
+                    );
+                  });
+              }
+            },
+            {
+              text: 'Annuler',
+              style: 'cancel'
+            }
+          ]
+        );
+        break;
+      
+      case 'app':
+      default:
+        // Ouvrir la conversation dans l'application
+        router.push({
+          pathname: '(screens)/chat_screen',
+          params: { 
+            id: item.id,
+            advertId: item.advertId,
+            name: item.sender.name
+          }
+        });
+        break;
+    }
   };
   
   // Fonction pour obtenir les initiales d'un nom
@@ -150,6 +257,26 @@ const Inbox_section3 = () => {
       default: return 'document-outline';
     }
   };
+  
+  // Fonction pour obtenir l'icône du moyen de communication
+  const getContactIcon = (contactMethod) => {
+    switch(contactMethod) {
+      case 'email': return 'mail-outline';
+      case 'phone': return 'call-outline';
+      case 'app': 
+      default: return 'chatbubble-outline';
+    }
+  };
+  
+  // Fonction pour obtenir le texte du moyen de communication
+  const getContactText = (contactMethod) => {
+    switch(contactMethod) {
+      case 'email': return 'Préfère être contacté par email';
+      case 'phone': return 'Préfère être contacté par téléphone';
+      case 'app':
+      default: return 'Via l\'application';
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -170,7 +297,7 @@ const Inbox_section3 = () => {
               {backgroundColor: theme.cardbg},
               item.unread && styles.unreadCard
             ]}
-            onPress={() => openChat(item)}
+            onPress={() => openContactApp(item)}
           >
             <View style={styles.messageHeader}>
               <View style={styles.advertTypeTag}>
@@ -227,24 +354,17 @@ const Inbox_section3 = () => {
             </View>
             
             <View style={styles.messageFooter}>
-              {item.sender.preferred_contact === 'app' && (
-                <View style={styles.contactPrefContainer}>
-                  <Ionicons name="chatbubble-outline" size={12} color="#9E9E9E" style={styles.contactIcon} />
-                  <Text style={styles.contactPref}>Via l'application</Text>
-                </View>
-              )}
-              {item.sender.preferred_contact === 'phone' && (
-                <View style={styles.contactPrefContainer}>
-                  <Ionicons name="call-outline" size={12} color="#9E9E9E" style={styles.contactIcon} />
-                  <Text style={styles.contactPref}>Préfère être contacté par téléphone</Text>
-                </View>
-              )}
-              {item.sender.preferred_contact === 'email' && (
-                <View style={styles.contactPrefContainer}>
-                  <Ionicons name="mail-outline" size={12} color="#9E9E9E" style={styles.contactIcon} />
-                  <Text style={styles.contactPref}>Préfère être contacté par email</Text>
-                </View>
-              )}
+              <View style={styles.contactPrefContainer}>
+                <Ionicons 
+                  name={getContactIcon(item.sender.preferred_contact)} 
+                  size={12} 
+                  color="#9E9E9E" 
+                  style={styles.contactIcon} 
+                />
+                <Text style={styles.contactPref}>
+                  {getContactText(item.sender.preferred_contact)}
+                </Text>
+              </View>
               {item.unread && (
                 <View style={styles.unreadBadge}>
                   <Text style={styles.unreadText}>Nouveau</Text>
@@ -259,6 +379,9 @@ const Inbox_section3 = () => {
 }
 
 export default Inbox_section3;
+
+// Les styles restent identiques
+
 
 const styles = StyleSheet.create({
   container: {
@@ -379,6 +502,7 @@ const styles = StyleSheet.create({
   contactPrefContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   contactIcon: {
     marginRight: 4,
@@ -394,10 +518,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
+    marginHorizontal: 5,
   },
   unreadText: {
     color: 'white',
     fontSize: 10,
     fontFamily: 'Montserrat_500Medium',
+  },
+  contactButton: {
+    backgroundColor: '#836EFE',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  contactButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Montserrat_700Bold',
   },
 });
