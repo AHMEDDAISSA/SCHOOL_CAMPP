@@ -4,12 +4,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'mail.tsi-network.net',
+  secure: true,
+  port: 465,  
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  logger: true,
+  tls:{rejectUnauthorized:false},
   debug: process.env.NODE_ENV !== 'production',
 });
 
@@ -45,7 +47,7 @@ Pour confirmer votre adresse e-mail, veuillez saisir le code de vérification à
   `;
 
   const mailOptions = {
-    from: `"Your App" <${process.env.EMAIL_USER}>`,
+    from: `"Your App" ${process.env.EMAIL_USER}`,
     to: email,
     subject: 'Verify Your Email',
     html,
