@@ -47,7 +47,7 @@ Pour confirmer votre adresse e-mail, veuillez saisir le code de vérification à
   `;
 
   const mailOptions = {
-    from: `"Your App" ${process.env.EMAIL_USER}`,
+    from: `"BRILLAZ CAMP" ${process.env.EMAIL_USER}`,
     to: email,
     subject: 'Verify Your Email',
     html,
