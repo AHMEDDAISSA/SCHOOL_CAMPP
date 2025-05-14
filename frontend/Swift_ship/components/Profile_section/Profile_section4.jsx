@@ -20,10 +20,11 @@ const Profile_section4 = () => {
     );
   }
   
-  const { theme, resetProfileImage } = themeContext;
+  const { theme, resetProfileImage, clearProfileData } = themeContext;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setModalVisible(true);
+    await clearProfileData();
   };
 
   const confirmLogout = () => {

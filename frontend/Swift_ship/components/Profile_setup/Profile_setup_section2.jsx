@@ -226,34 +226,33 @@ const Profile_setup_section2 = (data) => {
     return true;
   };
 
-  const handleContinue = async () => {
-    if (validateForm()) {
-      const fullName = `${formData.first_name} ${formData.last_name}`;
-      Toast.show({
-        type: 'success',
-        text1: 'Profil mis à jour',
-        text2: `Profil ${formData.role === 'parent' ? 'Parent' : 
-               formData.role === 'admin' ? 'Administrateur' : 
-               formData.role === 'exploitant' ? 'Exploitant' : ''} sélectionné`,
-        position: 'top',
-        visibilityTime: 3000,
-        autoHide: true,
-        topOffset: 70,
-      });
-
-      console.log("ff",{
-        userId: formData.userId,
-        fullName: fullName,
-        email: formData.email,
-        phoneNumber: formData.phone,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        nickName: formData.nickName,
-        countryCode: formData.countryCode,
-        role: formData.role,
-        lastUpdated: new Date().toISOString(),
-        camp: formData.camp
-      });
+ const handleContinue = async () => {
+  if (validateForm()) {
+    const fullName = `${formData.first_name} ${formData.last_name}`;
+    Toast.show({
+      type: 'success',
+      text1: 'Profil mis à jour',
+      text2: `Profil ${formData.role === 'parent' ? 'Parent' : 
+             formData.role === 'admin' ? 'Administrateur' : 
+             formData.role === 'exploitant' ? 'Exploitant' : ''} sélectionné`,
+      position: 'top',
+      visibilityTime: 3000,
+      autoHide: true,
+      topOffset: 70,
+    });
+       const userData = {
+      userId: formData.userId,
+      fullName: fullName,
+      email: formData.email,
+      phone: formData.phone,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      nickName: formData.nickName,
+      countryCode: formData.countryCode,
+      role: formData.role,
+      lastUpdated: new Date().toISOString(),
+      camp: formData.camp
+    };
       const response = await registerUser({
         userId: formData.userId,
         fullName: fullName,
@@ -267,26 +266,59 @@ const Profile_setup_section2 = (data) => {
         lastUpdated: new Date().toISOString(),
         camp: formData.camp
       });
-      if (response.status == "success") {
-        router.push('/login');
-      }else{
-        console.log("responsess error", response);
+       try {
+      // 1. Enregistrer sur le serveur
+      const response = await registerUser(userData);
+      
+      // 2. Mettre à jour le contexte local (décommentez et utilisez cette ligne)
+      updateProfileData({
+        fullName: fullName,
+        email: formData.email,
+        phoneNumber: formData.phone,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        nickName: formData.nickName,
+        countryCode: formData.countryCode,
+        role: formData.role,
+        lastUpdated: new Date().toISOString(),
+      });
+      
+      // 3. Enregistrer dans AsyncStorage les informations de l'utilisateur
+      try {
+        await AsyncStorage.setItem('userInfo', JSON.stringify(userData));
+      } catch (storageError) {
+        console.error('Erreur lors de la sauvegarde des données utilisateur:', storageError);
       }
       
-      
-      // updateProfileData({
-      //   fullName: fullName,
-      //   email: formData.email,
-      //   phoneNumber: formData.phone,
-      //   first_name: formData.first_name,
-      //   last_name: formData.last_name,
-      //   nickName: formData.nickName,
-      //   countryCode: formData.countryCode,
-      //   role: formData.role,
-      //   lastUpdated: new Date().toISOString(),
-      // });
+      if (response.status === "success") {
+        router.push('/login');
+      } else {
+        console.log("réponse erreur", response);
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur',
+          text2: 'Une erreur est survenue lors de l\'enregistrement du profil',
+          position: 'top',
+          visibilityTime: 4000,
+          autoHide: true,
+          topOffset: 70,
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement du profil:", error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: 'Une erreur est survenue lors de l\'enregistrement du profil',
+        position: 'top',
+        visibilityTime: 4000,
+        autoHide: true,
+        topOffset: 70,
+      });
     }
-  };
+  }
+};
+  
 
   const RequiredLabel = ({ text }) => (
     <View style={styles.labelContainer}>

@@ -130,11 +130,12 @@ export const verifyOTP = async (userId, code) => {
 // POST: Resend OTP
 export const resendOTP = async (userId, email = null) => {
   try {
-    const payload = { userId };
-    if (email) {
-      payload.email = email;
-    }
-    const response = await api.post('/auth/resend-verification', payload);
+    const payload = {};
+    if (userId) payload.userId = userId;
+    if (email) payload.email = email;
+    
+    // Make sure this endpoint matches what's in your routes file
+    const response = await api.post('/auth/resend-otp', payload);
     return response;
   } catch (error) {
     console.error('resendOTP error:', error.message);

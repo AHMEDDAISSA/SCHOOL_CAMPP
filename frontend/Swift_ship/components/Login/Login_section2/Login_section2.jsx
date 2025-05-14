@@ -102,11 +102,15 @@ const Login_section2 = () => {
                         // Store user info in AsyncStorage and update context
                         if (userData.user) {
                             await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
-                            setProfileData(prev => ({
-                                ...prev,
-                                email,
-                                ...userData.user,
-                            }));
+                            setProfileData({
+    fullName: userData.user.fullName || `${userData.user.first_name || ''} ${userData.user.last_name || ''}`.trim(),
+    email: userData.user.email,
+    phoneNumber: userData.user.phone,
+    role: userData.user.role,
+    first_name: userData.user.first_name,
+    last_name: userData.user.last_name,
+    
+  });
                             
                             // Get user role
                             const userRole = userData.user.role;

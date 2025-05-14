@@ -1,7 +1,6 @@
-import { StyleSheet, Text, View, Modal, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, Modal, TouchableOpacity, BackHandler } from 'react-native'; // Ajouter BackHandler
 import React, { useContext, useEffect } from 'react';
-import Back from "../../../assets/images/back.svg";
-import Dark_back from "../../../assets/images/dark_back.svg";
+// Supprimer les imports Back et Dark_back
 import Success from "../../../assets/images/success.svg";
 import ThemeContext from '../../../theme/ThemeContext';
 import Button from '../../Button/Button';
@@ -11,8 +10,40 @@ import Toast from 'react-native-toast-message';
 const Signup_section4 = ({ modalVisible6, closeModal6, email, userId }) => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
 
-    
-    // Show success toast when modal becomes visible
+    // Gestion du bouton retour physique
+    useEffect(() => {
+        const backAction = () => {
+            if (modalVisible6) {
+                Alert.alert(
+                    "Confirmation",
+                    "Voulez-vous vraiment quitter l'inscription ?",
+                    [
+                        {
+                            text: "Non",
+                            onPress: () => null,
+                            style: "cancel"
+                        },
+                        { 
+                            text: "Oui", 
+                            onPress: () => closeModal6()
+                        }
+                    ]
+                );
+                return true; // Bloque le retour par défaut
+            }
+            return false; // Comportement normal
+        };
+
+
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            backAction
+        );
+
+        return () => backHandler.remove();
+    }, [modalVisible6]);
+
+    // Show success toast (existant)
     useEffect(() => {
         if (modalVisible6) {
             Toast.show({
@@ -39,9 +70,7 @@ const Signup_section4 = ({ modalVisible6, closeModal6, email, userId }) => {
             >
                 <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
                     <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
-                        <TouchableOpacity onPress={closeModal6}>
-                           {darkMode? <Dark_back /> : <Back />}
-                        </TouchableOpacity>
+                        {/* Supprimer le TouchableOpacity pour la flèche */}
                         <View style={styles.image_container}>
                             <Success />
                         </View>

@@ -61,7 +61,22 @@ const Home = () => {
     useEffect(() => {
       refreshAnnonces();
       updateNewStatus();
-    }, []);
+      
+    const getLatestUserData = async () => {
+    try {
+      const storedUserInfo = await AsyncStorage.getItem('userInfo');
+      if (storedUserInfo) {
+        const userInfo = JSON.parse(storedUserInfo);
+        // Mettre à jour le contexte avec les dernières informations
+        updateProfileData(userInfo);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des données utilisateur:', error);
+    }
+  };
+  
+  getLatestUserData();
+}, []);
 
     // Nouvelle fonction pour gérer les contacts selon le moyen préféré
     const handleContact = (item) => {

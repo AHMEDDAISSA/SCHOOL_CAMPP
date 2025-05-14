@@ -344,7 +344,7 @@ const PublierAnnonce = () => {
   if (!camp) missing.push('camp');
   if (images.length === 0) missing.push('photos');
   
-  if ((category === 'Louer' || category === 'Acheter') && !price) {
+  if ((category === '4' || category === '5') && !price) {
     missing.push('prix');
   }
   
@@ -779,17 +779,17 @@ const PublierAnnonce = () => {
         </View>
         
         {/* Afficher champs selon la catégorie sélectionnée */}
-        {(category === 'Louer' || category === 'Prêter') && (
+        {(category === '2' || category === '4') && (
           <View style={styles.formSection}>
             <Text style={[styles.label, {color: theme.color}]}>
               Durée disponible
-              {category === 'Louer' && <Text style={styles.requiredStar}>*</Text>}
+              {category === '4' && <Text style={styles.requiredStar}>*</Text>}
             </Text>
             <TextInput
               style={[
                 styles.input, 
                 {backgroundColor: theme.cardbg2, color: theme.color},
-                category === 'Louer' && !duration && missingFields.includes('durée') ? styles.inputError : null
+                category === '4' && !duration && missingFields.includes('durée') ? styles.inputError : null
               ]}
               placeholder="Ex: 1 semaine, 2 mois, etc."
               placeholderTextColor="#A8A8A8"
@@ -799,7 +799,7 @@ const PublierAnnonce = () => {
           </View>
         )}
         
-        {(category === 'Louer' || category === 'Acheter') && (
+        {(category === '4' || category === '5') && (
           <View style={styles.formSection}>
             <Text style={[styles.label, {color: theme.color}]}>
               Prix<Text style={styles.requiredStar}>*</Text>

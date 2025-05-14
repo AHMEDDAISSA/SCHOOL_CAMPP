@@ -891,7 +891,7 @@ export default function AnnonceDetail() {
 
                 {annonce.camp && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="flag-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+                    <Ionicons name="bonfire-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
                     <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
                       Camp: {annonce.camp}
                     </Text>
@@ -915,6 +915,14 @@ export default function AnnonceDetail() {
                     </Text>
                   </View>
                 )}
+                {(annonce.category === 'Louer' || annonce.category === 'Acheter') && annonce.price && (
+                   <View style={styles.infoRow}>
+                     <Ionicons name="cash-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+                     <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                       Prix: {annonce.price}€
+                     </Text>
+                   </View>
+                  )}
                 
                 <View style={styles.infoRow}>
                   <Ionicons name="calendar-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />

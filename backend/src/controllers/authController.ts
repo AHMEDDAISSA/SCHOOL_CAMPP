@@ -84,95 +84,94 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
   
   // Handler to resend OTP code - UPDATED VERSION
   export const resendOTPHandler = async (req: Request, res: Response): Promise<void> => {
-    const { userId, email } = req.body;
-  
-    // Check if we have at least the userId or email
-    if (!userId && !email) {
-      res.status(400).json({ 
-        success: false, 
-        message: "User ID or email is required." 
+  const { userId, email } = req.body;
+
+  // Check if we have at least the userId or email
+  if (!userId && !email) {
+    res.status(400).json({ 
+      status: 'error', 
+      message: "User ID or email is required." 
+    });
+    return;
+  }
+
+  try {
+    // Initialize user variable
+    let user: IUser | null = null;
+    
+    // First try to find by userId if provided
+    if (userId) {
+      user = await UserModel.findById(userId);
+    }
+    
+    // If user not found by ID and we have an email, try to find by email
+    if (!user && email) {
+      user = await UserModel.findOne({ email: email.trim().toLowerCase() });
+      if (!user) {
+        res.status(404).json({ 
+          status: 'error', 
+          message: "User not found with the provided email." 
+        });
+        return;
+      }
+    } else if (!user) {
+      // If we still don't have a user, return 404
+      res.status(404).json({ 
+        status: 'error', 
+        message: "User not found." 
       });
       return;
     }
-  
-    try {
-      // Initialize user variable
-      let user: IUser | null = null;
-      
-      // First try to find by userId if provided
-      if (userId) {
-        user = await UserModel.findById(userId);
-      }
-      
-      // If user not found by ID and we have an email, try to find by email
-      if (!user && email) {
-        user = await UserModel.findOne({ email: email.trim().toLowerCase() });
-        if (!user) {
-          res.status(404).json({ 
-            success: false, 
-            message: "User not found with the provided email." 
-          });
-          return;
-        }
-      } else if (!user) {
-        // If we still don't have a user, return 404
-        res.status(404).json({ 
-          success: false, 
-          message: "User not found." 
-        });
-        return;
-      }
-  
-      // Check if already verified
-      if (user.isVerified) {
-        res.status(400).json({ 
-          success: false, 
-          message: "Email already verified." 
-        });
-        return;
-      }
-  
-      // Generate new verification code
-      const newCode = generateVerificationCode();
-      
-      // Update user with new code
-      // Note: We use updateOne to avoid TypeScript errors if verificationCodeExpires isn't in the interface
-      await UserModel.updateOne(
-        { _id: user._id },
-        { 
-          $set: { 
-            verificationCode: newCode,
-            verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes expiration
-          } 
-        }
-      );
-  
-      // Send verification email
-      try {
-        // Use first_name if available for personalized emails
-        await sendVerificationEmail(user.email, newCode, user.first_name || '');
-        console.log(`New verification code sent to ${user.email}: ${newCode}`);
-      } catch (emailError) {
-        console.error('Error sending verification email:', emailError);
-        res.status(500).json({ 
-          success: false, 
-          message: "Failed to send verification email. Please try again." 
-        });
-        return;
-      }
-  
-      res.status(200).json({ 
-        success: true, 
-        message: "New verification code sent to your email." 
+
+    // Check if already verified
+    if (user.isVerified) {
+      res.status(400).json({ 
+        status: 'error', 
+        message: "Email already verified." 
       });
-    } catch (error) {
-      console.error("Resend OTP error:", error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Internal server error." 
-      });
+      return;
     }
-  };
+
+    // Generate new verification code
+    const newCode = generateVerificationCode();
+    
+    // Update user with new code - Using updateOne instead of save()
+    await UserModel.updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          verificationCode: newCode,
+          verificationCodeExpires: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes expiration
+        } 
+      }
+    );
+
+    // Send verification email
+    try {
+      // Use first_name if available for personalized emails
+      await sendVerificationEmail(user.email, newCode, user.first_name || '');
+      console.log(`New verification code sent to ${user.email}: ${newCode}`);
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      res.status(500).json({ 
+        status: 'error', 
+        message: "Failed to send verification email. Please try again." 
+      });
+      return;
+    }
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: "New verification code sent to your email." 
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: "Internal server error." 
+    });
+  }
+};
   
   export const registerHandler = async (req: Request, res: Response): Promise<void> => {
     // Handle both formats of data (direct or nested)

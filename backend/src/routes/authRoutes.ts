@@ -7,6 +7,12 @@ import { loginHandler, registerHandler ,  verifyEmailHandler,
 import { requestOTPByEmail } from "../controllers/otpController";
 
 const router = express.Router();
+router.post('/resend-otp', resendOTPHandler);
+
+
+router.post('/resend-verification', resendOTPHandler);
+
+
 
 // Public routes
 router.post('/register', registerHandler);

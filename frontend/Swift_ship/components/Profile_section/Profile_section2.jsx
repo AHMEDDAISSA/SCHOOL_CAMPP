@@ -46,18 +46,18 @@ const Profile_section2 = () => {
         </View>
         <View style={[styles.content, { backgroundColor: theme.cardbg }]}>
           <Text style={[styles.name, { color: theme.color2 }]}>
-            {profileData.fullName || 'Ahmed Aissa'}
+            {profileData.fullName || ''}
           </Text>
           <View style={styles.mail_row}>
             <Text style={[styles.mail, { color: theme.color4 }]}>
-              {profileData.email || 'ahmedaissa@gmail.com'}
+              {profileData.email || ''}
             </Text>
             <TouchableOpacity onPress={() => router.push('/profile-setup')}>
               <Text style={styles.edit}>edit</Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.no, { color: theme.color4 }]}>
-            {profileData.phoneNumber || '(208) 808-946'}
+            {profileData.phoneNumber || ''}
           </Text>
           
           {profileData.role && (
