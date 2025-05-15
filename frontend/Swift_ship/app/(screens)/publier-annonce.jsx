@@ -595,11 +595,11 @@ const PublierAnnonce = () => {
                 style={[
                   styles.categoryButton, 
                   { backgroundColor: darkMode 
-                    ? (category === cat.id ? '#5D5FEF' : '#363636') 
-                    : (category === cat.id ? '#39335E' : '#F0F0F0') 
+                    ? (category === cat.name ? '#5D5FEF' : '#363636') 
+                    : (category === cat.name ? '#39335E' : '#F0F0F0') 
                   }
                 ]}
-                onPress={() => setCategory(cat.id)}
+                onPress={() => setCategory(cat.name)}
               >
                 <View style={[
                   styles.categoryIconContainer,

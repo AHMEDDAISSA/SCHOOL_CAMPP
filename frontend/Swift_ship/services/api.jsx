@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const api = axios.create({
-  baseURL: 'http://192.168.1.16:3001',
+  baseURL: 'http://192.168.168.65:3001',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -359,11 +359,47 @@ export const createAnnounce = async (payload) => {
   try {
     const response = await api.post('/post/add', apiPayload);
     console.log('jaweb', response);
-    return response;
+    return response.data;
   } catch (error) {
     console.error('createAnnounce error:', error.message);
     throw error;
   }
 };
+export const deleteAnnounce = async (postId) => {
+  try {
+    const response = await api.delete(`/post/delete`, { data: { id: postId } });
+    console.log('réponse suppression:', response);
+    return response;
+  } catch (error) {
+    console.error('deleteAnnounce error:', error.message);
+    throw error;
+  }
+};
+
+
+
+export const getPosts = async (params = {}) => {
+  try {
+    // Construire les paramètres de requête
+    const queryParams = new URLSearchParams();
+    
+    if (params.search) queryParams.append('search', params.search);
+    if (params.category) queryParams.append('category', params.category);
+    if (params.camp) queryParams.append('camp', params.camp);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    const queryString = queryParams.toString();
+    const url = queryString ? `/post/get?${queryString}` : '/post/get';
+    
+    const response = await api.get(url);
+    console.log('getPosts response:', response);
+    return response;
+  } catch (error) {
+    console.error('getPosts error:', error.message);
+    throw error;
+  }
+};
+
 
 export default api;
