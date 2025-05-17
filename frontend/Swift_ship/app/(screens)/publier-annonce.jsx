@@ -17,7 +17,7 @@ import { createAnnounce } from '../../services/api';
 
 const PublierAnnonce = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext); 
-  // const { addAnnonce } = useContext(AnnonceContext);
+  const { addAnnonce } = useContext(AnnonceContext);
   const phoneInput = useRef(null);
   
 
@@ -407,29 +407,32 @@ const PublierAnnonce = () => {
     setLoading(true);
     
     try {
-      
-      const nouvelleAnnonce = {
-        title,
-        description,
-        category,
-        type,
-        condition,
-        camp, 
-        price: category === 'Louer' || category === 'Acheter' ? price : '',
-        duration: category === 'Louer' || category === 'Prêter' ? duration : '',
-        images: images,
-        isActive,
-         // Informations de contact importantes:
-        contactEmail: email,
-        contactPhone: phoneNumber,
-        contactName: userName,
-        showEmail: showEmail,
-        showPhone: showPhone,
-        showName: showName,
-        preferredContact: preferredContact, // IMPORTANT: cette propriété sera utilisée dans Inbox
-        createdAt: new Date().toISOString()
-      };
-      
+    // Création de l'objet annonce
+    const nouvelleAnnonce = {
+      id: Date.now().toString(), // Ajoutez un ID unique
+      title,
+      description,
+      category,
+      type,
+      condition,
+      camp, // Renommez en campType pour être cohérent avec Home.js
+      campType: camp, // Ajout pour la compatibilité avec le filtrage
+      price: category === 'Louer' || category === 'Acheter' ? price : '',
+      duration: category === 'Louer' || category === 'Prêter' ? duration : '',
+      images: images,
+      imageUrl: images.length > 0 ? images[0] : null, // Assurez-vous que imageUrl est défini
+      isActive,
+      date: new Date().toLocaleDateString('fr-FR'), // Format de date compatible
+      // Informations de contact
+      contactEmail: email,
+      contactPhone: phoneNumber,
+      contactName: userName,
+      showEmail: showEmail,
+      showPhone: showPhone,
+      showName: showName,
+      preferredContact: preferredContact,
+      createdAt: new Date().toISOString()
+    };
       
       // Ajouter l'annonce via le contexte
       const annonceAjoutee = createAnnounce(nouvelleAnnonce);      
@@ -595,11 +598,11 @@ const PublierAnnonce = () => {
                 style={[
                   styles.categoryButton, 
                   { backgroundColor: darkMode 
-                    ? (category === cat.name ? '#5D5FEF' : '#363636') 
-                    : (category === cat.name ? '#39335E' : '#F0F0F0') 
+                    ? (category === cat.id ? '#5D5FEF' : '#363636') 
+                    : (category === cat.id ? '#39335E' : '#F0F0F0') 
                   }
                 ]}
-                onPress={() => setCategory(cat.name)}
+                onPress={() => setCategory(cat.id)}
               >
                 <View style={[
                   styles.categoryIconContainer,

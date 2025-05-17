@@ -58,13 +58,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      // Simulation d'une réponse API réussie pour les besoins de l'exemple
-      // Dans un environnement réel, vous effectuerez un appel d'API ici
+     
       
-      // Stocker le token
+     
       await AsyncStorage.setItem('authToken', 'sample_token');
       
-      // Créer et stocker des données utilisateur basiques
+
       const user = {
         id: credentials.userId || 'user_id',
         fullName: credentials.fullName || 'Nom par défaut',

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const api = axios.create({
-  baseURL: 'http://192.168.168.65:3001',
+  baseURL: 'http://192.168.1.21:3001',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -342,14 +342,25 @@ export const updateSystemSettings = async (token, settings) => {
   }
 };
 
-// POST: Create new user
+
 export const createAnnounce = async (payload) => {
+  // Convertir l'ID de la catégorie en nom de catégorie
+  const categoryMapping = {
+    '1': 'Donner',
+    '2': 'Prêter',
+    '3': 'Emprunter',
+    '4': 'Louer',
+    '5': 'Acheter',
+    '6': 'Échanger'
+  };
+  
+  const categoryName = categoryMapping[payload.category] || payload.category;
+  
   const apiPayload = { 
     "email": payload.contactEmail, 
     "title": payload.title, 
     "description": payload.description, 
-    "category": payload.category, 
-    // "published_by": ObjectId('681db7e65e92e6e77b1d352b'),
+    "category": categoryName, 
     "camp": payload.camp,
     "is_published": true,
     "contact_info": payload.contactPhone,
@@ -365,22 +376,66 @@ export const createAnnounce = async (payload) => {
     throw error;
   }
 };
-export const deleteAnnounce = async (postId) => {
-  try {
-    const response = await api.delete(`/post/delete`, { data: { id: postId } });
-    console.log('réponse suppression:', response);
-    return response;
-  } catch (error) {
-    console.error('deleteAnnounce error:', error.message);
-    throw error;
-  }
-};
 
 
+
+// export const getPosts = async (params = {}) => {
+//   try {
+    
+//     const queryParams = new URLSearchParams();
+    
+//     if (params.search) queryParams.append('search', params.search);
+//     if (params.category) queryParams.append('category', params.category);
+//     if (params.camp) queryParams.append('camp', params.camp);
+//     if (params.page) queryParams.append('page', params.page);
+//     if (params.limit) queryParams.append('limit', params.limit);
+    
+//     const queryString = queryParams.toString();
+//     const url = queryString ? `/post/get?${queryString}` : '/post/get';
+    
+//     const response = await api.get(url);
+//     // console.log('getPosts response:', response);
+//     return response;
+//   } catch (error) {
+//     console.error('getPosts error:', error.message);
+//     throw error;
+//   }
+// };
+
+// export const deletePost = async (id) => {
+//   try {
+    
+//     const token = await AsyncStorage.getItem('authToken');
+    
+//     const response = await api.delete(`/post/delete/`, {
+//       headers: {
+//         Authorization: token ? `Bearer ${token}` : '',
+//       }
+//     });
+    
+//     console.log('deletePost response:', response);
+//     return response.data;
+//   } catch (error) {
+//     console.error('deletePost error:', error.message);
+//     throw error;
+//   }
+// };
+
+// export const deleteAnnounce = async (postId) => {
+//   console.log(postId)
+//   try {
+    
+//     const response = await axios.delete(`http://192.168.168.65:3001/post/delete/${postId}`);
+//     console.log('deletePost response:', response);
+//     return response.data;
+//   } catch (error) {
+//     console.error('deleteAnnounce error:', error.message);
+//     throw error;
+//   }
+// };
 
 export const getPosts = async (params = {}) => {
   try {
-    // Construire les paramètres de requête
     const queryParams = new URLSearchParams();
     
     if (params.search) queryParams.append('search', params.search);
@@ -393,10 +448,23 @@ export const getPosts = async (params = {}) => {
     const url = queryString ? `/post/get?${queryString}` : '/post/get';
     
     const response = await api.get(url);
-    console.log('getPosts response:', response);
+    // Important: Return response.data (the actual data from the API)    
     return response;
   } catch (error) {
     console.error('getPosts error:', error.message);
+    throw error;
+  }
+};
+
+// For deleteAnnounce - using the proper DELETE endpoint
+export const deleteAnnounce = async (postId) => {
+  console.log("api",postId);
+  try {
+    // Use the configured api instance, not direct axios
+    const response = await api.delete(`/post/delete/${postId}`);
+    return response;
+  } catch (error) {
+    console.error('deleteAnnounce error:', error.message);
     throw error;
   }
 };

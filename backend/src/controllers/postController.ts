@@ -80,17 +80,17 @@ export const getPosts = async (req: Request, res: Response): Promise<void> => {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export const getPostById = async (req: Request<{},{},{id:string}>, res: Response): Promise<void> => {
-    try {
-        const post = await Post.findById(req.body.id).populate("published_by");
-        if (!post) {
-            res.status(404).json({ message: "Post not found" });
-            return;
-        }
-        res.status(200).json(post);
-    } catch (error) {
-        res.status(500).json({ message: "Error fetching post", error });
+export const getPostById = async (req: Request<{id: string}, {}, {}>, res: Response): Promise<void> => {
+  try {
+    const post = await Post.findById(req.params.id).populate("published_by");
+    if (!post) {
+      res.status(404).json({ message: "Post not found" });
+      return;
     }
+    res.status(200).json(post);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching post", error });
+  }
 };
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -105,12 +105,17 @@ export const updatePost = async (req: Request <{},{},{id:string}>, res: Response
 };
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export const deletePost = async (req: Request<{},{},{id:string}>, res: Response):Promise<void> => {
+export const deletePost = async (
+    req: Request<{ id: string }, {}, {}>,
+    res: Response
+):Promise<void> => {
     try {
-        const deletedPost = await Post.findByIdAndDelete(req.body.id);
+        const deletedPost = await Post.findByIdAndDelete(req.params.id);
         if (!deletedPost)  res.status(404).json({ message: "Post not found" });
         res.status(200).json({ message: "Post deleted successfully" });
     } catch (error) {
+        console.log(req.params.id);
+        
         res.status(500).json({ message: "Error deleting post", error });
     }
 };

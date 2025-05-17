@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: 'mail.tsi-network.net',
+  host: `${process.env.EMAIL_HOST}`,
   secure: true,
   port: 465,  
   auth: {
@@ -30,7 +30,7 @@ export const sendVerificationEmail = async (email: string, code: string, firstNa
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
       <h2 style="color: #836EFE; text-align: center;">Email Verification</h2>
-      <p>Hello ${firstName || 'User'},</p>
+      <p>Salut ${firstName},</p>
       <p>Merci pour votre inscription.
 Pour confirmer votre adresse e-mail, veuillez saisir le code de vérification à 6 chiffres ci-dessous :</p>
       <div style="text-align: center; margin: 30px 0;">

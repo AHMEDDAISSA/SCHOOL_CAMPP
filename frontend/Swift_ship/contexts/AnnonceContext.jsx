@@ -1,38 +1,56 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect , useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getPosts, deleteAnnounce } from '../services/api';
+
 
 const AnnonceContext = createContext();
 
 export const AnnonceProvider = ({ children }) => {
   const [annonces, setAnnonces] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+ const isMounted = useRef(true); // Initialiser avec true
   
-  
+  // Nettoyage lors du démontage
   useEffect(() => {
-    loadAnnonces();
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
+
+
   
   // Charger les annonces depuis AsyncStorage
-  const loadAnnonces = async () => {
+ const loadAnnonces = async () => {
     try {
       setLoading(true);
       const storedAnnonces = await AsyncStorage.getItem('annonces');
-      if (storedAnnonces) {
-        setAnnonces(JSON.parse(storedAnnonces));
+      if (storedAnnonces && isMounted.current) {
+        const parsedAnnonces = JSON.parse(storedAnnonces);
+        // Vérifier que les données sont valides
+        if (Array.isArray(parsedAnnonces)) {
+          setAnnonces(parsedAnnonces);
+        } else {
+          console.warn("Format d'annonces invalide dans AsyncStorage");
+          setAnnonces([]);
+        }
       }
     } catch (error) {
       console.error('Erreur lors du chargement des annonces:', error);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
   
   // Sauvegarder les annonces dans AsyncStorage
-  const saveAnnonces = async (newAnnonces) => {
+ const saveAnnonces = async (newAnnonces) => {
     try {
       await AsyncStorage.setItem('annonces', JSON.stringify(newAnnonces));
+      return true;
     } catch (error) {
       console.error('Erreur lors de la sauvegarde des annonces:', error);
+      return false;
     }
   };
   const approveAnnounce = async (announceId) => {
@@ -77,48 +95,124 @@ const rejectAnnounce = async (announceId) => {
 };
   
   // Ajouter une nouvelle annonce
-  const addAnnonce = async (newAnnonce) => {
-    // Générer un ID unique basé sur la date
-    const id = `annonce_${Date.now()}`;
-    
-    // Ajouter une date de création et marqueur "nouveau"
-    const annonce = {
-      ...newAnnonce,
-      id,
-      date: new Date().toLocaleDateString('fr-FR'),
-      isNew: true,
-      createdAt: Date.now() // Pour le tri et le nettoyage
-    };
-    
-    // Ajouter au début de la liste
-    const updatedAnnonces = [annonce, ...annonces];
-    setAnnonces(updatedAnnonces);
-    
-    // Sauvegarder dans le stockage
-    await saveAnnonces(updatedAnnonces);
-    
-    return id; // Retourner l'ID pour la navigation
-  };
-  
-  // Supprimer une annonce
-  const deleteAnnonce = async (id) => {
-    try {
-      // Filtrer l'annonce à supprimer
-      const updatedAnnonces = annonces.filter(annonce => annonce.id !== id);
+ const addAnnonce = async (nouvelleAnnonce) => {
+   try {
       
-      // Mettre à jour l'état
-      setAnnonces(updatedAnnonces);
+      const storedAnnonces = await AsyncStorage.getItem('annonces');
+      const currentAnnonces = storedAnnonces ? JSON.parse(storedAnnonces) : [];
       
-      // Sauvegarder dans le stockage
-      await saveAnnonces(updatedAnnonces);
       
-      return true; // Succès de la suppression
+      if (!nouvelleAnnonce.id) {
+        nouvelleAnnonce.id = Date.now().toString();
+      }
+      
+      
+      nouvelleAnnonce.createdAt = nouvelleAnnonce.createdAt || new Date().toISOString();
+      nouvelleAnnonce.date = nouvelleAnnonce.date || new Date().toLocaleDateString('fr-FR');
+      nouvelleAnnonce.isNew = true;
+      
+      
+      const updatedAnnonces = [nouvelleAnnonce, ...currentAnnonces];
+      
+      
+      const saveSuccess = await saveAnnonces(updatedAnnonces);
+      
+      if (!saveSuccess) {
+        throw new Error("Erreur lors de la sauvegarde des annonces");
+      }
+      
+      // Mettre à jour l'état seulement si le composant est toujours monté
+      if (isMounted.current) {
+        setAnnonces(updatedAnnonces);
+      }
+      
+      return true;
     } catch (error) {
-      console.error('Erreur lors de la suppression de l\'annonce:', error);
-      return false; // Échec de la suppression
+      console.error('Erreur lors de l\'ajout de l\'annonce:', error);
+      return false;
+    }
+  };
+  const transformApiData = (apiData) => {
+    if (!apiData || !apiData.posts || !Array.isArray(apiData.posts)) return [];
+    console.log('Invalid API data format:', apiData);
+
+    return apiData.posts.map(post => ({
+      id: post._id,
+      title: post.title,
+      description: post.description,
+      category: typeof post.category === 'string' ? post.category : 
+               (post.category === '1' ? 'Donner' : 
+                post.category === '4' ? 'Louer' : 
+                post.category === '6' ? 'Échanger' : post.category),
+      type: post.type,
+      email: post.email,
+      camp: post.camp,
+      is_published: post.is_published,
+      contact_info: post.contact_info,
+      date: post.createdAt ? new Date(post.createdAt).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
+      isNew: true
+      
+    }));
+  };
+    
+  
+    const refreshAnnonces = async () => {
+    try {
+      setLoading(true);
+      const response = await getPosts();
+      //  console.log("API Response:", response);
+      if (response) {
+        console.log("ddddddss", response);
+        
+        setAnnonces(response.posts);
+        await AsyncStorage.setItem('annonces', JSON.stringify(response));
+      }
+      return true;
+    } catch (error) {
+      console.error('Erreur lors du chargement des annonces:', error);//*** */
+      
+      try {
+        const storedAnnonces = await AsyncStorage.getItem('annonces');
+     
+        
+        if (storedAnnonces) {
+          setAnnonces(JSON.parse(storedAnnonces));
+        }
+      } catch (e) {
+        console.error('Erreur lors de la récupération depuis AsyncStorage:', e);
+      }
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
   
+ 
+  const deleteAnnonceMeth = async (id) => {
+    
+    
+    console.log("ANNContext",id);
+  try {
+    
+    const success = await deleteAnnounce(id);
+    
+    if (success) {
+      const updatedAnnonces = annonces.filter(annonce => annonce.id !== id);
+      
+      if (isMounted.current) {
+        setAnnonces(updatedAnnonces);
+        await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
+      }
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'annonce:', error);
+    return false;
+  }
+};
+
+
   // Mettre à jour une annonce
   const updateAnnonce = async (id, updatedData) => {
     try {
@@ -127,62 +221,55 @@ const rejectAnnounce = async (announceId) => {
       );
       setAnnonces(updatedAnnonces);
       await saveAnnonces(updatedAnnonces);
-      return true; // Succès de la mise à jour
+      return true; 
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l\'annonce:', error);
-      return false; // Échec de la mise à jour
+      return false; 
     }
   };
   
   // Nettoyer les anciennes annonces (plus vieilles que maxAgeDays)
-  const cleanOldAnnonces = async (maxAgeDays = 30) => {
+   const cleanOldAnnonces = async (daysLimit) => {
     try {
-      const now = Date.now();
-      const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+      const currentDate = new Date();
+      const limitDate = new Date();
+      limitDate.setDate(currentDate.getDate() - daysLimit);
       
-      const updatedAnnonces = annonces.filter(annonce => {
-        return now - annonce.createdAt < maxAgeMs;
+      const filteredAnnonces = annonces.filter(annonce => {
+        const annonceDate = new Date(annonce.date);//.split('/').reverse().join('-'));
+        return annonceDate >= limitDate;
       });
       
-      // Ne mettre à jour que si des annonces ont été supprimées
-      if (updatedAnnonces.length < annonces.length) {
-        setAnnonces(updatedAnnonces);
-        await saveAnnonces(updatedAnnonces);
-        return annonces.length - updatedAnnonces.length; // Retourner le nombre d'annonces supprimées
+      const deletedCount = annonces.length - filteredAnnonces.length;
+      
+      if (deletedCount > 0) {
+        setAnnonces(filteredAnnonces);
+        await AsyncStorage.setItem('annonces', JSON.stringify(filteredAnnonces));
       }
       
-      return 0;
+      return deletedCount;
     } catch (error) {
-      console.error('Erreur lors du nettoyage des anciennes annonces:', error);
+      console.error('Erreur lors du nettoyage des annonces:', error);
       return 0;
     }
   };
+
   
   // Retirer le statut "nouveau" après un certain temps
-  const updateNewStatus = async (newStatusDays = 3) => {
+  const updateNewStatus = async () => {
     try {
-      const now = Date.now();
-      const newStatusMs = newStatusDays * 24 * 60 * 60 * 1000;
+      const viewedAnnoncesStr = await AsyncStorage.getItem('viewedAnnonces') || '[]';
+      const viewedAnnonces = JSON.parse(viewedAnnoncesStr);
       
-      const needsUpdate = annonces.some(
-        annonce => annonce.isNew && (now - annonce.createdAt > newStatusMs)
-      );
+      const updatedAnnonces = annonces.map(annonce => ({
+        ...annonce,
+        isNew: !viewedAnnonces.includes(annonce.id)
+      }));
       
-      if (needsUpdate) {
-        const updatedAnnonces = annonces.map(annonce => {
-          if (annonce.isNew && (now - annonce.createdAt > newStatusMs)) {
-            return { ...annonce, isNew: false };
-          }
-          return annonce;
-        });
-        
-        setAnnonces(updatedAnnonces);
-        await saveAnnonces(updatedAnnonces);
-        return true;
-      }
+      setAnnonces(updatedAnnonces);
       return true;
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du statut des annonces:', error);
+      console.error('Erreur lors de la mise à jour du statut "nouveau":', error);
       return false;
     }
   };
@@ -192,17 +279,17 @@ const rejectAnnounce = async (announceId) => {
     return annonces.find(annonce => annonce.id === id) || null;
   };
   
-  return (
+   return (
     <AnnonceContext.Provider
       value={{
         annonces,
         loading,
         addAnnonce,
-        deleteAnnonce,
+        deleteAnnonceMeth,
         updateAnnonce,
-        cleanOldAnnonces,
+        // cleanOldAnnonces,
         updateNewStatus,
-        refreshAnnonces: loadAnnonces,
+        refreshAnnonces,
         getAnnonceById
       }}
     >

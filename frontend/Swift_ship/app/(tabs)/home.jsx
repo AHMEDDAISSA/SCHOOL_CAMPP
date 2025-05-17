@@ -38,22 +38,24 @@ const Home = () => {
       }
       
       // Filtrer par type de camp
-      if (selectedCamp !== 'Tous') {
-        filteredAnnonces = filteredAnnonces.filter(annonce => annonce.campType === selectedCamp);
-      }
+   if (selectedCamp !== 'Tous') {
+  filteredAnnonces = filteredAnnonces.filter(annonce => 
+    annonce.campType === selectedCamp || annonce.camp === selectedCamp
+  );
+}
       
       // Filtrer par taille (si disponible)
       if (selectedSize !== 'Tous') {
         filteredAnnonces = filteredAnnonces.filter(annonce => annonce.size === selectedSize);
       }
       
-      return filteredAnnonces
-        .sort((a, b) => {
-          const dateA = new Date(a.date.split('/').reverse().join('-'));
-          const dateB = new Date(b.date.split('/').reverse().join('-'));
-          return dateB - dateA;
-        })
-        .slice(0, 8);
+      return filteredAnnonces;
+        // .sort((a, b) => {
+        //   const dateA = new Date(a.date.split('/').reverse().join('-'));
+        //   const dateB = new Date(b.date.split('/').reverse().join('-'));
+        //   return dateB - dateA;
+        // })
+        // .slice(0, 8);
     }, [annonces, selectedCategory, selectedType, selectedCamp, selectedSize]);
 
     const [subscribed, setSubscribed] = useState(false);
@@ -253,6 +255,8 @@ const Home = () => {
       }
     };
 
+
+    
     return (
       <View style={[styles.container, {backgroundColor: theme.background}]}> 
         <StatusBar translucent backgroundColor="transparent" barStyle={darkMode ? "light-content" : 'dark-content'} />
@@ -356,27 +360,27 @@ const Home = () => {
             </ScrollView>
             
             <Text style={styles.filterLabel}>Type de camp:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.filterButtonsContainer}>
-                {campTypes.map(camp => (
-                  <TouchableOpacity 
-                    key={camp} 
-                    style={[
-                      styles.filterButton, 
-                      selectedCamp === camp ? { backgroundColor: '#39335E' } : null
-                    ]}
-                    onPress={() => setSelectedCamp(camp)}
-                  >
-                    <Text style={[
-                      styles.filterButtonText, 
-                      selectedCamp === camp ? { color: '#FFFFFF' } : null
-                    ]}>
-                      {camp}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+  <View style={styles.filterButtonsContainer}>
+    {campTypes.map(camp => (
+      <TouchableOpacity 
+        key={camp} 
+        style={[
+          styles.filterButton, 
+          selectedCamp === camp ? { backgroundColor: '#39335E' } : null
+        ]}
+        onPress={() => setSelectedCamp(camp)}
+      >
+        <Text style={[
+          styles.filterButtonText, 
+          selectedCamp === camp ? { color: '#FFFFFF' } : null
+        ]}>
+          {camp}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+</ScrollView> 
           </View>
 
           <View style={styles.recentSection}>
@@ -425,15 +429,16 @@ const Home = () => {
                       )}
                       
                       {item.campType && (
-                        <View style={[styles.campBadgeWrapper, {backgroundColor: item.campType.includes('ski') ? '#1565C0' : '#2E7D32'}]}>
-                          <Text style={styles.campBadge}>{item.campType}</Text>
-                        </View>
+  <View style={[styles.campBadgeWrapper, {backgroundColor: item.campType.includes('ski') ? '#1565C0' : '#2E7D32'}]}>
+    <Text style={styles.campBadge}>{item.campType}</Text>
+  </View>
                       )}
                     </View>
                     <View style={styles.cardContent}>
                       <Text style={[styles.cardTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]} numberOfLines={2}>{item.title}</Text>
                       <Text style={[styles.cardType, { color: darkMode ? '#B0B0B0' : '#727272' }]}>{item.type}</Text>
-                      <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{formatDate(item.date)}</Text>
+                      <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{item.date}</Text>
+                      {/* <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{<formatDate></formatDate>(item.date)}</Text> */}
                       
                       {/* Bouton de contact modifié pour utiliser la fonction handleContact */}
                       <TouchableOpacity 

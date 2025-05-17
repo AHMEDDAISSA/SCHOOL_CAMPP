@@ -12,7 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import AnnonceContext from '../../contexts/AnnonceContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
-import { debounce } from 'lodash'; // Assurez-vous d'installer lodash: npm install lodash
+import { debounce } from 'lodash'; 
 
 // Screen dimensions for responsive layouts
 const { width } = Dimensions.get('window');
@@ -175,24 +175,49 @@ const getCategoryColor = (category) => {
 };
 
 const formatDate = (dateString) => {
-  // You can improve this with a date library like date-fns
-  const today = new Date();
-  const date = new Date(dateString.split('/').reverse().join('-'));
+  if (!dateString) return '';
   
-  // Check if it's today
-  if (date.toDateString() === today.toDateString()) {
-    return "Aujourd'hui";
+  try {
+    const today = new Date();
+    // Gestion des différents formats de date possibles
+    let date;
+    
+    if (dateString.includes('/')) {
+      // Format "DD/MM/YYYY"
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        date = new Date(parts[2], parts[1] - 1, parts[0]);
+      } else {
+        return dateString; // Format non reconnu, retourner tel quel
+      }
+    } else {
+      // Essayer comme ISO ou autre format standard
+      date = new Date(dateString);
+    }
+    
+    // Vérifier si la date est valide
+    if (isNaN(date.getTime())) {
+      return dateString; // Date invalide, retourner telle quelle
+    }
+    
+    // Check if it's today
+    if (date.toDateString() === today.toDateString()) {
+      return "Aujourd'hui";
+    }
+    
+    // Check if it's yesterday
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return "Hier";
+    }
+    
+    // Otherwise return the original format or a formatted date
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+  } catch (error) {
+    console.error('Erreur de formatage de la date:', error);
+    return dateString; // En cas d'erreur, retourner la chaîne d'origine
   }
-  
-  // Check if it's yesterday
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Hier";
-  }
-  
-  // Otherwise return the original format
-  return dateString;
 };
 
 // Main component
@@ -205,7 +230,7 @@ const Annonces = () => {
     refreshAnnonces, 
     cleanOldAnnonces,
     updateNewStatus,
-    deleteAnnonce
+    deleteAnnonceMeth
   } = useContext(AnnonceContext);
 
   // États pour la recherche améliorée
@@ -354,6 +379,7 @@ const Annonces = () => {
     // Nettoyer les anciennes annonces et mettre à jour le statut "nouveau"
     const initializeData = async () => {
       try {
+        setLoading(true);
         // Mettre à jour le statut "nouveau" des annonces
         await updateNewStatus();
         
@@ -362,8 +388,10 @@ const Annonces = () => {
         if (deletedCount > 0) {
           console.log(`${deletedCount} anciennes annonces supprimées`);
         }
+        setLoading(false);
       } catch (error) {
         console.error('Erreur d\'initialisation:', error);
+        setLoading(false);
       }
     };
     
@@ -377,10 +405,14 @@ const Annonces = () => {
       setError(null);
       
       // Utiliser la fonction de rafraîchissement du contexte
-      await refreshAnnonces();
+      const success = await refreshAnnonces();
       
-      setPage(prev => isRefresh ? 1 : prev + 1);
-      setHasMore(page < 3); // Simuler la limite de pagination
+      if (!success) {
+        setError('Impossible de charger les annonces. Veuillez réessayer.');
+      } else {
+        setPage(prev => isRefresh ? 1 : prev + 1);
+        setHasMore(page < 3); // Simuler la limite de pagination
+      }
       
     } catch (err) {
       console.error('Erreur lors du chargement des annonces:', err);
@@ -435,47 +467,63 @@ const Annonces = () => {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
-            // Afficher un indicateur de chargement pendant la suppression
-            setLoading(true);
-            
-            // Appeler la fonction de suppression du contexte
-            const success = await deleteAnnonce(id);
-            
-            setLoading(false);
-            
-            // Afficher un message de succès ou d'erreur
-            if (success) {
-              Toast.show({
-                type: 'success',
-                text1: 'Annonce supprimée avec succès',
-                visibilityTime: 2000,
-              });
-            } else {
+            try {
+              // Afficher un indicateur de chargement pendant la suppression
+              setLoading(true);
+              console.log("card", id);
+              
+              // Appeler la fonction de suppression du contexte
+              const success = await deleteAnnonceMeth(id);
+              
+              // Afficher un message de succès ou d'erreur
+              if (success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Annonce supprimée avec succès',
+                  visibilityTime: 2000,
+                });
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erreur lors de la suppression',
+                  text2: 'Veuillez réessayer',
+                  visibilityTime: 2000,
+                });
+              }
+            } catch (error) {
+              console.error('Erreur lors de la suppression:', error);
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
                 text2: 'Veuillez réessayer',
                 visibilityTime: 2000,
               });
+            } finally {
+              setLoading(false);
             }
           }
         }
       ]
     );
-  }, [deleteAnnonce]);
+  }, [deleteAnnonceMeth]);
   
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
+    if (!annonces || !Array.isArray(annonces)) return [];
+    
     return annonces.filter(item => {
+      // Vérifier que item est un objet valide
+      if (!item) return false;
+      
       const matchesCategory = activeFilter === '0' || 
         item.category === categories.find(cat => cat.id === activeFilter)?.name;
       
       // Recherche améliorée: recherche dans titre, type, description et catégorie
       const searchTerm = debouncedSearchTerm.toLowerCase();
       const matchesSearch = !searchTerm || 
-        item.title.toLowerCase().includes(searchTerm) || 
-        item.type.toLowerCase().includes(searchTerm) ||
-        item.category.toLowerCase().includes(searchTerm) ||
+        (item.title && item.title.toLowerCase().includes(searchTerm)) || 
+        (item.type && item.type.toLowerCase().includes(searchTerm)) ||
+        (item.category && item.category.toLowerCase().includes(searchTerm)) ||
         (item.description && item.description.toLowerCase().includes(searchTerm));
       
       return matchesCategory && matchesSearch;
@@ -483,20 +531,20 @@ const Annonces = () => {
   }, [annonces, activeFilter, debouncedSearchTerm, categories]);
   
   // Optimiser les fonctions de rendu pour la FlatList
-  const keyExtractor = useCallback((item) => item.id, []);
+  const keyExtractor = useCallback((item) => item.id?.toString() || Math.random().toString(), []);
   
   const renderItem = useCallback(({ item }) => (
     <MemoizedAnnonceCard 
       item={item}
       darkMode={darkMode}
-      onPress={() => router.push(`/annonce/${item.id}`)}  // Remove (screens) prefix
-      onDelete={handleDeleteAnnonce}
+      onPress={() => router.push(`/annonce/${item._id}`)}
+      onDelete={() => handleDeleteAnnonce(item._id)}
     />
-  ), [darkMode, handleDeleteAnnonce]);
+  ), [darkMode, ]);
   
   // Navigation
   const back = () => {
-    router.push('home');
+    router.push('/');  // Navigation vers la page d'accueil
   };
   
   // Show loading indicator when fonts are loading
