@@ -422,8 +422,8 @@ const PublierAnnonce = () => {
       images: images,
       imageUrl: images.length > 0 ? images[0] : null, // Assurez-vous que imageUrl est défini
       isActive,
-      date: new Date().toLocaleDateString('fr-FR'), // Format de date compatible
-      // Informations de contact
+      date: new Date().toLocaleDateString('fr-FR'), 
+      
       contactEmail: email,
       contactPhone: phoneNumber,
       contactName: userName,

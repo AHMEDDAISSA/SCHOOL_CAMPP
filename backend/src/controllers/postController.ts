@@ -8,7 +8,9 @@ import { PostType } from "../types/postTypes";
 export const createPost = async (req: Request<{}, {}, PostType>, res: Response) => {
     try {
         const { email, title, description, category, published_by,camp,is_published= true,contact_info ,type} = req.body;
-        const newPost = new Post({ email, title, description, category, published_by,camp,is_published,contact_info,type });
+        const uploadedFiles = req.files as Express.Multer.File[] || [];
+        const imageFilenames = uploadedFiles.map((file) => file.filename);
+        const newPost = new Post({ email, title, description, category, published_by,camp,is_published,contact_info,type,images: imageFilenames });
 
         await newPost.save();
 
@@ -21,63 +23,94 @@ export const createPost = async (req: Request<{}, {}, PostType>, res: Response) 
 
 };
 
-export const getPosts = async (req: Request, res: Response): Promise<void> => {
+interface TransformedPost {
+    _id: string;
+    email: string;
+    title: string;
+    description?: string;
+    contact_info?: string;
+    is_published: boolean;
+    category: string;
+    type: string;
+    camp: string;
+    published_by?: any;
+    images: string[];
+    imageUrl?: string; 
+    [key: string]: any; 
+}
+
+export const getPosts = async (req: Request, res: Response) => {
     try {
-        const { search, category, camp, page = "1", limit = "10" } = req.query;
-        const query: any = {};
+        // Récupérer les paramètres de requête
+        const { search, category, camp, page = 1, limit = 10 } = req.query;
+        
+        // Construire la requête de filtrage
+        const filter: any = {};
+        
         if (search) {
-            const searchWords = (search as string).split(" "); // Split search into words
-            const wordConditions = searchWords.map(word => ({
-                $or: [
-                    { title: { $regex: word, $options: "i" } },
-                    { description: { $regex: word, $options: "i" } },
-                ],
-            }));
-            query.$and = wordConditions; // All words must match somewhere
+            filter.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
         }
-        // Filter by category
+        
         if (category) {
-            const categoryDoc = await Category.findOne({ name: { $regex: new RegExp(`^${category}$`, "i") } });
-            if (!categoryDoc) {
-                res.status(404).json({ message: "Category not found" });
-                return;
-            }
-            query.category = categoryDoc._id;
+            filter.category = category;
         }
-
-        // Filter by camp
+        
         if (camp) {
-            const campDoc = await Camp.findOne({ type: { $regex: new RegExp(`^${camp}$`, "i") } });
-            if (!campDoc) {
-                res.status(404).json({ message: "Camp not found" });
-                return;
-            }
-            query.camp = campDoc._id;
+            filter.camp = camp;
         }
+        
         // Pagination
-        const pageNum = parseInt(page as string, 10);
-        const limitNum = parseInt(limit as string, 10);
-        const skip = (pageNum - 1) * limitNum;
-
-        const posts = await Post.find(query)
-            .populate("published_by")
-            .populate("category")
-            .populate("camp")
+        const skip = (Number(page) - 1) * Number(limit);
+        
+        // Récupérer les annonces
+        const posts = await Post.find(filter)
             .skip(skip)
-            .limit(limitNum);
-
-        const totalPosts = await Post.countDocuments(query);
-
-        res.status(200).json({
-            posts,
-            totalPosts,
-            currentPage: pageNum,
-            totalPages: Math.ceil(totalPosts / limitNum),
+            .limit(Number(limit))
+            .sort({ createdAt: -1 });
+        
+        // Compter le nombre total d'annonces correspondant au filtre
+        const total = await Post.countDocuments(filter);
+        
+        // Transformer les données pour inclure les URL complètes des images
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        
+        const transformedPosts = posts.map(post => {
+            // Utilisez une assertion de type pour éviter l'erreur TypeScript
+            const postObject: any = post.toObject();
+            
+            // Si le post a des images, créer les URL complètes
+            if (postObject.images && postObject.images.length > 0) {
+                postObject.images = postObject.images.map((imageName: string) => 
+                    `${baseUrl}/uploads/${imageName}`
+                );
+                // Ajouter imageUrl pour la compatibilité avec le frontend existant
+                postObject.imageUrl = postObject.images[0];
+            }
+            
+            return postObject;
         });
+        
+        res.status(200).json({
+            success: true,
+            totalCount: total,
+            page: Number(page),
+            limit: Number(limit),
+            posts: transformedPosts
+        });
+        
     } catch (error) {
-        console.log({ message: "Error fetching posts", error });
+        res.status(500).json({ 
+            success: false, 
+            message: "Error fetching posts", 
+            error 
+        });
     }
 };
+
+
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export const getPostById = async (req: Request<{id: string}, {}, {}>, res: Response): Promise<void> => {

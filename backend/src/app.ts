@@ -7,6 +7,7 @@ import categoryRouter from "./routes/categoryRoutes";
 import adminRouter from "./routes/categoryRoutes";
 import userRouter from "./routes/userRoutes";
 import dotenv from "dotenv";
+import path from 'path';
 
 dotenv.config();
 
@@ -25,7 +26,9 @@ app.use('/cat',categoryRouter);
 //stats and reset
 app.use('/admin',adminRouter);
 //acquiring users
-app.use('/user',userRouter)
+app.use('/user',userRouter);
+
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 //db connection
 mongoose.connect(process.env.MONGO_URI as string)

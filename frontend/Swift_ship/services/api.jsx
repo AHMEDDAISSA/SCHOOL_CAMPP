@@ -344,7 +344,7 @@ export const updateSystemSettings = async (token, settings) => {
 
 
 export const createAnnounce = async (payload) => {
-  // Convertir l'ID de la catégorie en nom de catégorie
+  
   const categoryMapping = {
     '1': 'Donner',
     '2': 'Prêter',
@@ -356,19 +356,44 @@ export const createAnnounce = async (payload) => {
   
   const categoryName = categoryMapping[payload.category] || payload.category;
   
-  const apiPayload = { 
-    "email": payload.contactEmail, 
-    "title": payload.title, 
-    "description": payload.description, 
-    "category": categoryName, 
-    "camp": payload.camp,
-    "is_published": true,
-    "contact_info": payload.contactPhone,
-    "type": payload.type 
+  // Créer un objet FormData pour envoyer des fichiers
+  const formData = new FormData();
+  
+  // Ajouter les données textuelles
+  formData.append("email", payload.contactEmail);
+  formData.append("title", payload.title);
+  formData.append("description", payload.description);
+  formData.append("category", categoryName);
+  formData.append("camp", payload.camp);
+  formData.append("is_published", payload.is_published || true);
+  formData.append("contact_info", payload.contactPhone);
+  formData.append("type", payload.type);
+  
+  // Ajouter les images
+  if (payload.images && payload.images.length > 0) {
+    payload.images.forEach((imageUri, index) => {
+      // Extraire le nom du fichier de l'URI
+      const uriParts = imageUri.split('/');
+      const fileName = uriParts[uriParts.length - 1];
+      
+      // Créer un objet de type fichier
+      const fileType = imageUri.includes('.jpeg') ? 'image/jpeg' : 'image/png';
+      
+      formData.append('images', {
+        uri: imageUri,
+        name: fileName,
+        type: fileType
+      });
+    });
   }
   
   try {
-    const response = await api.post('/post/add', apiPayload);
+    // Configurer les en-têtes pour FormData
+    const response = await api.post('/post/add', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
     console.log('jaweb', response);
     return response.data;
   } catch (error) {

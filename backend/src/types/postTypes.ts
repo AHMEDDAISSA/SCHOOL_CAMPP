@@ -8,4 +8,6 @@ export interface PostType {
     is_published: boolean;
     contact_info: string;
     type: string;
+    images?: string[];
+    imageUrl?: string;
 }
