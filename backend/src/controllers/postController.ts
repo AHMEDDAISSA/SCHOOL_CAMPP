@@ -78,19 +78,21 @@ export const getPosts = async (req: Request, res: Response) => {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         
         const transformedPosts = posts.map(post => {
-            // Utilisez une assertion de type pour éviter l'erreur TypeScript
-            const postObject: any = post.toObject();
+            const postObj = post.toObject();
             
-            // Si le post a des images, créer les URL complètes
-            if (postObject.images && postObject.images.length > 0) {
-                postObject.images = postObject.images.map((imageName: string) => 
+            // Transformer les images en URLs complètes
+            if (postObj.images && Array.isArray(postObj.images)) {
+                postObj.images = postObj.images.map((imageName: string) => 
                     `${baseUrl}/uploads/${imageName}`
                 );
-                // Ajouter imageUrl pour la compatibilité avec le frontend existant
-                postObject.imageUrl = postObject.images[0];
+                
+                // Définir aussi imageUrl pour la compatibilité
+                if (postObj.images.length > 0) {
+                    postObj.imageUrl = postObj.images[0];
+                }
             }
             
-            return postObject;
+            return postObj;
         });
         
         res.status(200).json({
@@ -102,10 +104,11 @@ export const getPosts = async (req: Request, res: Response) => {
         });
         
     } catch (error) {
+        console.error("Erreur dans getPosts:", error);
         res.status(500).json({ 
             success: false, 
             message: "Error fetching posts", 
-            error 
+            error
         });
     }
 };

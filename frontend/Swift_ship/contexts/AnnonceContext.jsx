@@ -157,35 +157,48 @@ const rejectAnnounce = async (announceId) => {
     
   
     const refreshAnnonces = async () => {
-    try {
-      setLoading(true);
-      const response = await getPosts();
-      //  console.log("API Response:", response);
-      if (response) {
-        console.log("ddddddss", response);
-        
-        setAnnonces(response.posts);
-        await AsyncStorage.setItem('annonces', JSON.stringify(response));
-      }
-      return true;
-    } catch (error) {
-      console.error('Erreur lors du chargement des annonces:', error);//*** */
+  try {
+    setLoading(true);
+    const response = await getPosts();
+    
+    if (response && response.posts) {
+      console.log("Données reçues de l'API:", response);
       
-      try {
-        const storedAnnonces = await AsyncStorage.getItem('annonces');
-     
-        
-        if (storedAnnonces) {
-          setAnnonces(JSON.parse(storedAnnonces));
+      // Vérifier que les images sont des URLs complètes et pas des tableaux sérialisés
+      const postsWithProcessedImages = response.posts.map(post => {
+        // Si les images sont déjà des URLs, on ne fait rien
+        if (post.images && Array.isArray(post.images)) {
+          // Si les images sont déjà un tableau d'URLs, on le garde tel quel
+          // Assurons-nous que imageUrl pointe vers la première image
+          if (post.images.length > 0 && !post.imageUrl) {
+            post.imageUrl = post.images[0];
+          }
         }
-      } catch (e) {
-        console.error('Erreur lors de la récupération depuis AsyncStorage:', e);
-      }
-      return false;
-    } finally {
-      setLoading(false);
+        return post;
+      });
+      
+      setAnnonces(postsWithProcessedImages);
+      await AsyncStorage.setItem('annonces', JSON.stringify(postsWithProcessedImages));
+      return true;
     }
-  };
+    return false;
+  } catch (error) {
+    console.error('Erreur lors du chargement des annonces:', error);
+    
+    try {
+      const storedAnnonces = await AsyncStorage.getItem('annonces');
+      
+      if (storedAnnonces) {
+        setAnnonces(JSON.parse(storedAnnonces));
+      }
+    } catch (e) {
+      console.error('Erreur lors de la récupération depuis AsyncStorage:', e);
+    }
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
   
  
   const deleteAnnonceMeth = async (id) => {

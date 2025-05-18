@@ -82,21 +82,21 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
       styles.cardImageContainer,
       { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }
     ]}>
-      {(item.imageUrl || (item.images && item.images.length > 0)) ? (
-        <Image 
-          source={{ uri: item.imageUrl || item.images[0] }} 
-          style={styles.cardImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.placeholderImageContainer}>
-          <Ionicons 
-            name={getCategoryIcon(item.category)} 
-            size={30} 
-            color={darkMode ? '#666666' : '#CCCCCC'} 
-          />
-        </View>
-      )}
+    {(item.imageUrl || (item.images && item.images.length > 0)) ? (
+  <Image 
+    source={{ uri: item.imageUrl || item.images[0] }} 
+    style={styles.cardImage}
+    resizeMode="cover"
+  />
+) : (
+  <View style={styles.placeholderImageContainer}>
+    <Ionicons 
+      name={getCategoryIcon(item.category)} 
+      size={30} 
+      color={darkMode ? '#666666' : '#CCCCCC'} 
+    />
+  </View>
+)}
       <View style={[
         styles.categoryBadgeContainer, 
         {backgroundColor: getCategoryColor(item.category)}
@@ -233,7 +233,7 @@ const Annonces = () => {
     deleteAnnonceMeth
   } = useContext(AnnonceContext);
 
-  // États pour la recherche améliorée
+  
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -384,10 +384,12 @@ const Annonces = () => {
         await updateNewStatus();
         
         // Nettoyer les anciennes annonces (plus de 30 jours)
-        const deletedCount = await cleanOldAnnonces(30);
-        if (deletedCount > 0) {
-          console.log(`${deletedCount} anciennes annonces supprimées`);
-        }
+
+        
+        // const deletedCount = await cleanOldAnnonces(30);
+        // if (deletedCount > 0) {
+        //   console.log(`${deletedCount} anciennes annonces supprimées`);
+        // }
         setLoading(false);
       } catch (error) {
         console.error('Erreur d\'initialisation:', error);
