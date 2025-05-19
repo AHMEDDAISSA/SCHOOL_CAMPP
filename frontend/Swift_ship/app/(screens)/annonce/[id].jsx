@@ -1,7 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, ActivityIndicator, 
-         SafeAreaView, Platform, Alert, Share, Dimensions, TextInput, Switch, 
-         KeyboardAvoidingView, Pressable } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, ActivityIndicator, SafeAreaView, Platform, Alert, Share, Dimensions, TextInput, Switch, KeyboardAvoidingView, Pressable } from 'react-native';
 import Back from "../../../assets/images/back.svg";
 import Dark_back from "../../../assets/images/dark_back.svg";
 import { useFonts, Montserrat_700Bold, Montserrat_600SemiBold, Montserrat_500Medium } from '@expo-google-fonts/montserrat';
@@ -12,6 +10,7 @@ import AnnonceContext from '../../../contexts/AnnonceContext';
 import { router, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Get screen width for responsive designs
 const { width } = Dimensions.get('window');
@@ -19,7 +18,11 @@ const { width } = Dimensions.get('window');
 export default function AnnonceDetail() {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
   const { annonces, deleteAnnonce, updateAnnonce } = useContext(AnnonceContext);
-  const { id } = useLocalSearchParams();
+  
+  // Utiliser useLocalSearchParams pour récupérer l'ID depuis l'URL
+  const params = useLocalSearchParams();
+  const paramId = params.id;
+  
   const [annonce, setAnnonce] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,7 +30,7 @@ export default function AnnonceDetail() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  
   // Form state variables (for edit mode)
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -41,6 +44,9 @@ export default function AnnonceDetail() {
   const [email, setEmail] = useState('');
   const [camp, setCamp] = useState('');
 
+  // ID state to store the valid ID from different sources
+  const [id, setId] = useState(null);
+  
   // Catégories disponibles
   const categories = [
     { id: '1', name: 'Donner', icon: 'gift-outline' },
@@ -70,54 +76,96 @@ export default function AnnonceDetail() {
   const campOptions = [
     "Camp De Ski", "Camp Vert"
   ];
-
-  // Load annonce data
+  
+  // Récupérer l'ID de l'annonce depuis les différentes sources possibles
   useEffect(() => {
-    if (annonces && id) {
-      console.log("Looking for annonce with ID:", id);
-      
-      const foundAnnonce = annonces.find(item => {
-        console.log("Comparing with:", item.id, "Match:", item.id === id);
-        return item.id === id;
-      });
-      
-      if (foundAnnonce) {
-        console.log("Annonce found:", foundAnnonce.title);
-        setAnnonce(foundAnnonce);
+    const getIdFromMultipleSources = async () => {
+      try {
+        // Essai depuis les paramètres d'URL
+        const urlParamId = paramId;
         
-        // Initialize form fields with existing data
-        setTitle(foundAnnonce.title || '');
-        setDescription(foundAnnonce.description || '');
-        setCategory(foundAnnonce.category || '');
-        setType(foundAnnonce.type || '');
-        setDuration(foundAnnonce.duration || '');
-        setPrice(foundAnnonce.price || '');
-        setCondition(foundAnnonce.condition || '');
-        setCamp(foundAnnonce.camp || ''); // Ensure camp is initialized
-        setEmail(foundAnnonce.email || ''); // Ensure email is initialized
-         
+        // Essai depuis AsyncStorage
+        const storedId = await AsyncStorage.getItem('currentAnnonceId');
         
-        const emailToUse = foundAnnonce.email || 
-                        (foundAnnonce.contact && foundAnnonce.contact.email) || 
-                        (profileData && profileData.email) || '';
+        // Récupérer depuis les segments d'URL
+        const urlSegments = window.location?.pathname?.split('/') || [];
+        const lastSegment = urlSegments[urlSegments.length - 1];
+        
+        console.log("ID sources:", {
+          "From URL params": urlParamId,
+          "From AsyncStorage": storedId,
+          "From URL segments": lastSegment
+        });
+        
+        // Utiliser le premier ID disponible
+        const finalId = urlParamId || storedId || lastSegment;
+        if (finalId) {
+          console.log("Using final ID:", finalId);
+          setId(finalId);
+        } else {
+          setError("Impossible de trouver l'identifiant de l'annonce");
+        }
+        
+      } catch (e) {
+        console.error("Error retrieving ID:", e);
+        setError("Une erreur s'est produite lors de la récupération de l'identifiant");
+      }
+    };
+    
+    getIdFromMultipleSources();
+  }, [paramId]);
+
+  // Charger les données de l'annonce une fois que nous avons l'ID
+  useEffect(() => {
+    if (!id || !annonces || !Array.isArray(annonces)) {
+      return;
+    }
+    
+    console.log("Looking for annonce with ID:", id);
+    
+    // Rechercher l'annonce par ID
+    // Essayer différentes propriétés d'ID puisque le format peut varier
+    const foundAnnonce = annonces.find(item => 
+      (item._id && (item._id === id || item._id.toString() === id)) || 
+      (item.id && (item.id === id || item.id.toString() === id))
+    );
+    
+    if (foundAnnonce) {
+      console.log("Annonce trouvée:", foundAnnonce.title);
+      setAnnonce(foundAnnonce);
+      
+      // Initialiser les champs du formulaire
+      setTitle(foundAnnonce.title || '');
+      setDescription(foundAnnonce.description || '');
+      setCategory(foundAnnonce.category || '');
+      setType(foundAnnonce.type || '');
+      setDuration(foundAnnonce.duration || '');
+      setPrice(foundAnnonce.price || '');
+      setCondition(foundAnnonce.condition || '');
+      setCamp(foundAnnonce.camp || '');
+      
+      // Récupérer l'email de contact
+      const emailToUse = foundAnnonce.email || 
+                      (foundAnnonce.contact && foundAnnonce.contact.email) || 
+                      (profileData && profileData.email) || '';
       setEmail(emailToUse);
 
-        // Handle images array or single imageUrl
-        const annonceImages = (foundAnnonce.images && foundAnnonce.images.length > 0) ? 
-                          foundAnnonce.images : 
-                          (foundAnnonce.imageUrl ? [foundAnnonce.imageUrl] : []);
-        setImages(annonceImages);
-          
-        setLoading(false);
-      } else {
-        console.log("Annonce not found");
-        setError('Annonce non trouvée');
-        setLoading(false);
+      // Gérer les images
+      const annonceImages = [];
+      if (foundAnnonce.images && foundAnnonce.images.length > 0) {
+        annonceImages.push(...foundAnnonce.images);
+      } else if (foundAnnonce.imageUrl) {
+        annonceImages.push(foundAnnonce.imageUrl);
       }
+      setImages(annonceImages);
+          
+      setLoading(false);
+    } else {
+      console.log("Annonce not found");
+      setError('Annonce non trouvée');
+      setLoading(false);
     }
-  }, [annonces, id]);
-
-  
+  }, [annonces, id, profileData]);
 
   const goBack = () => {
     if (isEditMode) {
@@ -218,27 +266,36 @@ export default function AnnonceDetail() {
           style: "destructive",
           onPress: async () => {
             setIsDeleting(true);
-            const success = await deleteAnnonce(id);
-            setIsDeleting(false);
-            if (success) {
-              Toast.show({
-                type: 'success',
-                text1: 'Annonce supprimée avec succès',
-                visibilityTime: 2000,
-              });
-              router.back();
-            } else {
+            try {
+              // Utiliser la bonne propriété ID selon l'annonce
+              const annonceId = annonce._id || annonce.id;
+              const success = await deleteAnnonce(annonceId);
+              
+              if (success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Annonce supprimée avec succès',
+                  visibilityTime: 2000,
+                });
+                router.back();
+              } else {
+                throw new Error("Échec de la suppression");
+              }
+            } catch (error) {
+              console.error("Erreur lors de la suppression:", error);
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
                 visibilityTime: 2000,
               });
+            } finally {
+              setIsDeleting(false);
             }
           }
         }
       ]
     );
-  }, [deleteAnnonce, id]);
+  }, [annonce, deleteAnnonce]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -263,7 +320,7 @@ export default function AnnonceDetail() {
     if (!category) missing.push('catégorie');
     if (!type) missing.push('type d\'objet');
     if (!camp) missing.push('camp'); 
-    if (!email) missing.push('email'); // Added email validation
+    if (!email) missing.push('email');
     if (images.length === 0) missing.push('photos');
     
     // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
@@ -316,22 +373,29 @@ export default function AnnonceDetail() {
         } : { email: email }
       };
       
+      // Récupérer l'ID approprié de l'annonce
+      const annonceId = annonce._id || annonce.id;
+      
       // Mettre à jour l'annonce via le contexte
-      await updateAnnonce(id, updatedAnnonce);
+      const success = await updateAnnonce(annonceId, updatedAnnonce);
       
-      // Mettre à jour l'état local
-      setAnnonce(updatedAnnonce);
-      
-      // Fermer le mode édition
-      setIsEditMode(false);
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Annonce mise à jour !',
-        text2: 'Votre annonce a été mise à jour avec succès.',
-        position: 'bottom',
-        visibilityTime: 3000
-      });
+      if (success) {
+        // Mettre à jour l'état local
+        setAnnonce(updatedAnnonce);
+        
+        // Fermer le mode édition
+        setIsEditMode(false);
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Annonce mise à jour !',
+          text2: 'Votre annonce a été mise à jour avec succès.',
+          position: 'bottom',
+          visibilityTime: 3000
+        });
+      } else {
+        throw new Error("Échec de la mise à jour");
+      }
     } catch (error) {
       console.error("Erreur lors de la mise à jour de l'annonce:", error);
       Toast.show({
@@ -371,13 +435,49 @@ export default function AnnonceDetail() {
   };
 
   const formatDate = (dateString) => {
-    const today = new Date();
-    const date = new Date(dateString.split('/').reverse().join('-'));
-    if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) return "Hier";
-    return dateString;
+    if (!dateString) return '';
+    
+    try {
+      const today = new Date();
+      // Gestion des différents formats de date possibles
+      let date;
+      
+      if (typeof dateString === 'string' && dateString.includes('/')) {
+        // Format "DD/MM/YYYY"
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          date = new Date(parts[2], parts[1] - 1, parts[0]);
+        } else {
+          return dateString; // Format non reconnu, retourner tel quel
+        }
+      } else {
+        // Essayer comme ISO ou autre format standard
+        date = new Date(dateString);
+      }
+      
+      // Vérifier si la date est valide
+      if (isNaN(date.getTime())) {
+        return dateString; // Date invalide, retourner telle quelle
+      }
+      
+      // Check if it's today
+      if (date.toDateString() === today.toDateString()) {
+        return "Aujourd'hui";
+      }
+      
+      // Check if it's yesterday
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (date.toDateString() === yesterday.toDateString()) {
+        return "Hier";
+      }
+      
+      // Otherwise return the formatted date
+      return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    } catch (error) {
+      console.error('Erreur de formatage de la date:', error);
+      return dateString; // En cas d'erreur, retourner la chaîne d'origine
+    }
   };
 
   if (!fontsLoaded || loading) {
@@ -402,6 +502,29 @@ export default function AnnonceDetail() {
           </View>
           <View style={styles.errorContainer}>
             <Text style={[styles.errorText, { color: theme.color }]}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={goBack}>
+              <Text style={styles.retryButtonText}>Retourner</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!annonce) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <StatusBar style={darkMode ? 'light' : 'dark'} />
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={goBack} accessibilityLabel="Retour" accessibilityRole="button">
+              {darkMode ? <Dark_back /> : <Back />}
+            </TouchableOpacity>
+            <Text style={[styles.heading, { color: theme.color }]}>Annonce</Text>
+            <View style={styles.headerRightPlaceholder} />
+          </View>
+          <View style={styles.errorContainer}>
+            <Text style={[styles.errorText, { color: theme.color }]}>Annonce non disponible</Text>
             <TouchableOpacity style={styles.retryButton} onPress={goBack}>
               <Text style={styles.retryButtonText}>Retourner</Text>
             </TouchableOpacity>
@@ -789,7 +912,6 @@ export default function AnnonceDetail() {
                 onPress={() => setIsEditMode(false)}
               >
                 <Ionicons name="close-circle-outline" size={24} color="white" />
-                <Text style={styles.cancelButtonText}></Text>
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               
@@ -858,7 +980,7 @@ export default function AnnonceDetail() {
               </Text>
               
               <View style={[styles.userContainer, { backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-              <Image 
+                <Image 
                   source={profileData?.profileImage ? { uri: profileData.profileImage } : require('../../../assets/images/placeholder.png')}
                   style={styles.userAvatar}
                 />
@@ -898,11 +1020,11 @@ export default function AnnonceDetail() {
                   </View>
                 )}
 
-                {annonce.email && (
+                {email && (
                   <View style={styles.infoRow}>
                     <Ionicons name="mail-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
                     <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                       : {annonce.email}
+                      Email: {email}
                     </Text>
                   </View>
                 )}

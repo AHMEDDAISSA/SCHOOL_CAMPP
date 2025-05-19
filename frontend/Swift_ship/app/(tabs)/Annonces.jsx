@@ -72,7 +72,7 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
       styles.announceCard,
       { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }
     ]}
-    onPress={onPress}
+    onPress={onPress} // Important : utilisez onPress directement
     accessible={true}
     accessibilityLabel={`Annonce: ${item.title}`}
     accessibilityHint="Appuyez pour voir les détails de l'annonce"
@@ -82,21 +82,21 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
       styles.cardImageContainer,
       { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }
     ]}>
-    {(item.imageUrl || (item.images && item.images.length > 0)) ? (
-  <Image 
-    source={{ uri: item.imageUrl || item.images[0] }} 
-    style={styles.cardImage}
-    resizeMode="cover"
-  />
-) : (
-  <View style={styles.placeholderImageContainer}>
-    <Ionicons 
-      name={getCategoryIcon(item.category)} 
-      size={30} 
-      color={darkMode ? '#666666' : '#CCCCCC'} 
-    />
-  </View>
-)}
+      {(item.imageUrl || (item.images && item.images.length > 0)) ? (
+        <Image 
+          source={{ uri: item.imageUrl || item.images[0] }} 
+          style={styles.cardImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.placeholderImageContainer}>
+          <Ionicons 
+            name={getCategoryIcon(item.category)} 
+            size={30} 
+            color={darkMode ? '#666666' : '#CCCCCC'} 
+          />
+        </View>
+      )}
       <View style={[
         styles.categoryBadgeContainer, 
         {backgroundColor: getCategoryColor(item.category)}
@@ -104,6 +104,7 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
         <Text style={styles.categoryBadge}>{item.category}</Text>
       </View>
     </View>
+    
     <View style={styles.cardContent}>
       <Text style={[
         styles.cardTitle, 
@@ -125,21 +126,20 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
           {formatDate(item.date)}
         </Text>
         
-        {/* Bouton de suppression */}
+        {/* Bouton de suppression avec stopPropagation */}
         <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation(); // Empêcher la propagation vers la carte
-            onDelete(item.id);
-          }}
-          accessible={true}
-          accessibilityLabel="Supprimer l'annonce"
-          accessibilityHint="Appuyez pour supprimer cette annonce"
-          accessibilityRole="button"
-        >
-          <Ionicons name="trash-outline" size={14} color="white" />
-          <Text style={styles.deleteButtonText}>Effacer</Text>
-        </TouchableOpacity>
+      style={styles.deleteButton}
+      onPress={(e) => {
+        e.stopPropagation(); // Empêche la navigation vers la page détail
+        onDelete();
+      }}
+      accessible={true}
+      accessibilityLabel="Supprimer l'annonce"
+      accessibilityRole="button"
+    >
+      <Ionicons name="trash-outline" size={14} color="white" />
+      <Text style={styles.deleteButtonText}>Effacer</Text>
+    </TouchableOpacity>
       </View>
     </View>
   </TouchableOpacity>
@@ -371,8 +371,8 @@ const Annonces = () => {
   
   // États
   const [activeFilter, setActiveFilter] = useState('0');
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  // const [page, setPage] = useState(1);
+  // const [hasMore, setHasMore] = useState(true);
   
   // Initialisation et nettoyage
   useEffect(() => {
@@ -385,7 +385,7 @@ const Annonces = () => {
         
         // Nettoyer les anciennes annonces (plus de 30 jours)
 
-        
+
         // const deletedCount = await cleanOldAnnonces(30);
         // if (deletedCount > 0) {
         //   console.log(`${deletedCount} anciennes annonces supprimées`);
@@ -401,7 +401,7 @@ const Annonces = () => {
   }, []);
   
   // Fonction pour rafraîchir les données
-  const fetchAnnonces = useCallback(async (isRefresh = false) => {
+   const fetchAnnonces = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -411,9 +411,6 @@ const Annonces = () => {
       
       if (!success) {
         setError('Impossible de charger les annonces. Veuillez réessayer.');
-      } else {
-        setPage(prev => isRefresh ? 1 : prev + 1);
-        setHasMore(page < 3); // Simuler la limite de pagination
       }
       
     } catch (err) {
@@ -423,8 +420,8 @@ const Annonces = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page, refreshAnnonces]);
-  
+  }, [refreshAnnonces]);
+
   // Load data on component mount
   useEffect(() => {
     fetchAnnonces();
@@ -445,15 +442,17 @@ const Annonces = () => {
   // Pull to refresh handler
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchAnnonces(true);
+    fetchAnnonces();
   }, [fetchAnnonces]);
   
   // Load more handler for pagination
-  const handleLoadMore = () => {
-    if (!loading && hasMore) {
-      fetchAnnonces();
-    }
-  };
+
+  // const handleLoadMore = () => {
+  //   if (!loading && hasMore) {
+  //     fetchAnnonces();
+  //   }
+  // };
+
   
   // Fonction pour confirmer et gérer la suppression
   const handleDeleteAnnonce = useCallback((id) => {
@@ -469,6 +468,7 @@ const Annonces = () => {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
+            setIsDeleting(true);
             try {
               // Afficher un indicateur de chargement pendant la suppression
               setLoading(true);
@@ -535,14 +535,25 @@ const Annonces = () => {
   // Optimiser les fonctions de rendu pour la FlatList
   const keyExtractor = useCallback((item) => item.id?.toString() || Math.random().toString(), []);
   
-  const renderItem = useCallback(({ item }) => (
+ const renderItem = useCallback(({ item }) => {
+  return (
     <MemoizedAnnonceCard 
       item={item}
       darkMode={darkMode}
-      onPress={() => router.push(`/annonce/${item._id}`)}
+      onPress={() => {
+        // Store ID in AsyncStorage as a guaranteed method
+        AsyncStorage.setItem('currentAnnonceId', item._id.toString())
+          .then(() => {
+            console.log("Navigating to annonce with ID:", item._id);
+            // Use the simpler navigation approach
+            router.push(`/annonce/${item._id}`);
+          })
+          .catch(err => console.error("Error storing ID:", err));
+      }}
       onDelete={() => handleDeleteAnnonce(item._id)}
     />
-  ), [darkMode, ]);
+  );
+}, [darkMode, handleDeleteAnnonce]);
   
   // Navigation
   const back = () => {
@@ -731,30 +742,35 @@ const Annonces = () => {
           )}
           
           {/* Annonces list */}
-          <FlatList
-            data={filteredAnnonces}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.announcesListContainer}
-            refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
-                onRefresh={onRefresh}
-                colors={['#39335E', '#EB001B']}
-                tintColor={darkMode ? '#FFFFFF' : '#39335E'}
-              />
-            }
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              loading && !refreshing ? (
-                <View style={styles.footerLoader}>
-                  <ActivityIndicator size="small" color="#39335E" />
-                </View>
-              ) : null
-            }
-          />
+           <FlatList
+  data={filteredAnnonces}
+  keyExtractor={keyExtractor}
+  renderItem={renderItem}
+  showsVerticalScrollIndicator={false}
+  contentContainerStyle={styles.announcesListContainer}
+  
+  // Optimisations de performance
+  initialNumToRender={10}        // Nombre d'éléments à rendre initialement
+  maxToRenderPerBatch={10}       // Nombre d'éléments à rendre par lot
+  windowSize={21}                // Taille de la fenêtre de rendu (défaut: 21, soit 10 écrans au-dessus/en-dessous)
+  removeClippedSubviews={true}   // Retire les éléments non visibles du DOM natif
+  
+  refreshControl={
+    <RefreshControl 
+      refreshing={refreshing} 
+      onRefresh={onRefresh}
+      colors={['#39335E', '#EB001B']}
+      tintColor={darkMode ? '#FFFFFF' : '#39335E'}
+    />
+  }
+  ListFooterComponent={
+    loading && !refreshing ? (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#39335E" />
+      </View>
+    ) : null
+  }
+/>
         </View>
         
         {/* Bouton s'abonner aux notifications - Fixed at bottom */}

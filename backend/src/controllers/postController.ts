@@ -41,8 +41,8 @@ interface TransformedPost {
 
 export const getPosts = async (req: Request, res: Response) => {
     try {
-        // Récupérer les paramètres de requête
-        const { search, category, camp, page = 1, limit = 10 } = req.query;
+        // Récupérer les paramètres de requête, mais ignorer la pagination
+        const { search, category, camp } = req.query;
         
         // Construire la requête de filtrage
         const filter: any = {};
@@ -62,17 +62,12 @@ export const getPosts = async (req: Request, res: Response) => {
             filter.camp = camp;
         }
         
-        // Pagination
-        const skip = (Number(page) - 1) * Number(limit);
-        
-        // Récupérer les annonces
+        // Récupérer TOUTES les annonces (sans skip/limit)
         const posts = await Post.find(filter)
-            .skip(skip)
-            .limit(Number(limit))
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 }); // Trier par date de création (plus récent d'abord)
         
-        // Compter le nombre total d'annonces correspondant au filtre
-        const total = await Post.countDocuments(filter);
+        // Compter le nombre total d'annonces
+        const total = posts.length;
         
         // Transformer les données pour inclure les URL complètes des images
         const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -98,8 +93,6 @@ export const getPosts = async (req: Request, res: Response) => {
         res.status(200).json({
             success: true,
             totalCount: total,
-            page: Number(page),
-            limit: Number(limit),
             posts: transformedPosts
         });
         
@@ -112,7 +105,6 @@ export const getPosts = async (req: Request, res: Response) => {
         });
     }
 };
-
 
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

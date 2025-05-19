@@ -161,25 +161,15 @@ const rejectAnnounce = async (announceId) => {
     setLoading(true);
     const response = await getPosts();
     
-    if (response && response.posts) {
+    if (response) {
       console.log("Données reçues de l'API:", response);
       
-      // Vérifier que les images sont des URLs complètes et pas des tableaux sérialisés
-      const postsWithProcessedImages = response.posts.map(post => {
-        // Si les images sont déjà des URLs, on ne fait rien
-        if (post.images && Array.isArray(post.images)) {
-          // Si les images sont déjà un tableau d'URLs, on le garde tel quel
-          // Assurons-nous que imageUrl pointe vers la première image
-          if (post.images.length > 0 && !post.imageUrl) {
-            post.imageUrl = post.images[0];
-          }
-        }
-        return post;
-      });
-      
-      setAnnonces(postsWithProcessedImages);
-      await AsyncStorage.setItem('annonces', JSON.stringify(postsWithProcessedImages));
-      return true;
+      if (response.posts && Array.isArray(response.posts)) {
+        // Stocker toutes les annonces sans se soucier de la pagination
+        setAnnonces(response.posts);
+        await AsyncStorage.setItem('annonces', JSON.stringify(response.posts));
+        return true;
+      }
     }
     return false;
   } catch (error) {
