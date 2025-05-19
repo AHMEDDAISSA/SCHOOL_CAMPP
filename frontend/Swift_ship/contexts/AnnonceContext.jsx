@@ -110,6 +110,8 @@ const rejectAnnounce = async (announceId) => {
       nouvelleAnnonce.createdAt = nouvelleAnnonce.createdAt || new Date().toISOString();
       nouvelleAnnonce.date = nouvelleAnnonce.date || new Date().toLocaleDateString('fr-FR');
       nouvelleAnnonce.isNew = true;
+
+      nouvelleAnnonce.needsModeration = true; 
       
       
       const updatedAnnonces = [nouvelleAnnonce, ...currentAnnonces];
@@ -132,29 +134,29 @@ const rejectAnnounce = async (announceId) => {
       return false;
     }
   };
-  const transformApiData = (apiData) => {
-    if (!apiData || !apiData.posts || !Array.isArray(apiData.posts)) return [];
-    console.log('Invalid API data format:', apiData);
 
-    return apiData.posts.map(post => ({
-      id: post._id,
-      title: post.title,
-      description: post.description,
-      category: typeof post.category === 'string' ? post.category : 
-               (post.category === '1' ? 'Donner' : 
-                post.category === '4' ? 'Louer' : 
-                post.category === '6' ? 'Échanger' : post.category),
-      type: post.type,
-      email: post.email,
-      camp: post.camp,
-      is_published: post.is_published,
-      contact_info: post.contact_info,
-      date: post.createdAt ? new Date(post.createdAt).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
-      isNew: true
-      
-    }));
-  };
-    
+  const transformApiData = (apiData) => {
+  if (!apiData || !apiData.posts || !Array.isArray(apiData.posts)) return [];
+  console.log('Invalid API data format:', apiData);
+
+  return apiData.posts.map(post => ({
+    id: post._id,
+    title: post.title,
+    description: post.description,
+    category: typeof post.category === 'string' ? post.category : 
+              (post.category === '1' ? 'Donner' : 
+              post.category === '4' ? 'Louer' : 
+              post.category === '6' ? 'Échanger' : post.category),
+    type: post.type,
+    email: post.email,
+    camp: post.camp,
+    is_published: post.is_published,
+    contact_info: post.contact_info,
+    date: post.createdAt ? new Date(post.createdAt).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
+    isNew: true,
+    needsModeration: post.needsModeration || true // Préserver ou définir par défaut
+  }));
+};
   
     const refreshAnnonces = async () => {
   try {

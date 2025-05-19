@@ -82,7 +82,7 @@ const AnnonceCard = React.memo(({ item, darkMode, onPress, onDelete }) => (
           style={styles.deleteButton}
           onPress={(e) => {
             e.stopPropagation(); // Empêcher la propagation vers la carte
-            onDelete(item.id);
+            onDelete(item._id); // Assurez-vous d'utiliser _id et non id
           }}
           accessible={true}
           accessibilityLabel="Supprimer l'annonce"
@@ -127,7 +127,7 @@ const formatDate = (dateString) => {
   
   // Vérifier si le format est correct
   const today = new Date();
-  const date = new Date(dateString.split('/').reverse().join('-'));
+  const date = new Date(dateString);
   
   // Check if it's today
   if (date.toDateString() === today.toDateString()) {
@@ -141,334 +141,333 @@ const formatDate = (dateString) => {
     return "Hier";
   }
   
-  // Otherwise return the original format
-  return dateString;
+  // Otherwise return formatted date
+  return date.toLocaleDateString('fr-FR');
 };
 
 const AdminDashboard = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
-   const { logout } = useContext(AuthContext);
+  const { logout } = useContext(AuthContext);
+  
+  // Utiliser le contexte AnnonceContext pour accéder aux annonces et fonctions
   const { annonces, loading, refreshAnnonces, deleteAnnonce, cleanOldAnnonces, updateNewStatus } = useContext(AnnonceContext);
+  
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'annonces', 'users', 'settings'
-  const [announcesModalVisible, setAnnouncesModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('0'); // Catégorie sélectionnée
   const [searchQuery, setSearchQuery] = useState('');
   const screenWidth = Dimensions.get('window').width - 32;
   
-
-
-  
-    
   // Navigation hook inside the component
   const navigation = useNavigation();
     
-const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const handleLogout = () => {
-  Alert.alert(
-    "Déconnexion",
-    "Êtes-vous sûr de vouloir vous déconnecter?",
-    [
-      {
-        text: "Annuler",
-        style: "cancel"
-      },
-      {
-        text: "Déconnexion", 
-        onPress: async () => {
-          try {
-            const success = await logout();
-            if (success) {
-              router.replace('/login');
+    Alert.alert(
+      "Déconnexion",
+      "Êtes-vous sûr de vouloir vous déconnecter?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        {
+          text: "Déconnexion", 
+          onPress: async () => {
+            try {
+              const success = await logout();
+              if (success) {
+                router.replace('/login');
+                Toast.show({
+                  type: 'success',
+                  text1: 'Déconnexion réussie',
+                  visibilityTime: 2000
+                });
+              }
+            } catch (error) {
               Toast.show({
-                type: 'success',
-                text1: 'Déconnexion réussie',
-                visibilityTime: 2000
+                type: 'error',
+                text1: 'Erreur de déconnexion',
+                text2: error.message,
+                visibilityTime: 3000
               });
             }
-          } catch (error) {
-            Toast.show({
-              type: 'error',
-              text1: 'Erreur de déconnexion',
-              text2: error.message,
-              visibilityTime: 3000
-            });
           }
         }
-      }
-    ]
-  );
-};
-const generatePDF = async () => {
-  // Afficher le chargement
-  Toast.show({
-    type: 'info',
-    text1: 'Génération du PDF en cours...',
-    visibilityTime: 2000,
-  });
+      ]
+    );
+  };
 
-  try {
-    // Date pour le nom du fichier
-    const today = new Date();
-    const dateString = today.toISOString().split('T')[0];
-    
-    // Création du contenu HTML pour le PDF
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Bourse au prêt - Sauvegarde des données</title>
-          <style>
-            body {
-              font-family: 'Helvetica', Arial, sans-serif;
-              color: #333;
-              margin: 0;
-              padding: 20px;
-            }
-            h1 {
-              color: #39335E;
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            h2 {
-              color: #5D5FEF;
-              margin-top: 30px;
-              border-bottom: 1px solid #ddd;
-              padding-bottom: 5px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 30px;
-            }
-            th, td {
-              text-align: left;
-              padding: 8px;
-              border-bottom: 1px solid #ddd;
-            }
-            th {
-              background-color: #f2f2f2;
-              font-weight: bold;
-            }
-            tr:nth-child(even) {
-              background-color: #f9f9f9;
-            }
-            .category {
-              font-weight: bold;
-              display: inline-block;
-              padding: 4px 8px;
-              border-radius: 4px;
-              color: white;
-            }
-            .category-donner { background-color: #4CAF50; }
-            .category-preter { background-color: #2196F3; }
-            .category-emprunter { background-color: #FF9800; }
-            .category-louer { background-color: #9C27B0; }
-            .category-acheter { background-color: #F44336; }
-            .category-echanger { background-color: #009688; }
-            .footer {
-              text-align: center;
-              margin-top: 40px;
-              font-size: 12px;
-              color: #666;
-            }
-            .stats-container {
-              display: flex;
-              flex-wrap: wrap;
-              justify-content: space-around;
-              margin-bottom: 20px;
-            }
-            .stat-box {
-              width: 45%;
-              padding: 10px;
-              margin-bottom: 15px;
-              border: 1px solid #ddd;
-              border-radius: 8px;
-              text-align: center;
-            }
-            .stat-number {
-              font-size: 24px;
-              font-weight: bold;
-              color: #5D5FEF;
-              margin: 5px 0;
-            }
-            .stat-label {
-              font-size: 14px;
-              color: #666;
-            }
-          </style>
-        </head>
-        <body>
-          <h1>Bourse au prêt - Sauvegarde des données</h1>
-          <p><strong>Date:</strong> ${today.toLocaleDateString()}</p>
-          
-          <h2>Statistiques générales</h2>
-          <div class="stats-container">
-            <div class="stat-box">
-              <div class="stat-number">${totalAnnounces}</div>
-              <div class="stat-label">Annonces totales</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-number">${flaggedAnnounces}</div>
-              <div class="stat-label">Annonces à modérer</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-number">${totalUsers}</div>
-              <div class="stat-label">Utilisateurs validés</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-number">${pendingUsers}</div>
-              <div class="stat-label">Utilisateurs en attente</div>
-            </div>
-          </div>
+  const generatePDF = async () => {
+    // Afficher le chargement
+    Toast.show({
+      type: 'info',
+      text1: 'Génération du PDF en cours...',
+      visibilityTime: 2000,
+    });
 
-          <h2>Distribution par catégorie</h2>
-          <table>
-            <tr>
-              <th>Catégorie</th>
-              <th>Nombre d'annonces</th>
-            </tr>
-            ${categoryStats.map(stat => `
-              <tr>
-                <td><span class="category category-${stat.name.toLowerCase()}">${stat.name}</span></td>
-                <td>${stat.count}</td>
-              </tr>
-            `).join('')}
-          </table>
-
-          <h2>Liste des annonces</h2>
-          <table>
-            <tr>
-              <th>Titre</th>
-              <th>Catégorie</th>
-              <th>Type</th>
-              <th>Date</th>
-            </tr>
-            ${annonces.map(item => `
-              <tr>
-                <td>${item.title}</td>
-                <td>${item.category}</td>
-                <td>${item.type || 'N/A'}</td>
-                <td>${item.date || 'N/A'}</td>
-              </tr>
-            `).join('')}
-          </table>
-
-          <h2>Utilisateurs en attente de validation</h2>
-          <table>
-            <tr>
-              <th>Nom</th>
-              <th>Email</th>
-              <th>Date d'inscription</th>
-            </tr>
-            ${pendingUsersList.map(user => `
-              <tr>
-                <td>${user.name}</td>
-                <td>${user.email}</td>
-                <td>${user.date}</td>
-              </tr>
-            `).join('')}
-          </table>
-
-          <h2>Annonces à modérer</h2>
-          <table>
-            <tr>
-              <th>Titre</th>
-              <th>Catégorie</th>
-              <th>Raison de signalement</th>
-            </tr>
-            ${annoncesToModerate.map(item => `
-              <tr>
-                <td>${item.title}</td>
-                <td>${item.category}</td>
-                <td>${item.reason}</td>
-              </tr>
-            `).join('')}
-          </table>
-
-          <div class="footer">
-            <p>Document généré automatiquement le ${today.toLocaleDateString()} à ${today.toLocaleTimeString()}</p>
-            <p>Bourse au prêt - Système d'administration</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    if (Platform.OS === 'web') {
-      // Pour le web, on utilise une méthode différente pour créer et télécharger le PDF
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bourse_au_pret_sauvegarde_${dateString}.html`;
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+    try {
+      // Date pour le nom du fichier
+      const today = new Date();
+      const dateString = today.toISOString().split('T')[0];
       
-      Toast.show({
-        type: 'success',
-        text1: 'Sauvegarde générée',
-        text2: 'Le fichier a été téléchargé avec succès.',
-        visibilityTime: 2000,
-      });
-    } else {
-      // Pour les plateformes mobiles
-      // Option 1: Utiliser react-native-print pour afficher directement le PDF
-      try {
-        await Print.printAsync({
-          html: htmlContent,
-        });
+      // Création du contenu HTML pour le PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Bourse au prêt - Sauvegarde des données</title>
+            <style>
+              body {
+                font-family: 'Helvetica', Arial, sans-serif;
+                color: #333;
+                margin: 0;
+                padding: 20px;
+              }
+              h1 {
+                color: #39335E;
+                text-align: center;
+                margin-bottom: 30px;
+              }
+              h2 {
+                color: #5D5FEF;
+                margin-top: 30px;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 5px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 30px;
+              }
+              th, td {
+                text-align: left;
+                padding: 8px;
+                border-bottom: 1px solid #ddd;
+              }
+              th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+              }
+              tr:nth-child(even) {
+                background-color: #f9f9f9;
+              }
+              .category {
+                font-weight: bold;
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 4px;
+                color: white;
+              }
+              .category-donner { background-color: #4CAF50; }
+              .category-preter { background-color: #2196F3; }
+              .category-emprunter { background-color: #FF9800; }
+              .category-louer { background-color: #9C27B0; }
+              .category-acheter { background-color: #F44336; }
+              .category-echanger { background-color: #009688; }
+              .footer {
+                text-align: center;
+                margin-top: 40px;
+                font-size: 12px;
+                color: #666;
+              }
+              .stats-container {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-around;
+                margin-bottom: 20px;
+              }
+              .stat-box {
+                width: 45%;
+                padding: 10px;
+                margin-bottom: 15px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                text-align: center;
+              }
+              .stat-number {
+                font-size: 24px;
+                font-weight: bold;
+                color: #5D5FEF;
+                margin: 5px 0;
+              }
+              .stat-label {
+                font-size: 14px;
+                color: #666;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Bourse au prêt - Sauvegarde des données</h1>
+            <p><strong>Date:</strong> ${today.toLocaleDateString()}</p>
+            
+            <h2>Statistiques générales</h2>
+            <div class="stats-container">
+              <div class="stat-box">
+                <div class="stat-number">${totalAnnounces}</div>
+                <div class="stat-label">Annonces totales</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-number">${annoncesToModerate.length}</div>
+                <div class="stat-label">Annonces à modérer</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-number">${totalUsers}</div>
+                <div class="stat-label">Utilisateurs validés</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-number">${pendingUsers}</div>
+                <div class="stat-label">Utilisateurs en attente</div>
+              </div>
+            </div>
+
+            <h2>Distribution par catégorie</h2>
+            <table>
+              <tr>
+                <th>Catégorie</th>
+                <th>Nombre d'annonces</th>
+              </tr>
+              ${categoryStats.map(stat => `
+                <tr>
+                  <td><span class="category category-${stat.name.toLowerCase()}">${stat.name}</span></td>
+                  <td>${stat.count}</td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <h2>Liste des annonces</h2>
+            <table>
+              <tr>
+                <th>Titre</th>
+                <th>Catégorie</th>
+                <th>Type</th>
+                <th>Date</th>
+              </tr>
+              ${annonces.map(item => `
+                <tr>
+                  <td>${item.title}</td>
+                  <td>${item.category}</td>
+                  <td>${item.type || 'N/A'}</td>
+                  <td>${formatDate(item.date) || 'N/A'}</td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <h2>Utilisateurs en attente de validation</h2>
+            <table>
+              <tr>
+                <th>Nom</th>
+                <th>Email</th>
+                <th>Date d'inscription</th>
+              </tr>
+              ${pendingUsersList.map(user => `
+                <tr>
+                  <td>${user.name}</td>
+                  <td>${user.email}</td>
+                  <td>${user.date}</td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <h2>Annonces à modérer</h2>
+            <table>
+              <tr>
+                <th>Titre</th>
+                <th>Catégorie</th>
+                <th>Raison de signalement</th>
+              </tr>
+              ${annoncesToModerate.map(item => `
+                <tr>
+                  <td>${item.title}</td>
+                  <td>${item.category}</td>
+                  <td>${item.reason || 'Nouvelle annonce'}</td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <div class="footer">
+              <p>Document généré automatiquement le ${today.toLocaleDateString()} à ${today.toLocaleTimeString()}</p>
+              <p>Bourse au prêt - Système d'administration</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      if (Platform.OS === 'web') {
+        // Pour le web, on utilise une méthode différente pour créer et télécharger le PDF
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bourse_au_pret_sauvegarde_${dateString}.html`;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
         
         Toast.show({
           type: 'success',
-          text1: 'PDF généré',
-          text2: 'Vous pouvez maintenant l\'enregistrer ou le partager',
-          visibilityTime: 3000,
+          text1: 'Sauvegarde générée',
+          text2: 'Le fichier a été téléchargé avec succès.',
+          visibilityTime: 2000,
         });
-      } 
-      // Option 2: Si Print ne fonctionne pas, utiliser RNHTMLtoPDF
-      catch (printError) {
-        console.log('Print failed, falling back to PDF generation', printError);
-        
-        const options = {
-          html: htmlContent,
-          fileName: `bourse_au_pret_sauvegarde_${dateString}`,
-          directory: 'Documents',
-        };
-
-        const file = await RNHTMLtoPDF.convert(options);
-        
-        if (file.filePath) {
-          // Partager le fichier PDF
-          await Share.open({
-            url: `file://${file.filePath}`,
-            title: 'Sauvegarde des données Bourse au prêt',
-            message: 'Voici la sauvegarde des données de l\'application Bourse au prêt.',
-            type: 'application/pdf',
+      } else {
+        // Pour les plateformes mobiles
+        // Option 1: Utiliser react-native-print pour afficher directement le PDF
+        try {
+          await Print.printAsync({
+            html: htmlContent,
           });
           
           Toast.show({
             type: 'success',
-            text1: 'PDF généré avec succès',
-            text2: `Sauvegardé dans: ${file.filePath}`,
+            text1: 'PDF généré',
+            text2: 'Vous pouvez maintenant l\'enregistrer ou le partager',
             visibilityTime: 3000,
           });
+        } 
+        // Option 2: Si Print ne fonctionne pas, utiliser RNHTMLtoPDF
+        catch (printError) {
+          console.log('Print failed, falling back to PDF generation', printError);
+          
+          const options = {
+            html: htmlContent,
+            fileName: `bourse_au_pret_sauvegarde_${dateString}`,
+            directory: 'Documents',
+          };
+
+          const file = await RNHTMLtoPDF.convert(options);
+          
+          if (file.filePath) {
+            // Partager le fichier PDF
+            await Share.open({
+              url: `file://${file.filePath}`,
+              title: 'Sauvegarde des données Bourse au prêt',
+              message: 'Voici la sauvegarde des données de l\'application Bourse au prêt.',
+              type: 'application/pdf',
+            });
+            
+            Toast.show({
+              type: 'success',
+              text1: 'PDF généré avec succès',
+              text2: `Sauvegardé dans: ${file.filePath}`,
+              visibilityTime: 3000,
+            });
+          }
         }
       }
+    } catch (error) {
+      console.error('Erreur lors de la génération du PDF:', error);
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur de génération du PDF',
+        text2: error.message || 'Une erreur est survenue',
+        visibilityTime: 3000,
+      });
     }
-  } catch (error) {
-    console.error('Erreur lors de la génération du PDF:', error);
-    
-    Toast.show({
-      type: 'error',
-      text1: 'Erreur de génération du PDF',
-      text2: error.message || 'Une erreur est survenue',
-      visibilityTime: 3000,
-    });
-  }
-};
+  };
 
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -478,6 +477,21 @@ const generatePDF = async () => {
   });
     
   useEffect(() => {
+    const refreshData = async () => {
+    await refreshAnnonces();
+    // Mettre à jour les annonces à modérer après chaque rafraîchissement
+    setAnnoncesToModerate(getAnnoncesToModerate());
+  };
+  
+  refreshData();
+  
+  // Configurer un rafraîchissement périodique si nécessaire
+  const refreshInterval = setInterval(() => {
+    refreshData();
+  }, 300000); // Rafraîchir toutes les 5 minutes
+  
+  return () => clearInterval(refreshInterval);
+
     const backAction = () => {
       Alert.alert(
         "Confirmation", 
@@ -497,7 +511,7 @@ const generatePDF = async () => {
       return true; 
     };
 
-    const backHandler = BackHandler.addEventListener(
+    const backHandler = BackHandler.addEventListener( /**linaa sarr un petit changement  */
       "hardwareBackPress",
       backAction
     );
@@ -532,6 +546,7 @@ const generatePDF = async () => {
           categoryCounts[annonce.category]++;
         }
       });
+      
       const updatedCategoryStats = [
         { name: 'Donner', count: categoryCounts['Donner'], color: '#4CAF50' },
         { name: 'Prêter', count: categoryCounts['Prêter'], color: '#2196F3' },
@@ -571,85 +586,37 @@ const generatePDF = async () => {
     }
   }, [annonces]);
 
-  const [flaggedAnnounces, setFlaggedAnnounces] = useState(0);
-  const [annoncesToModerate, setAnnoncesToModerate] = useState([
-    {
-      id: 'm1',
-      title: 'Pantalon de ski Rouge',
-      category: 'Prêter',
-      reason: 'Contact externe',
-      date: '04/05/2025',
-      type: 'Vêtement',
-      campType: 'Camp De Ski',
-      size: '10-12 ans',
-      imageUrl: null
-    },
-    {
-      id: 'm2',
-      title: 'Bottes de randonnée',
-      category: 'Donner',
-      reason: 'Contenu inapproprié',
-      date: '01/05/2025',
-      
-      type: 'Chaussures',
-      campType: 'Camp Vert',
-      imageUrl: null
-    },
-    {
-      id: 'm3',
-      title: 'Bonnet et gants de ski',
-      category: 'Vendre',
-      reason: 'Prix excessif',
-      date: '30/04/2025',
-      
-      type: 'Accessoire',
-      campType: 'Camp De Ski',
-      imageUrl: null
-    },
-  ]);
-
-  // Mettez à jour cet état quand les annonces à modérer changent
-  useEffect(() => {
-    if (annoncesToModerate) {
-      setFlaggedAnnounces(annoncesToModerate.length);
-    }
-  }, [annoncesToModerate]);
-
-  // Initialisation et récupération des données
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Mettre à jour le statut "nouveau" des annonces
-        await updateNewStatus();
-        
-        // Nettoyer les anciennes annonces (plus de 30 jours)
-        const deletedCount = await cleanOldAnnonces(30);
-        if (deletedCount > 0) {
-          console.log(`${deletedCount} anciennes annonces supprimées`);
-        }
-        
-        // Rafraîchir les annonces
-        await refreshAnnonces();
-      } catch (error) {
-        console.error('Erreur d\'initialisation:', error);
-      }
-    };
+ 
+  const getAnnoncesToModerate = useCallback(() => {
+    if (!annonces || annonces.length === 0) return [];
     
-    initializeData();
-  }, []);
+    // Filtrer les annonces qui ont le statut "needsModeration" ou qui sont nouvelles (dernières 24h)
+    return annonces.filter(annonce => {
+      // Vérifier si l'annonce a été marquée pour modération
+      if (annonce.needsModeration) return true;
+      
+      // Vérifier si l'annonce est nouvelle (créée dans les dernières 24h)
+      const creationDate = new Date(annonce.date);
+      const now = new Date();
+      const timeDifference = now - creationDate;
+      const hoursDifference = timeDifference / (1000 * 60 * 60);
+      
+      return hoursDifference <= 24;
+  }).map(annonce => ({
+    ...annonce,
+    reason: annonce.needsModeration ? 
+      (annonce.reason || "Nouvelle annonce nécessitant modération") : 
+      "Annonce récente (dernières 24h)"
+  }));
+}, [annonces]);
 
-  const [statsPeriod, setStatsPeriod] = useState('week'); // 'week', 'month', 'year'
-  
-  // Catégories de filtrage
-  const categories = [
-    { id: '0', name: 'Tous' },
-    { id: '1', name: 'Donner', icon: 'gift-outline' },
-    { id: '2', name: 'Prêter', icon: 'swap-horizontal-outline' },
-    { id: '3', name: 'Emprunter', icon: 'hand-left-outline' },
-    { id: '4', name: 'Louer', icon: 'cash-outline' },
-    { id: '5', name: 'Acheter', icon: 'cart-outline' },
-    { id: '6', name: 'Échanger', icon: 'repeat-outline' }
-  ];
+  // État pour les annonces à modérer
+  const [annoncesToModerate, setAnnoncesToModerate] = useState([]);
+
+  // Mettre à jour les annonces à modérer quand les annonces changent
+  useEffect(() => {
+    setAnnoncesToModerate(getAnnoncesToModerate());
+  }, [annonces, getAnnoncesToModerate]);
 
   // États pour les données d'administration
   const [pendingUsers, setPendingUsers] = useState(7);
@@ -666,19 +633,20 @@ const generatePDF = async () => {
     { id: 'u7', name: 'Paul Girard', email: 'paul.g@gmail.com', date: '28/04/2025', status: 'En attente' },
   ]);
     
-  
   // Fonction pour rafraîchir les données
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await refreshAnnonces();
       await updateNewStatus();
+      // Mettre à jour les annonces à modérer après le rafraîchissement
+      setAnnoncesToModerate(getAnnoncesToModerate());
     } catch (error) {
       console.error('Erreur lors du rafraîchissement:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshAnnonces, updateNewStatus]);
+  }, [refreshAnnonces, updateNewStatus, getAnnoncesToModerate]);
     
   // Nombre total d'annonces
   const [totalAnnounces, setTotalAnnounces] = useState(0);
@@ -700,6 +668,8 @@ const generatePDF = async () => {
     
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
+    if (!annonces || annonces.length === 0) return [];
+    
     return annonces.filter(item => {
       const matchesCategory = selectedCategory === '0' || 
         item.category === categories.find(cat => cat.id === selectedCategory)?.name;
@@ -710,8 +680,19 @@ const generatePDF = async () => {
       
       return matchesCategory && matchesSearch;
     });
-  }, [annonces, selectedCategory, searchQuery, categories]);
+  }, [annonces, selectedCategory, searchQuery]);
     
+  // Catégories de filtrage
+  const categories = [
+    { id: '0', name: 'Tous' },
+    { id: '1', name: 'Donner', icon: 'gift-outline' },
+    { id: '2', name: 'Prêter', icon: 'swap-horizontal-outline' },
+    { id: '3', name: 'Emprunter', icon: 'hand-left-outline' },
+    { id: '4', name: 'Louer', icon: 'cash-outline' },
+    { id: '5', name: 'Acheter', icon: 'cart-outline' },
+    { id: '6', name: 'Échanger', icon: 'repeat-outline' }
+  ];
+
   // Fonction pour approuver un utilisateur
   const approveUser = (userId) => {
     Alert.alert(
@@ -771,30 +752,62 @@ const generatePDF = async () => {
     
   // Fonction pour approuver une annonce
   const approveAnnounce = (announceId) => {
-    Alert.alert(
-      "Approuver l'annonce",
-      "Cette annonce sera approuvée et restera visible. Continuer ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        { 
-          text: "Approuver", 
-          onPress: () => {
-            const updatedAnnounces = annoncesToModerate.filter(announce => announce.id !== announceId);
-            setAnnoncesToModerate(updatedAnnounces);
-            setFlaggedAnnounces(flaggedAnnounces - 1);
+  Alert.alert(
+    "Approuver l'annonce",
+    "Cette annonce sera approuvée et restera visible. Continuer ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      { 
+        text: "Approuver", 
+        onPress: async () => {
+          try {
+            // Trouver l'annonce à mettre à jour
+            const annonceToUpdate = annonces.find(a => a._id === announceId || a.id === announceId);
+            
+            if (annonceToUpdate) {
+              // Mettre à jour l'annonce localement
+              const updatedAnnonce = { 
+                ...annonceToUpdate, 
+                needsModeration: false, 
+                status: 'approved'
+              };
+              
+              // Mettre à jour la liste des annonces
+              const updatedAnnonces = annonces.map(a => 
+                (a._id === announceId || a.id === announceId) ? updatedAnnonce : a
+              );
+              
+              // Mettre à jour le contexte
+              // Si vous avez une fonction updateAnnonce dans votre contexte
+              await updateAnnonce(announceId, { needsModeration: false, status: 'approved' });
+              
+              // Mettre à jour la liste de modération
+              const updatedModeration = annoncesToModerate.filter(announce => announce._id !== announceId && announce.id !== announceId);
+              setAnnoncesToModerate(updatedModeration);
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Annonce approuvée',
+                visibilityTime: 2000,
+              });
+            }
+          } catch (error) {
+            console.error("Erreur lors de l'approbation:", error);
             Toast.show({
-              type: 'success',
-              text1: 'Annonce approuvée',
-              visibilityTime: 2000,
+              type: 'error',
+              text1: 'Erreur lors de l\'approbation',
+              text2: error.message || 'Une erreur est survenue',
+              visibilityTime: 3000,
             });
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
     
   // Fonction pour rejeter une annonce
   const rejectAnnounce = (announceId) => {
@@ -808,16 +821,41 @@ const generatePDF = async () => {
         },
         { 
           text: "Supprimer", 
-          onPress: () => {
-            const updatedAnnounces = annoncesToModerate.filter(announce => announce.id !== announceId);
-            setAnnoncesToModerate(updatedAnnounces);
-            setFlaggedAnnounces(flaggedAnnounces - 1);
-            setTotalAnnounces(totalAnnounces - 1);
-            Toast.show({
-              type: 'success',
-              text1: 'Annonce supprimée',
-              visibilityTime: 2000,
-            });
+          onPress: async () => {
+            try {
+              // Appeler la fonction de suppression du contexte
+              const success = await deleteAnnonce(announceId);
+              
+              if (success) {
+                // Mettre à jour l'état local des annonces à modérer
+                const updatedModeration = annoncesToModerate.filter(announce => announce._id !== announceId);
+                setAnnoncesToModerate(updatedModeration);
+                
+                // Mettre à jour le nombre total d'annonces
+                setTotalAnnounces(prev => prev - 1);
+                
+                Toast.show({
+                  type: 'success',
+                  text1: 'Annonce supprimée',
+                  visibilityTime: 2000,
+                });
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erreur lors de la suppression',
+                  text2: 'Veuillez réessayer',
+                  visibilityTime: 2000,
+                });
+              }
+            } catch (error) {
+              console.error("Erreur lors du rejet de l'annonce:", error);
+              Toast.show({
+                type: 'error',
+                text1: 'Erreur lors de la suppression',
+                text2: error.message || 'Une erreur est survenue',
+                visibilityTime: 3000,
+              });
+            }
           }
         }
       ]
@@ -838,25 +876,45 @@ const generatePDF = async () => {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
-            // Appeler la fonction de suppression du contexte
-            const success = await deleteAnnonce(id);
-            
-            // Afficher un message de succès ou d'erreur
-            if (success) {
-              Toast.show({
+            try {
+              const announceId = id;
+
+              // Appeler la fonction de suppression du contexte
+              const success = await deleteAnnonce(id);
+              
+              // Afficher un message de succès ou d'erreur
+              if (success) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Annonce supprimée avec succès',
+                  visibilityTime: 2000,
+                });
+                
+                // Mettre à jour le nombre total d'annonces
+                setTotalAnnounces(prev => prev - 1);
+                
+                // Mettre à jour les annonces à modérer si nécessaire
+                setAnnoncesToModerate(prev => prev.filter(item => item._id !== announceId && item.id !== announceId));
+                Toast.show({
                 type: 'success',
                 text1: 'Annonce supprimée avec succès',
                 visibilityTime: 2000,
               });
-              
-              // Mettre à jour le nombre total d'annonces
-              setTotalAnnounces(prev => prev - 1);
-            } else {
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erreur lors de la suppression',
+                  text2: 'Veuillez réessayer',
+                  visibilityTime: 2000,
+                });
+              }
+            } catch (error) {
+              console.error('Erreur lors de la suppression:', error);
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
-                text2: 'Veuillez réessayer',
-                visibilityTime: 2000,
+                text2: error.message || 'Une erreur est survenue',
+                visibilityTime: 3000,
               });
             }
           }
@@ -888,26 +946,38 @@ const generatePDF = async () => {
                 },
                 {
                   text: "Réinitialiser",
-                  onPress: () => {
-                    // Réinitialisation des données
-                    setTotalAnnounces(0);
-                    setAnnoncesToModerate([]);
-                    setVisitStats([0, 0, 0, 0, 0, 0, 0]);
-                    setCategoryStats([
-                      { name: 'Donner', count: 0, color: '#4CAF50' },
-                      { name: 'Prêter', count: 0, color: '#2196F3' },
-                      { name: 'Emprunter', count: 0, color: '#FF9800' },
-                      { name: 'Louer', count: 0, color: '#9C27B0' },
-                      { name: 'Acheter', count: 0, color: '#F44336' },
-                      { name: 'Échanger', count: 0, color: '#009688' }
-                    ]);
-                    setFlaggedAnnounces(0);
-                    // On garde les utilisateurs validés
-                    Toast.show({
-                      type: 'success',
-                      text1: 'Système réinitialisé pour la nouvelle année',
-                      visibilityTime: 3000,
-                    });
+                  onPress: async () => {
+                    try {
+                      // Réinitialisation des données
+                      // Idéalement, cela appellerait une fonction du contexte pour nettoyer toutes les annonces
+                      // AnnonceContext.resetAllAnnonces()
+                      
+                      setTotalAnnounces(0);
+                      setAnnoncesToModerate([]);
+                      setVisitStats([0, 0, 0, 0, 0, 0, 0]);
+                      setCategoryStats([
+                        { name: 'Donner', count: 0, color: '#4CAF50' },
+                        { name: 'Prêter', count: 0, color: '#2196F3' },
+                        { name: 'Emprunter', count: 0, color: '#FF9800' },
+                        { name: 'Louer', count: 0, color: '#9C27B0' },
+                        { name: 'Acheter', count: 0, color: '#F44336' },
+                        { name: 'Échanger', count: 0, color: '#009688' }
+                      ]);
+                      
+                      Toast.show({
+                        type: 'success',
+                        text1: 'Système réinitialisé pour la nouvelle année',
+                        visibilityTime: 3000,
+                      });
+                    } catch (error) {
+                      console.error('Erreur lors de la réinitialisation:', error);
+                      Toast.show({
+                        type: 'error',
+                        text1: 'Erreur lors de la réinitialisation',
+                        text2: error.message || 'Une erreur est survenue',
+                        visibilityTime: 3000,
+                      });
+                    }
                   }
                 }
               ]
@@ -918,21 +988,14 @@ const generatePDF = async () => {
     );
   };
     
-  const toggleSetting = (setting) => {
-    setSecuritySettings({
-      ...securitySettings,
-      [setting]: !securitySettings[setting]
-    });
-  };
-    
   // Optimiser les fonctions de rendu pour la FlatList
-  const keyExtractor = useCallback((item) => item.id.toString(), []);
+  const keyExtractor = useCallback((item) => item._id?.toString() || Math.random().toString(), []);
     
   const renderItem = useCallback(({ item }) => (
     <AnnonceCard 
       item={item}
       darkMode={darkMode}
-      onPress={() => router.push(`/annonce/${item.id}`)}
+      onPress={() => router.push(`/annonce/${item._id}`)}
       onDelete={handleDeleteAnnonce}
     />
   ), [darkMode, handleDeleteAnnonce]);
@@ -1155,12 +1218,12 @@ const generatePDF = async () => {
                   la réinitialisation du système.
                 </Text>
                 <TouchableOpacity
-  style={[styles.backupButton, {backgroundColor: '#2196F3', marginTop: 20}]}
-  onPress={generatePDF}
->
-  <Ionicons name="download" size={18} color="#FFFFFF" />
-  <Text style={styles.backupButtonText}>Télécharger la sauvegarde</Text>
-</TouchableOpacity>
+                  style={[styles.backupButton, {backgroundColor: '#2196F3', marginTop: 20}]}
+                  onPress={generatePDF}
+                >
+                  <Ionicons name="download" size={18} color="#FFFFFF" />
+                  <Text style={styles.backupButtonText}>Télécharger la sauvegarde</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -1191,7 +1254,7 @@ const generatePDF = async () => {
         );
       
       default:
-        // Dashboard par défaut
+        // Dashboard par défaut (Modération)
         return (
           <View style={styles.tabContent}>
             
@@ -1199,26 +1262,27 @@ const generatePDF = async () => {
             <View style={styles.moderationSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, {color: theme.color}]}>Modération</Text>
-                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>{annoncesToModerate.length} annonce(s) à modérer</Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                  {annoncesToModerate.length} annonce(s) à modérer
+                </Text>
               </View>
               
               {annoncesToModerate.length > 0 ? (
                 annoncesToModerate.map(item => (
                   <View 
-                    key={item.id} 
+                    key={item._id} 
                     style={[styles.moderationCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
                   >
                     <View style={styles.moderationHeader}>
                       <View style={styles.moderationTitleContainer}>
                         <Text style={[styles.moderationTitle, {color: theme.color}]}>{item.title}</Text>
                       </View>
-                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Publié le {item.date}</Text>
-                      {/* <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>
-                        <Text style={{fontWeight: '600'}}>Motif du signalement:</Text> {item.reason}
-                      </Text> */}
-                      {/* <Text style={[styles.moderationReporter, {color: theme.color}]}>
-                        <Text style={{fontWeight: '600'}}>Signalé par:</Text> {item.reporter}
-                      </Text> */}
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>
+                        Publié le {formatDate(item.date)}
+                      </Text>
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>
+                        <Text style={{fontWeight: '600'}}>Motif du signalement:</Text> {item.reason || "Nouvelle annonce"}
+                      </Text>
                     </View>
                     
                     <View style={styles.moderationDetails}>
@@ -1228,24 +1292,26 @@ const generatePDF = async () => {
                       </View>
                       <View style={styles.moderationDetail}>
                         <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Type:</Text>
-                        <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.type}</Text>
+                        <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.type || "Non spécifié"}</Text>
                       </View>
-                      <View style={styles.moderationDetail}>
-                        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Camp:</Text>
-                        <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.campType}</Text>
-                      </View>
-                      {/* {item.size && (
+                      {item.campType && (
+                        <View style={styles.moderationDetail}>
+                          <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Camp:</Text>
+                          <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.campType}</Text>
+                        </View>
+                      )}
+                      {item.size && (
                         <View style={styles.moderationDetail}>
                           <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText}]}>Taille:</Text>
                           <Text style={[styles.moderationDetailValue, {color: theme.color}]}>{item.size}</Text>
                         </View>
-                      )} */}
+                      )}
                     </View>
                     
                     <View style={styles.moderationActions}>
                       <TouchableOpacity 
                         style={[styles.viewButton, {backgroundColor: '#2196F3'}]}
-                        onPress={() => router.push(`/annonce/${item.id}`)}  
+                        onPress={() => router.push(`/annonce/${item._id}`)}  
                       >
                         <Ionicons name="eye" size={16} color="#FFFFFF" />
                         <Text style={styles.viewButtonText}>Voir</Text>
@@ -1253,15 +1319,15 @@ const generatePDF = async () => {
                       
                       <TouchableOpacity 
                         style={[styles.approveButton, {backgroundColor: '#4CAF50'}]}
-                        onPress={() => approveAnnounce(item.id)}
+                        onPress={() => approveAnnounce(item._id)}
                       >
                         <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                         <Text style={styles.approveButtonText}>Approuver</Text>
                       </TouchableOpacity>
                       
                       <TouchableOpacity 
-                        style={[styles.rejectButton, {backgroundColor: '#F44336'}]}
-                        onPress={() => rejectAnnounce(item.id)}
+                      style={[styles.rejectButton, {backgroundColor: '#F44336'}]}
+                        onPress={() => rejectAnnounce(item._id)}
                       >
                         <Ionicons name="close" size={16} color="#FFFFFF" />
                         <Text style={styles.rejectButtonText}>Rejeter</Text>
@@ -1297,12 +1363,14 @@ const generatePDF = async () => {
             <Text style={[styles.heading, {color: theme.color}]}>{adminName}</Text>
           </View>
         </View>
-        {/* <TouchableOpacity style={styles.notification_box} onPress={() => {}}>
+        <TouchableOpacity style={styles.notification_box} onPress={() => setActiveTab('dashboard')}>
           {darkMode ? <Dark_Notification style={styles.notification} /> : <Notification style={styles.notification} />}
-          <View style={styles.circle}>
-            <Text style={styles.notification_count}>{flaggedAnnounces + pendingUsers}</Text>
-          </View>
-        </TouchableOpacity> */}
+          {annoncesToModerate.length > 0 && (
+            <View style={styles.circle}>
+              <Text style={styles.notification_count}>{annoncesToModerate.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View> 
 
       {/* Navigation entre les onglets */}
@@ -1316,19 +1384,19 @@ const generatePDF = async () => {
           onPress={() => setActiveTab('dashboard')}
         >
           <Ionicons
-  name="shield-checkmark"
-  size={20}
-  color={activeTab === 'dashboard' ? '#5D5FEF' : (darkMode ? '#888888' : '#666666')}
-/>
-<Text
-  style={[
-    styles.tabText,
-    activeTab === 'dashboard' && styles.activeTabText,
-    { color: activeTab === 'dashboard' ? '#5D5FEF' : (darkMode ? '#AAAAAA' : '#666666') }
-  ]}
->
-  Modération
-</Text>
+            name="shield-checkmark"
+            size={20}
+            color={activeTab === 'dashboard' ? '#5D5FEF' : (darkMode ? '#888888' : '#666666')}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'dashboard' && styles.activeTabText,
+              { color: activeTab === 'dashboard' ? '#5D5FEF' : (darkMode ? '#AAAAAA' : '#666666') }
+            ]}
+          >
+            Modération
+          </Text>
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -1417,11 +1485,11 @@ const generatePDF = async () => {
           />
         }
       >
-       <View style={styles.adminHeader}>
-  <Text style={[styles.adminTitle, { color: theme.color, textAlign: 'center' }]}>
-    Bourse au prêt - Administration
-  </Text>
-</View>
+        <View style={styles.adminHeader}>
+          <Text style={[styles.adminTitle, { color: theme.color, textAlign: 'center' }]}>
+            Bourse au prêt - Administration
+          </Text>
+        </View>
         {/* Contenu de l'onglet actif */}
         {renderTabContent()}
       </ScrollView>
@@ -1474,15 +1542,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: 'Montserrat_700Bold',
   },
-  // notification_box: {
-  //   position: 'relative',
-  //   width: 44,
-  //   height: 44,
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  //   backgroundColor: '#F0F2F5',
-  //   borderRadius: 12,
-  // },
+  notification_box: {
+    position: 'relative',
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F2F5',
+    borderRadius: 12,
+  },
   notification: {
     width: 24,
     height: 24,
@@ -2124,32 +2192,31 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   pieChartContainer: {
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-periodFilterContainer: {
-  flexDirection: 'row',
-  marginBottom: 12,
-  alignSelf: 'center',
-},
-periodButton: {
-  paddingHorizontal: 16,
-  paddingVertical: 8,
-  borderRadius: 20,
-  marginHorizontal: 4,
-  backgroundColor: '#F0F0F0',
-},
-activePeriodButton: {
-  backgroundColor: '#5D5FEF',
-},
-periodButtonText: {
-  fontSize: 14,
-  color: '#666666',
-  fontFamily: 'Montserrat_500Medium',
-},
-activePeriodButtonText: {
-  color: '#FFFFFF',
-  fontFamily: 'Montserrat_600SemiBold',
-},
-  
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodFilterContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignSelf: 'center',
+  },
+  periodButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    backgroundColor: '#F0F0F0',
+  },
+  activePeriodButton: {
+    backgroundColor: '#5D5FEF',
+  },
+  periodButtonText: {
+    fontSize: 14,
+    color: '#666666',
+    fontFamily: 'Montserrat_500Medium',
+  },
+  activePeriodButtonText: {
+    color: '#FFFFFF',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
 });

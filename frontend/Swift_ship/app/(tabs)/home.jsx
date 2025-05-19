@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import AnnonceContext from '../../contexts/AnnonceContext';
 import * as Linking from 'expo-linking'; // Ajout de l'import Linking pour ouvrir les applications externes
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Added AsyncStorage import for storing ID
 
 const Home = () => {
     const { theme, darkMode, profileData } = useContext(ThemeContext);
@@ -38,11 +39,11 @@ const Home = () => {
       }
       
       // Filtrer par type de camp
-   if (selectedCamp !== 'Tous') {
-  filteredAnnonces = filteredAnnonces.filter(annonce => 
-    annonce.campType === selectedCamp || annonce.camp === selectedCamp
-  );
-}
+      if (selectedCamp !== 'Tous') {
+        filteredAnnonces = filteredAnnonces.filter(annonce => 
+          annonce.campType === selectedCamp || annonce.camp === selectedCamp
+        );
+      }
       
       // Filtrer par taille (si disponible)
       if (selectedSize !== 'Tous') {
@@ -50,12 +51,6 @@ const Home = () => {
       }
       
       return filteredAnnonces;
-        // .sort((a, b) => {
-        //   const dateA = new Date(a.date.split('/').reverse().join('-'));
-        //   const dateB = new Date(b.date.split('/').reverse().join('-'));
-        //   return dateB - dateA;
-        // })
-        // .slice(0, 8);
     }, [annonces, selectedCategory, selectedType, selectedCamp, selectedSize]);
 
     const [subscribed, setSubscribed] = useState(false);
@@ -64,21 +59,31 @@ const Home = () => {
       refreshAnnonces();
       updateNewStatus();
       
-    const getLatestUserData = async () => {
-    try {
-      const storedUserInfo = await AsyncStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        const userInfo = JSON.parse(storedUserInfo);
-        // Mettre à jour le contexte avec les dernières informations
-        updateProfileData(userInfo);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la récupération des données utilisateur:', error);
-    }
-  };
-  
-  getLatestUserData();
-}, []);
+      const getLatestUserData = async () => {
+        try {
+          const storedUserInfo = await AsyncStorage.getItem('userInfo');
+          if (storedUserInfo) {
+            const userInfo = JSON.parse(storedUserInfo);
+            // Mettre à jour le contexte avec les dernières informations
+            updateProfileData(userInfo);
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération des données utilisateur:', error);
+        }
+      };
+      
+      getLatestUserData();
+    }, []);
+
+    // Helper function to navigate to announcement details
+    const navigateToAnnonceDetail = (id) => {
+      AsyncStorage.setItem('currentAnnonceId', id.toString())
+        .then(() => {
+          console.log("Navigating to annonce with ID:", id);
+          router.push(`/annonce/${id}`);
+        })
+        .catch(err => console.error("Error storing ID:", err));
+    };
 
     // Nouvelle fonction pour gérer les contacts selon le moyen préféré
     const handleContact = (item) => {
@@ -216,20 +221,49 @@ const Home = () => {
     };
 
     const formatDate = (dateString) => {
-      const today = new Date();
-      const date = new Date(dateString.split('/').reverse().join('-'));
+      if (!dateString) return '';
       
-      if (date.toDateString() === today.toDateString()) {
-        return "Aujourd'hui";
+      try {
+        const today = new Date();
+        // Gestion des différents formats de date possibles
+        let date;
+        
+        if (typeof dateString === 'string' && dateString.includes('/')) {
+          // Format "DD/MM/YYYY"
+          const parts = dateString.split('/');
+          if (parts.length === 3) {
+            date = new Date(parts[2], parts[1] - 1, parts[0]);
+          } else {
+            return dateString; // Format non reconnu, retourner tel quel
+          }
+        } else {
+          // Essayer comme ISO ou autre format standard
+          date = new Date(dateString);
+        }
+        
+        // Vérifier si la date est valide
+        if (isNaN(date.getTime())) {
+          return dateString; // Date invalide, retourner telle quelle
+        }
+        
+        // Check if it's today
+        if (date.toDateString() === today.toDateString()) {
+          return "Aujourd'hui";
+        }
+        
+        // Check if it's yesterday
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (date.toDateString() === yesterday.toDateString()) {
+          return "Hier";
+        }
+        
+        // Otherwise return the formatted date
+        return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+      } catch (error) {
+        console.error('Erreur de formatage de la date:', error);
+        return dateString; // En cas d'erreur, retourner la chaîne d'origine
       }
-      
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (date.toDateString() === yesterday.toDateString()) {
-        return "Hier";
-      }
-      
-      return dateString;
     };
 
     const categories = [
@@ -255,8 +289,6 @@ const Home = () => {
       }
     };
 
-
-    
     return (
       <View style={[styles.container, {backgroundColor: theme.background}]}> 
         <StatusBar translucent backgroundColor="transparent" barStyle={darkMode ? "light-content" : 'dark-content'} />
@@ -360,27 +392,27 @@ const Home = () => {
             </ScrollView>
             
             <Text style={styles.filterLabel}>Type de camp:</Text>
-<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-  <View style={styles.filterButtonsContainer}>
-    {campTypes.map(camp => (
-      <TouchableOpacity 
-        key={camp} 
-        style={[
-          styles.filterButton, 
-          selectedCamp === camp ? { backgroundColor: '#39335E' } : null
-        ]}
-        onPress={() => setSelectedCamp(camp)}
-      >
-        <Text style={[
-          styles.filterButtonText, 
-          selectedCamp === camp ? { color: '#FFFFFF' } : null
-        ]}>
-          {camp}
-        </Text>
-      </TouchableOpacity>
-    ))}
-  </View>
-</ScrollView> 
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.filterButtonsContainer}>
+                {campTypes.map(camp => (
+                  <TouchableOpacity 
+                    key={camp} 
+                    style={[
+                      styles.filterButton, 
+                      selectedCamp === camp ? { backgroundColor: '#39335E' } : null
+                    ]}
+                    onPress={() => setSelectedCamp(camp)}
+                  >
+                    <Text style={[
+                      styles.filterButtonText, 
+                      selectedCamp === camp ? { color: '#FFFFFF' } : null
+                    ]}>
+                      {camp}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
           </View>
 
           <View style={styles.recentSection}>
@@ -403,7 +435,7 @@ const Home = () => {
                   <TouchableOpacity 
                     key={item.id} 
                     style={[styles.announceCard, { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }]}
-                    onPress={() => router.push(`/annonce/${item.id}`)}  
+                    onPress={() => navigateToAnnonceDetail(item.id || item._id)}
                   >
                     <View style={styles.cardImageWrapper}>
                       <Image
@@ -429,16 +461,15 @@ const Home = () => {
                       )}
                       
                       {item.campType && (
-  <View style={[styles.campBadgeWrapper, {backgroundColor: item.campType.includes('ski') ? '#1565C0' : '#2E7D32'}]}>
-    <Text style={styles.campBadge}>{item.campType}</Text>
-  </View>
+                        <View style={[styles.campBadgeWrapper, {backgroundColor: item.campType.includes('ski') ? '#1565C0' : '#2E7D32'}]}>
+                          <Text style={styles.campBadge}>{item.campType}</Text>
+                        </View>
                       )}
                     </View>
                     <View style={styles.cardContent}>
                       <Text style={[styles.cardTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]} numberOfLines={2}>{item.title}</Text>
                       <Text style={[styles.cardType, { color: darkMode ? '#B0B0B0' : '#727272' }]}>{item.type}</Text>
-                      <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{item.date}</Text>
-                      {/* <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{<formatDate></formatDate>(item.date)}</Text> */}
+                      <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{formatDate(item.date)}</Text>
                       
                       {/* Bouton de contact modifié pour utiliser la fonction handleContact */}
                       <TouchableOpacity 
