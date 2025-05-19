@@ -1,15 +1,26 @@
 import express from "express";
-import { getUsers, getUser} from "../controllers/userController";
+import { 
+    getUsers, 
+    getUser, 
+    getUserByEmail, 
+    addUser, 
+    getAllUsers,  // Add these new functions
+    updateUserStatus,
+    deleteUser
+} from "../controllers/userController";
 import { authenticateToken } from "../middleware/authMiddleware";
-import { getUserByEmail } from "../controllers/userController";
-import { addUser } from "../controllers/userController";
+
 const router = express.Router();
 
+// Existing routes
 router.post("/", addUser);
-
-// Route to add a user (with only email)
 router.get("/add-user", getUserByEmail);
 router.post('/get-users', getUsers);
-router.post('/get-user',authenticateToken, getUser);
+router.post('/get-user', authenticateToken, getUser);
+
+// New admin routes for user management
+router.get("/all-users", authenticateToken, getAllUsers); // Get all users for admin dashboard
+router.put("/update-status/:id", authenticateToken, updateUserStatus); // Update user status (approve/reject)
+router.delete("/delete/:id", authenticateToken, deleteUser); // Delete user
 
 export default router;

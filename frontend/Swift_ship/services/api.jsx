@@ -98,6 +98,43 @@ export const getUser = async (token) => {
   }
 };
 
+export const getAllUsers = async (token) => {
+  try {
+    const response = await api.get('/user/all-users', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('getAllUsers error:', error.message);
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId, token) => {
+  try {
+    const response = await api.delete(`/user/delete/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('deleteUser error:', error.message);
+    throw error;
+  }
+};
+
+export const updateUserStatus = async (userId, status, token) => {
+  try {
+    const response = await api.put(`/user/update-status/${userId}`, 
+      { status }, // status should be 'active' or 'pending'
+      { headers: { Authorization: `Bearer ${token}` }}
+    );
+    return response;
+  } catch (error) {
+    console.error('updateUserStatus error:', error.message);
+    throw error;
+  }
+};
+
 // POST: Register user
 export const registerUser = async (userData) => {
   try {

@@ -16,6 +16,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
+import { getAllUsers, deleteUser, updateUserStatus } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const AnnonceCard = React.memo(({ item, darkMode, onPress, onDelete }) => (
@@ -157,6 +159,13 @@ const AdminDashboard = () => {
   const [selectedCategory, setSelectedCategory] = useState('0'); // Catégorie sélectionnée
   const [searchQuery, setSearchQuery] = useState('');
   const screenWidth = Dimensions.get('window').width - 32;
+  const [moderationMode, setModerationMode] = useState('all');
+  const [allUsers, setAllUsers] = useState([]);
+const [pendingUsers, setPendingUsers] = useState(0);
+const [totalUsers, setTotalUsers] = useState(0);
+const [userLoading, setUserLoading] = useState(false);
+const [totalAnnounces, setTotalAnnounces] = useState(0);
+
   
   // Navigation hook inside the component
   const navigation = useNavigation();
@@ -469,6 +478,8 @@ const AdminDashboard = () => {
     }
   };
 
+  
+
   // Load fonts
   const [fontsLoaded] = useFonts({
     Montserrat_700Bold,
@@ -480,13 +491,13 @@ const AdminDashboard = () => {
     const refreshData = async () => {
     await refreshAnnonces();
     // Mettre à jour les annonces à modérer après chaque rafraîchissement
-    setAnnoncesToModerate(getAnnoncesToModerate());
+    const moderatedAnnounces = getAnnoncesToModerate();
+    setAnnoncesToModerate(moderatedAnnounces);
   };
-  
   refreshData();
   
   // Configurer un rafraîchissement périodique si nécessaire
-  const refreshInterval = setInterval(() => {
+   const refreshInterval = setInterval(() => {
     refreshData();
   }, 300000); // Rafraîchir toutes les 5 minutes
   
@@ -528,41 +539,52 @@ const AdminDashboard = () => {
     { name: 'Échanger', count: 1, color: '#009688' }
   ]);
 
-  useEffect(() => {
-    if (annonces && annonces.length > 0) {
-      // Initialiser un objet pour compter les annonces par catégorie
-      const categoryCounts = {
-        'Donner': 0,
-        'Prêter': 0,
-        'Emprunter': 0,
-        'Louer': 0,
-        'Acheter': 0,
-        'Échanger': 0
-      };
-      
-      // Compter les annonces par catégorie
-      annonces.forEach(annonce => {
-        if (categoryCounts.hasOwnProperty(annonce.category)) {
-          categoryCounts[annonce.category]++;
-        }
-      });
+ useEffect(() => {
+  if (annonces && annonces.length > 0) {
+    // Initialiser un objet pour compter les annonces par catégorie
+    const categoryCounts = {
+      'Donner': 0,
+      'Prêter': 0,
+      'Emprunter': 0,
+      'Louer': 0,
+      'Acheter': 0,
+      'Échanger': 0
+    };
+    
+    // Compter les annonces par catégorie
+    annonces.forEach(annonce => {
+      if (categoryCounts.hasOwnProperty(annonce.category)) {
+        categoryCounts[annonce.category]++;
+      }
+    });
       
       const updatedCategoryStats = [
-        { name: 'Donner', count: categoryCounts['Donner'], color: '#4CAF50' },
-        { name: 'Prêter', count: categoryCounts['Prêter'], color: '#2196F3' },
-        { name: 'Emprunter', count: categoryCounts['Emprunter'], color: '#FF9800' },
-        { name: 'Louer', count: categoryCounts['Louer'], color: '#9C27B0' },
-        { name: 'Acheter', count: categoryCounts['Acheter'], color: '#F44336' },
-        { name: 'Échanger', count: categoryCounts['Échanger'], color: '#009688' }
-      ];
+      { name: 'Donner', count: categoryCounts['Donner'], color: '#4CAF50' },
+      { name: 'Prêter', count: categoryCounts['Prêter'], color: '#2196F3' },
+      { name: 'Emprunter', count: categoryCounts['Emprunter'], color: '#FF9800' },
+      { name: 'Louer', count: categoryCounts['Louer'], color: '#9C27B0' },
+      { name: 'Acheter', count: categoryCounts['Acheter'], color: '#F44336' },
+      { name: 'Échanger', count: categoryCounts['Échanger'], color: '#009688' }
+    ];
       
       // Filtrer pour n'afficher que les catégories qui ont au moins une annonce
-      const filteredStats = updatedCategoryStats.filter(cat => cat.count > 0);
+       const filteredStats = updatedCategoryStats.filter(cat => cat.count > 0);
       
       // Mettre à jour l'état
       setCategoryStats(filteredStats.length > 0 ? filteredStats : updatedCategoryStats);
+
+      setTotalAnnounces(annonces.length);
     }
   }, [annonces]);
+  const pendingUsersList = useMemo(() => {
+  return allUsers
+    .filter(user => user.status === 'pending')
+    .map(user => ({
+      name: user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email.split('@')[0],
+      email: user.email,
+      date: new Date(user.createdAt).toLocaleDateString('fr-FR')
+    }));
+}, [allUsers]);
 
   const [visitStats, setVisitStats] = useState([13]);
 
@@ -588,75 +610,136 @@ const AdminDashboard = () => {
 
  
   const getAnnoncesToModerate = useCallback(() => {
-    if (!annonces || annonces.length === 0) return [];
+  if (!annonces || annonces.length === 0) return [];
+  
+  // Si on est en mode "Toutes les annonces", retourner toutes les annonces
+  if (moderationMode === 'all') {
+    return annonces.map(annonce => ({
+      ...annonce,
+      reason: annonce.needsModeration ? 
+        (annonce.reason || "Nouvelle annonce nécessitant modération") : 
+        annonce.category // Utiliser la catégorie comme information supplémentaire
+    }));
+  }
+  
+  // Sinon, filtrer celles qui nécessitent une modération (comportement actuel)
+  return annonces.filter(annonce => {
+    // Vérifier si l'annonce a été marquée pour modération
+    if (annonce.needsModeration) return true;
     
-    // Filtrer les annonces qui ont le statut "needsModeration" ou qui sont nouvelles (dernières 24h)
-    return annonces.filter(annonce => {
-      // Vérifier si l'annonce a été marquée pour modération
-      if (annonce.needsModeration) return true;
-      
-      // Vérifier si l'annonce est nouvelle (créée dans les dernières 24h)
-      const creationDate = new Date(annonce.date);
-      const now = new Date();
-      const timeDifference = now - creationDate;
-      const hoursDifference = timeDifference / (1000 * 60 * 60);
-      
-      return hoursDifference <= 24;
+    // Vérifier si l'annonce est nouvelle (créée dans les dernières 24h)
+    const creationDate = new Date(annonce.date);
+    const now = new Date();
+    const timeDifference = now - creationDate;
+    const hoursDifference = timeDifference / (1000 * 60 * 60);
+    
+    return hoursDifference <= 24;
   }).map(annonce => ({
     ...annonce,
     reason: annonce.needsModeration ? 
       (annonce.reason || "Nouvelle annonce nécessitant modération") : 
       "Annonce récente (dernières 24h)"
   }));
-}, [annonces]);
+}, [annonces, moderationMode])
+
+  
+
 
   // État pour les annonces à modérer
   const [annoncesToModerate, setAnnoncesToModerate] = useState([]);
+
+  useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      setUserLoading(true);
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem('authToken');
+      
+      if (!token) {
+        Toast.show({
+          type: 'error',
+          text1: 'Session expirée',
+          text2: 'Veuillez vous reconnecter',
+          visibilityTime: 3000
+        });
+        return;
+      }
+      
+      const response = await getAllUsers(token);
+      
+      if (response && response.data) {
+        // Set all users - Assurez-vous que votre API renvoie les données dans response.data
+        setAllUsers(response.data);
+        
+        // Count pending and active users
+        const pending = response.data.filter(user => user.status === 'pending').length;
+        const active = response.data.filter(user => user.status === 'active').length;
+        
+        setPendingUsers(pending);
+        setTotalUsers(active);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: 'Impossible de charger les utilisateurs',
+        visibilityTime: 3000
+      });
+    } finally {
+      setUserLoading(false);
+    }
+  };
+  
+  fetchUsers();
+  // Add this to the dependency array if you want to refresh when these change
+}, [refreshing]);
+
 
   // Mettre à jour les annonces à modérer quand les annonces changent
   useEffect(() => {
     setAnnoncesToModerate(getAnnoncesToModerate());
   }, [annonces, getAnnoncesToModerate]);
 
-  // États pour les données d'administration
-  const [pendingUsers, setPendingUsers] = useState(7);
-  const [totalUsers, setTotalUsers] = useState(4);
-  
-  // États pour les utilisateurs en attente de validation
-  const [pendingUsersList, setPendingUsersList] = useState([
-    { id: 'u1', name: 'Thomas Leroux', email: 'thomas.l@gmail.com', date: '04/05/2025', status: 'En attente' },
-    { id: 'u2', name: 'Claire Fontaine', email: 'claire.f@gmail.com', date: '03/05/2025', status: 'En attente' },
-    { id: 'u3', name: 'Marc Dubois', email: 'marc.d@gmail.com', date: '02/05/2025', status: 'En attente' },
-    { id: 'u4', name: 'Julie Moreau', email: 'julie.m@gmail.com', date: '01/05/2025', status: 'En attente' },
-    { id: 'u5', name: 'Luc Bernard', email: 'luc.b@gmail.com', date: '30/04/2025', status: 'En attente' },
-    { id: 'u6', name: 'Sophie Moreau', email: 'sophie.m@gmail.com', date: '29/04/2025', status: 'En attente' },
-    { id: 'u7', name: 'Paul Girard', email: 'paul.g@gmail.com', date: '28/04/2025', status: 'En attente' },
-  ]);
     
-  // Fonction pour rafraîchir les données
+
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshAnnonces();
-      await updateNewStatus();
-      // Mettre à jour les annonces à modérer après le rafraîchissement
-      setAnnoncesToModerate(getAnnoncesToModerate());
-    } catch (error) {
-      console.error('Erreur lors du rafraîchissement:', error);
-    } finally {
-      setRefreshing(false);
+  setRefreshing(true);
+  try {
+    // Refresh announcements
+    await refreshAnnonces();
+    await updateNewStatus();
+    
+    // Refresh users data
+   const token = await AsyncStorage.getItem('authToken');
+    if (token) {
+      const userResponse = await getAllUsers(token);
+      if (userResponse && userResponse.data) {
+        setAllUsers(userResponse.data);
+        
+        // Count pending and active users
+        const pending = userResponse.data.filter(user => user.status === 'pending').length;
+        const active = userResponse.data.filter(user => user.status === 'active').length;
+        
+        setPendingUsers(pending);
+        setTotalUsers(active);
+      }
     }
-  }, [refreshAnnonces, updateNewStatus, getAnnoncesToModerate]);
     
-  // Nombre total d'annonces
-  const [totalAnnounces, setTotalAnnounces] = useState(0);
+    // Update moderation items
+     const moderatedAnnounces = getAnnoncesToModerate();
+    setAnnoncesToModerate(moderatedAnnounces);
     
-  // Actualiser le nombre total d'annonces
-  useEffect(() => {
+    // Update total announces count
     if (annonces) {
       setTotalAnnounces(annonces.length);
     }
-  }, [annonces]);
+  } catch (error) {
+    console.error('Erreur lors du rafraîchissement:', error);
+  } finally {
+    setRefreshing(false);
+  }
+}, [refreshAnnonces, updateNewStatus, getAnnoncesToModerate]);
     
   const profileImage = profileData && profileData.profileImage 
     ? { uri: profileData.profileImage } 
@@ -665,22 +748,35 @@ const AdminDashboard = () => {
   const adminName = profileData && profileData.fullName 
     ? profileData.fullName 
     : 'Administrateur';
-    
+  
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
-    if (!annonces || annonces.length === 0) return [];
+  if (!annonces || annonces.length === 0) return [];
+  
+   return annonces.filter(item => {
+    // Simplification de la vérification de catégorie
+    const matchesCategory = selectedCategory === '0' || 
+      (selectedCategory === '1' && item.category === 'Donner') ||
+      (selectedCategory === '2' && item.category === 'Prêter') ||
+      (selectedCategory === '3' && item.category === 'Emprunter') ||
+      (selectedCategory === '4' && item.category === 'Louer') ||
+      (selectedCategory === '5' && item.category === 'Acheter') ||
+      (selectedCategory === '6' && item.category === 'Échanger');
     
-    return annonces.filter(item => {
-      const matchesCategory = selectedCategory === '0' || 
-        item.category === categories.find(cat => cat.id === selectedCategory)?.name;
-      
-      const matchesSearch = !searchQuery || 
-        item.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        item.type?.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      return matchesCategory && matchesSearch;
-    });
-  }, [annonces, selectedCategory, searchQuery]);
+    // Vérifier si la recherche correspond
+    const matchesSearch = !searchQuery || 
+      item.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      item.type?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesCategory && matchesSearch;
+  });
+}, [annonces, selectedCategory, searchQuery]);
+
+// Fonction pour obtenir le nom de la catégorie par son ID
+const getCategoryNameById = (categoryId) => {
+  const category = categories.find(cat => cat.id === categoryId);
+  return category ? category.name : '';
+};
     
   // Catégories de filtrage
   const categories = [
@@ -694,64 +790,133 @@ const AdminDashboard = () => {
   ];
 
   // Fonction pour approuver un utilisateur
-  const approveUser = (userId) => {
-    Alert.alert(
-      "Confirmer l'approbation",
-      "Voulez-vous vraiment approuver cet utilisateur ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        { 
-          text: "Approuver", 
-          onPress: () => {
-            // Logique d'approbation
-            const updatedUsers = pendingUsersList.filter(user => user.id !== userId);
-            setPendingUsersList(updatedUsers);
-            setPendingUsers(pendingUsers - 1);
-            setTotalUsers(totalUsers + 1);
+ const approveUser = async (userId) => {
+  Alert.alert(
+    "Confirmer l'approbation",
+    "Voulez-vous vraiment approuver cet utilisateur ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      { 
+        text: "Approuver", 
+        onPress: async () => {
+          try {
+            const token = await AsyncStorage.getItem('authToken');
+            
+            if (!token) {
+              Toast.show({
+                type: 'error',
+                text1: 'Session expirée',
+                text2: 'Veuillez vous reconnecter',
+                visibilityTime: 3000
+              });
+              return;
+            }
+            
+            // Call the API to update user status
+            const response = await updateUserStatus(userId, 'active', token);
+            
+            if (response && response.data && response.data.success) {
+              // Update the local state to reflect the change
+              const updatedUsers = allUsers.map(user => 
+                user._id === userId ? { ...user, status: 'active' } : user
+              );
+              
+              setAllUsers(updatedUsers);
+              setPendingUsers(prev => prev - 1);
+              setTotalUsers(prev => prev + 1);
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Utilisateur approuvé',
+                visibilityTime: 2000,
+              });
+            } else {
+              throw new Error(response?.data?.message || "Échec de l'approbation");
+            }
+          } catch (error) {
+            console.error("Erreur lors de l'approbation de l'utilisateur:", error);
             Toast.show({
-              type: 'success',
-              text1: 'Utilisateur approuvé',
-              visibilityTime: 2000,
+              type: 'error',
+              text1: 'Erreur',
+              text2: error.message || "Échec de l'approbation",
+              visibilityTime: 3000
             });
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
     
   // Fonction pour rejeter un utilisateur
-  const rejectUser = (userId) => {
-    Alert.alert(
-      "Confirmer le rejet",
-      "Voulez-vous vraiment rejeter cet utilisateur ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        { 
-          text: "Rejeter", 
-          onPress: () => {
-            // Logique de rejet
-            const updatedUsers = pendingUsersList.filter(user => user.id !== userId);
-            setPendingUsersList(updatedUsers);
-            setPendingUsers(pendingUsers - 1);
+  const rejectUser = async (userId) => {
+  Alert.alert(
+    "Confirmer le rejet",
+    "Voulez-vous vraiment rejeter cet utilisateur ? Cette action supprimera l'utilisateur du système.",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      { 
+        text: "Rejeter", 
+        onPress: async () => {
+          try {
+            const token = await AsyncStorage.getItem('authToken');
+            
+            if (!token) {
+              Toast.show({
+                type: 'error',
+                text1: 'Session expirée',
+                text2: 'Veuillez vous reconnecter',
+                visibilityTime: 3000
+              });
+              return;
+            }
+            
+            // Call the API to delete the user
+            const response = await deleteUser(userId, token);
+            
+            if (response && response.data && response.data.success) {
+              // Update local state by removing the user
+              const updatedUsers = allUsers.filter(user => user._id !== userId);
+              
+              setAllUsers(updatedUsers);
+              setPendingUsers(prev => 
+                allUsers.find(user => user._id === userId)?.status === 'pending' ? prev - 1 : prev
+              );
+              setTotalUsers(prev => 
+                allUsers.find(user => user._id === userId)?.status === 'active' ? prev - 1 : prev
+              );
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Utilisateur rejeté',
+                visibilityTime: 2000,
+              });
+            } else {
+              throw new Error(response?.data?.message || "Échec du rejet");
+            }
+          } catch (error) {
+            console.error("Erreur lors du rejet de l'utilisateur:", error);
             Toast.show({
-              type: 'success',
-              text1: 'Utilisateur rejeté',
-              visibilityTime: 2000,
+              type: 'error',
+              text1: 'Erreur',
+              text2: error.message || "Échec du rejet",
+              visibilityTime: 3000
             });
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
     
   // Fonction pour approuver une annonce
-  const approveAnnounce = (announceId) => {
+ const approveAnnounce = (announceId) => {
   Alert.alert(
     "Approuver l'annonce",
     "Cette annonce sera approuvée et restera visible. Continuer ?",
@@ -780,12 +945,15 @@ const AdminDashboard = () => {
                 (a._id === announceId || a.id === announceId) ? updatedAnnonce : a
               );
               
-              // Mettre à jour le contexte
               // Si vous avez une fonction updateAnnonce dans votre contexte
-              await updateAnnonce(announceId, { needsModeration: false, status: 'approved' });
+              if (typeof updateAnnonce === 'function') {
+                await updateAnnonce(announceId, { needsModeration: false, status: 'approved' });
+              }
               
               // Mettre à jour la liste de modération
-              const updatedModeration = annoncesToModerate.filter(announce => announce._id !== announceId && announce.id !== announceId);
+              const updatedModeration = annoncesToModerate.filter(
+                announce => announce._id !== announceId && announce.id !== announceId
+              );
               setAnnoncesToModerate(updatedModeration);
               
               Toast.show({
@@ -793,6 +961,9 @@ const AdminDashboard = () => {
                 text1: 'Annonce approuvée',
                 visibilityTime: 2000,
               });
+
+              // Forcer un rafraîchissement des données
+              refreshAnnonces();
             }
           } catch (error) {
             console.error("Erreur lors de l'approbation:", error);
@@ -810,118 +981,123 @@ const AdminDashboard = () => {
 };
     
   // Fonction pour rejeter une annonce
-  const rejectAnnounce = (announceId) => {
-    Alert.alert(
-      "Rejeter l'annonce",
-      "Cette annonce sera supprimée définitivement. Continuer ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        { 
-          text: "Supprimer", 
-          onPress: async () => {
-            try {
-              // Appeler la fonction de suppression du contexte
-              const success = await deleteAnnonce(announceId);
+ const rejectAnnounce = (announceId) => {
+  Alert.alert(
+    "Rejeter l'annonce",
+    "Cette annonce sera supprimée définitivement. Continuer ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      { 
+        text: "Supprimer", 
+        onPress: async () => {
+          try {
+            // Appeler la fonction de suppression du contexte
+            const success = await deleteAnnonce(announceId);
+            
+            if (success) {
+              // Mettre à jour l'état local des annonces à modérer
+              const updatedModeration = annoncesToModerate.filter(
+                announce => announce._id !== announceId && announce.id !== announceId
+              );
+              setAnnoncesToModerate(updatedModeration);
               
-              if (success) {
-                // Mettre à jour l'état local des annonces à modérer
-                const updatedModeration = annoncesToModerate.filter(announce => announce._id !== announceId);
-                setAnnoncesToModerate(updatedModeration);
-                
-                // Mettre à jour le nombre total d'annonces
-                setTotalAnnounces(prev => prev - 1);
-                
-                Toast.show({
-                  type: 'success',
-                  text1: 'Annonce supprimée',
-                  visibilityTime: 2000,
-                });
-              } else {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Erreur lors de la suppression',
-                  text2: 'Veuillez réessayer',
-                  visibilityTime: 2000,
-                });
-              }
-            } catch (error) {
-              console.error("Erreur lors du rejet de l'annonce:", error);
+              // Mettre à jour le nombre total d'annonces
+              setTotalAnnounces(prev => prev - 1);
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Annonce supprimée',
+                visibilityTime: 2000,
+              });
+              
+              // Rafraîchir les données
+              refreshAnnonces();
+            } else {
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
-                text2: error.message || 'Une erreur est survenue',
-                visibilityTime: 3000,
+                text2: 'Veuillez réessayer',
+                visibilityTime: 2000,
               });
             }
+          } catch (error) {
+            console.error("Erreur lors du rejet de l'annonce:", error);
+            Toast.show({
+              type: 'error',
+              text1: 'Erreur lors de la suppression',
+              text2: error.message || 'Une erreur est survenue',
+              visibilityTime: 3000,
+            });
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
     
   // Fonction pour supprimer une annonce
   const handleDeleteAnnonce = useCallback((id) => {
-    Alert.alert(
-      "Confirmation de suppression",
-      "Êtes-vous sûr de vouloir supprimer cette annonce ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const announceId = id;
+  Alert.alert(
+    "Confirmation de suppression",
+    "Êtes-vous sûr de vouloir supprimer cette annonce ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const announceId = id;
 
-              // Appeler la fonction de suppression du contexte
-              const success = await deleteAnnonce(id);
+            // Appeler la fonction de suppression du contexte
+            const success = await deleteAnnonce(id);
+            
+            // Afficher un message de succès ou d'erreur
+            if (success) {
+              // Mettre à jour le nombre total d'annonces
+              setTotalAnnounces(prev => prev - 1);
               
-              // Afficher un message de succès ou d'erreur
-              if (success) {
-                Toast.show({
-                  type: 'success',
-                  text1: 'Annonce supprimée avec succès',
-                  visibilityTime: 2000,
-                });
-                
-                // Mettre à jour le nombre total d'annonces
-                setTotalAnnounces(prev => prev - 1);
-                
-                // Mettre à jour les annonces à modérer si nécessaire
-                setAnnoncesToModerate(prev => prev.filter(item => item._id !== announceId && item.id !== announceId));
-                Toast.show({
+              // Mettre à jour les annonces à modérer
+              setAnnoncesToModerate(prev => 
+                prev.filter(item => item._id !== announceId && item.id !== announceId)
+              );
+              
+              Toast.show({
                 type: 'success',
                 text1: 'Annonce supprimée avec succès',
                 visibilityTime: 2000,
               });
-              } else {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Erreur lors de la suppression',
-                  text2: 'Veuillez réessayer',
-                  visibilityTime: 2000,
-                });
-              }
-            } catch (error) {
-              console.error('Erreur lors de la suppression:', error);
+              
+              // Rafraîchir les annonces
+              refreshAnnonces();
+            } else {
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
-                text2: error.message || 'Une erreur est survenue',
-                visibilityTime: 3000,
+                text2: 'Veuillez réessayer',
+                visibilityTime: 2000,
               });
             }
+          } catch (error) {
+            console.error('Erreur lors de la suppression:', error);
+            Toast.show({
+              type: 'error',
+              text1: 'Erreur lors de la suppression',
+              text2: error.message || 'Une erreur est survenue',
+              visibilityTime: 3000,
+            });
           }
         }
-      ]
-    );
-  }, [deleteAnnonce]);
+      }
+    ]
+  );
+}, [deleteAnnonce, refreshAnnonces]);
     
   // Fonction pour réinitialiser le système
   const resetSystem = () => {
@@ -1128,57 +1304,129 @@ const AdminDashboard = () => {
           </View>
         );
           
-      case 'users':
-        return (
-          <View style={styles.tabContent}>
-            {/* Section validation utilisateurs */}
-            <View style={styles.usersSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>Validation utilisateurs</Text>
-                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>{pendingUsers} utilisateur(s) en attente</Text>
-              </View>
-              
-              {pendingUsersList.length > 0 ? (
-                pendingUsersList.map(user => (
-                  <View 
-                    key={user.id} 
-                    style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
-                  >
-                    <View style={styles.userInfo}>
-                      <Text style={[styles.userName, {color: theme.color}]}>{user.name}</Text>
-                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>{user.email}</Text>
-                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>Demande le {user.date}</Text>
-                    </View>
-                    
-                    <View style={styles.userActions}>
-                      <TouchableOpacity 
-                        style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
-                        onPress={() => approveUser(user.id)}
-                      >
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        <Text style={styles.approveUserButtonText}>Approuver</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
-                        onPress={() => rejectUser(user.id)}
-                      >
-                        <Ionicons name="close" size={16} color="#FFFFFF" />
-                        <Text style={styles.rejectUserButtonText}>Rejeter</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
-                  <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
-                  <Text style={[styles.emptyText, {color: theme.color}]}>
-                    Aucun utilisateur en attente
+    case 'users':
+  return (
+    <View style={styles.tabContent}>
+      {/* Section validation utilisateurs */}
+      <View style={styles.usersSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
+            Validation utilisateurs
+          </Text>
+          <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+            {pendingUsers} utilisateur(s) en attente
+          </Text>
+        </View>
+        
+        {userLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#39335E" />
+          </View>
+        ) : allUsers.filter(user => user.status === 'pending').length > 0 ? (
+          allUsers
+            .filter(user => user.status === 'pending')
+            .map(user => (
+              <View 
+                key={user._id} 
+                style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+              >
+                <View style={styles.userInfo}>
+                  <Text style={[styles.userName, {color: theme.color}]}>
+                    {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 
+                     user.email.split('@')[0]}
+                  </Text>
+                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                    {user.email}
+                  </Text>
+                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                    Demande le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
                   </Text>
                 </View>
-              )}
-            </View>
+                
+                <View style={styles.userActions}>
+                  <TouchableOpacity 
+                    style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
+                    onPress={() => approveUser(user._id)}
+                  >
+                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    <Text style={styles.approveUserButtonText}>Approuver</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
+                    onPress={() => rejectUser(user._id)}
+                  >
+                    <Ionicons name="close" size={16} color="#FFFFFF" />
+                    <Text style={styles.rejectUserButtonText}>Rejeter</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+        ) : (
+          <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+            <Ionicons name="warning-outline" size={48} color="#FF9800" />
+            <Text style={[styles.emptyText, {color: theme.color}]}>
+              Aucun utilisateur en attente
+            </Text>
           </View>
-        );
+        )}
+
+        {/* Section for all approved users */}
+        {allUsers.filter(user => user.status === 'active').length > 0 && (
+          <View style={{marginTop: 32}}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
+                Utilisateurs approuvés
+              </Text>
+              <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                {totalUsers} utilisateur(s) actif(s)
+              </Text>
+            </View>
+
+            {allUsers
+              .filter(user => user.status === 'active')
+              .map(user => (
+                <View 
+                  key={user._id} 
+                  style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+                >
+                  <View style={styles.userInfo}>
+                    <Text style={[styles.userName, {color: theme.color}]}>
+                      {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 
+                       user.email.split('@')[0]}
+                    </Text>
+                    <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                      {user.email}
+                    </Text>
+                    {user.role && (
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                        Rôle: {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                      </Text>
+                    )}
+                    {user.camp && user.camp.name && (
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                        Camp: {user.camp.name}
+                      </Text>
+                    )}
+                  </View>
+                  
+                  <View style={styles.userActions}>
+                    <TouchableOpacity 
+                      style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
+                      onPress={() => rejectUser(user._id)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.rejectUserButtonText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            }
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
           
       case 'settings':
         return (
@@ -1255,24 +1503,23 @@ const AdminDashboard = () => {
       
       default:
         // Dashboard par défaut (Modération)
-        return (
-          <View style={styles.tabContent}>
-            
-            {/* Section modération */}
-            <View style={styles.moderationSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, {color: theme.color}]}>Modération</Text>
-                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                  {annoncesToModerate.length} annonce(s) à modérer
-                </Text>
-              </View>
-              
-              {annoncesToModerate.length > 0 ? (
-                annoncesToModerate.map(item => (
-                  <View 
-                    key={item._id} 
-                    style={[styles.moderationCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
-                  >
+          return (
+    <View style={styles.tabContent}>
+      {/* Section modération */}
+      <View style={styles.moderationSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, {color: theme.color}]}>Modération</Text>
+          <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+            {annoncesToModerate.length} annonce(s) à modérer
+          </Text>
+        </View>
+        
+        {annoncesToModerate.length > 0 ? (
+          annoncesToModerate.map(item => (
+            <View 
+              key={item._id || item.id} 
+              style={[styles.moderationCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+            >
                     <View style={styles.moderationHeader}>
                       <View style={styles.moderationTitleContainer}>
                         <Text style={[styles.moderationTitle, {color: theme.color}]}>{item.title}</Text>
@@ -1335,17 +1582,18 @@ const AdminDashboard = () => {
                     </View>
                   </View>
                 ))
-              ) : (
-                <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
-                  <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
-                  <Text style={[styles.emptyText, {color: theme.color}]}>
-                    Aucune annonce à modérer
-                  </Text>
-                </View>
-              )}
-            </View>
+                ) : (
+          <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+            <Ionicons name="warning-outline" size={48} color="#FF9800" /> 
+            <Text style={[styles.emptyText, {color: theme.color}]}>
+              Aucune annonce à modérer
+            </Text>
           </View>
-        );
+        )}
+      </View>
+    </View>
+  );
+        
     }
   };
 
@@ -1363,14 +1611,14 @@ const AdminDashboard = () => {
             <Text style={[styles.heading, {color: theme.color}]}>{adminName}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.notification_box} onPress={() => setActiveTab('dashboard')}>
+        {/* <TouchableOpacity style={styles.notification_box} onPress={() => setActiveTab('dashboard')}>
           {darkMode ? <Dark_Notification style={styles.notification} /> : <Notification style={styles.notification} />}
           {annoncesToModerate.length > 0 && (
             <View style={styles.circle}>
               <Text style={styles.notification_count}>{annoncesToModerate.length}</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View> 
 
       {/* Navigation entre les onglets */}
@@ -2219,4 +2467,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Montserrat_600SemiBold',
   },
+  moderationModeSelector: {
+  flexDirection: 'row',
+  borderRadius: 20,
+  overflow: 'hidden',
+  marginBottom: 10
+},
+modeModeButton: {
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 20,
+  marginLeft: 8
+},
+activeModeButton: {
+  backgroundColor: '#5D5FEF',
+},
+modeButtonText: {
+  fontSize: 14,
+  fontFamily: 'Montserrat_500Medium',
+},
 });
