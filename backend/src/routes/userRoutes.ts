@@ -19,7 +19,7 @@ router.post('/get-users', getUsers);
 router.post('/get-user', authenticateToken, getUser);
 
 // New admin routes for user management
-router.get("/all-users", authenticateToken, getAllUsers); // Get all users for admin dashboard
+router.get("/all-users", getAllUsers);
 router.put("/update-status/:id", authenticateToken, updateUserStatus); // Update user status (approve/reject)
 router.delete("/delete/:id", authenticateToken, deleteUser); // Delete user
 

@@ -98,33 +98,16 @@ export const getUser = async (req: Request<{},{},{userId:string}>, res: Response
 
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Check if the user is an admin (if you have auth middleware)
-    // Uncomment if you have auth middleware and want to check admin status
-    // if (req.user?.role !== "admin") {
-    //     res.status(403).json({ message: "Admin access required" });
-    //     return;
-    // }
-
+    // Débogage - vérifier l'authentification
+    console.log('Auth header:', req.headers.authorization);
+    
+    // Récupérer tous les utilisateurs
     const users = await User.find().sort({ createdAt: -1 }).populate('camp');
     
-    // Transform the data as needed
-    const transformedUsers = users.map(user => ({
-      _id: user._id,
-      email: user.email,
-      first_name: user.first_name || "",
-      last_name: user.last_name || "",
-      fullName: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email.split('@')[0],
-      phone: user.phone || "",
-      camp: user.camp,
-      role: user.role,
-      canPost: user.canPost,
-      isVerified: user.isVerified,
-      status: user.isVerified ? "active" : "pending", // Map isVerified to status for frontend
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
-    }));
+    console.log(`Nombre d'utilisateurs trouvés: ${users.length}`);
     
-    res.status(200).json(transformedUsers);
+    // Renvoyer les données
+    res.status(200).json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ 
@@ -134,6 +117,7 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
+
 export const updateUserStatus = async (req: Request<{id: string}, {}, {status: string}>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

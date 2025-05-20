@@ -524,3 +524,4 @@ export const loginHandler = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ status: "error", message: "Internal server error." });
   }
 };
+

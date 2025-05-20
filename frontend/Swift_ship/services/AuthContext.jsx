@@ -36,6 +36,51 @@ export const AuthProvider = ({ children }) => {
 
     initialize();
   }, []);
+  const refreshAuthToken = async () => {
+  try {
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    
+    if (!refreshToken) {
+      return false;
+    }
+    
+    const response = await api.post('/auth/refresh-token', { refreshToken });
+    
+    if (response && response.token) {
+      await AsyncStorage.setItem('authToken', response.token);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return false;
+  }
+};
+const refreshToken = async () => {
+  try {
+    // Check if refresh token exists
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    
+    if (!refreshToken) {
+      return false;
+    }
+    
+    // Call your API endpoint to get a new token using the refresh token
+    const response = await api.post('/auth/refresh-token', { refreshToken });
+    
+    if (response && response.data && response.data.token) {
+      // Save the new token
+      await AsyncStorage.setItem('authToken', response.data.token);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return false;
+  }
+};
 
   const checkLoginStatus = async () => {
     try {
@@ -148,6 +193,8 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       register, 
+      refreshAuthToken,
+      refreshToken,
       checkLoginStatus,
       updateUserData
     }}>

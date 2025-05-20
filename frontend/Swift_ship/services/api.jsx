@@ -11,14 +11,21 @@ const api = axios.create({
 });
 
 
-api.interceptors.request.use(
-  config => {
-    console.log(`[Request] ${config.method?.toUpperCase()} ${config.url}`);
-    if (config.data) console.log('Payload:', config.data);
-    if (config.params) console.log('Query Params:', config.params);
-    return config;
+api.interceptors.response.use(
+  response => {
+    console.log(`[Response] ${response.status}:`, response.data);
+    return response; // Retourner l'objet de réponse complet
   },
-  error => Promise.reject(error)
+  error => {
+    if (error.code === 'ECONNABORTED') {
+      console.error('Request timeout. Server might be down.');
+    } else if (!error.response) {
+      console.error('Network error. Check server and connection.');
+    } else {
+      console.error(`[Error ${error.response.status}]`, error.response.data);
+    }
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor for error handling
@@ -98,39 +105,14 @@ export const getUser = async (token) => {
   }
 };
 
-export const getAllUsers = async (token) => {
+export const getAllUsers = async () => {
   try {
-    const response = await api.get('/user/all-users', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    return response;
+    const response = await axios.get('http://192.168.1.21:3001/user/all-users');
+    
+    // Retourner la réponse complète
+    return response.data;
   } catch (error) {
-    console.error('getAllUsers error:', error.message);
-    throw error;
-  }
-};
-
-export const deleteUser = async (userId, token) => {
-  try {
-    const response = await api.delete(`/user/delete/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    return response;
-  } catch (error) {
-    console.error('deleteUser error:', error.message);
-    throw error;
-  }
-};
-
-export const updateUserStatus = async (userId, status, token) => {
-  try {
-    const response = await api.put(`/user/update-status/${userId}`, 
-      { status }, // status should be 'active' or 'pending'
-      { headers: { Authorization: `Bearer ${token}` }}
-    );
-    return response;
-  } catch (error) {
-    console.error('updateUserStatus error:', error.message);
+    console.error('getAllUsers error:', error);
     throw error;
   }
 };
@@ -151,6 +133,29 @@ export const registerUser = async (userData) => {
   }
 };
 
+export const deleteUser = async (userId) => {
+  try {
+    // Appel direct sans vérification de token, comme pour deleteAnnonce
+    const response = await axios.delete(`http://192.168.1.21:3001/user/delete/${userId}`);
+    
+    return response.data;
+  } catch (error) {
+    console.error('deleteUser error:', error);
+    throw error;
+  }
+};
+export const updateUserStatus = async (userId, status) => {
+  try {
+    const response = await axios.put(`http://192.168.1.21:3001/user/update-status/${userId}`, 
+      { status } // status should be 'active' or 'pending'
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('updateUserStatus error:', error);
+    throw error;
+  }
+};
 // === EMAIL VERIFICATION METHODS ===
 
 // POST: Verify OTP with code

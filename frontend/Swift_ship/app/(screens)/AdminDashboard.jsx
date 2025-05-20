@@ -149,7 +149,7 @@ const formatDate = (dateString) => {
 
 const AdminDashboard = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
-  const { logout } = useContext(AuthContext);
+  const { logout, refreshToken  } = useContext(AuthContext);
   
   // Utiliser le contexte AnnonceContext pour accéder aux annonces et fonctions
   const { annonces, loading, refreshAnnonces, deleteAnnonce, cleanOldAnnonces, updateNewStatus } = useContext(AnnonceContext);
@@ -650,84 +650,79 @@ const [totalAnnounces, setTotalAnnounces] = useState(0);
 
   useEffect(() => {
   const fetchUsers = async () => {
-    try {
-      setUserLoading(true);
-      // Get token from AsyncStorage
-      const token = await AsyncStorage.getItem('authToken');
+  try {
+    setUserLoading(true);
+    
+    const response = await getAllUsers();
+    
+    if (response && Array.isArray(response)) {
+      console.log("Données utilisateurs reçues:", response);
       
-      if (!token) {
-        Toast.show({
-          type: 'error',
-          text1: 'Session expirée',
-          text2: 'Veuillez vous reconnecter',
-          visibilityTime: 3000
-        });
-        return;
-      }
+      // Prétraiter les utilisateurs pour garantir une structure cohérente
+      const processedUsers = response.map(user => ({
+        ...user,
+        // S'assurer que tous les utilisateurs ont un attribut status
+        status: user.status || (user.verified ? 'active' : 'pending')
+      }));
       
-      const response = await getAllUsers(token);
+      setAllUsers(processedUsers);
       
-      if (response && response.data) {
-        // Set all users - Assurez-vous que votre API renvoie les données dans response.data
-        setAllUsers(response.data);
-        
-        // Count pending and active users
-        const pending = response.data.filter(user => user.status === 'pending').length;
-        const active = response.data.filter(user => user.status === 'active').length;
-        
-        setPendingUsers(pending);
-        setTotalUsers(active);
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Impossible de charger les utilisateurs',
-        visibilityTime: 3000
-      });
-    } finally {
-      setUserLoading(false);
+      // Compter les utilisateurs en attente et actifs
+      const pending = processedUsers.filter(user => 
+        user.status === 'pending' || 
+        user.verified === false || 
+        (user.verificationCode && !user.verified)
+      ).length;
+      
+      const active = processedUsers.filter(user => 
+        user.status === 'active' || 
+        user.verified === true ||
+        (!user.verificationCode && user.verified !== false)
+      ).length;
+      
+      setPendingUsers(pending);
+      setTotalUsers(active);
+      
+      await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
     }
-  };
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    // ... reste du code de gestion d'erreur
+  } finally {
+    setUserLoading(false);
+  }
+};
   
   fetchUsers();
-  // Add this to the dependency array if you want to refresh when these change
 }, [refreshing]);
-
-
-  // Mettre à jour les annonces à modérer quand les annonces changent
-  useEffect(() => {
-    setAnnoncesToModerate(getAnnoncesToModerate());
-  }, [annonces, getAnnoncesToModerate]);
 
     
 
-  const onRefresh = useCallback(async () => {
+ const onRefresh = useCallback(async () => {
   setRefreshing(true);
   try {
     // Refresh announcements
     await refreshAnnonces();
     await updateNewStatus();
     
-    // Refresh users data
-   const token = await AsyncStorage.getItem('authToken');
-    if (token) {
-      const userResponse = await getAllUsers(token);
-      if (userResponse && userResponse.data) {
-        setAllUsers(userResponse.data);
-        
-        // Count pending and active users
-        const pending = userResponse.data.filter(user => user.status === 'pending').length;
-        const active = userResponse.data.filter(user => user.status === 'active').length;
-        
-        setPendingUsers(pending);
-        setTotalUsers(active);
-      }
+    // Refresh users data (sans vérification de token)
+    const userResponse = await getAllUsers();
+    if (userResponse) {
+      setAllUsers(userResponse);
+      
+      // Count pending and active users
+      const pending = userResponse.filter(user => user.status === 'pending').length;
+      const active = userResponse.filter(user => user.status === 'active').length;
+      
+      setPendingUsers(pending);
+      setTotalUsers(active);
+      
+      // Mettre à jour AsyncStorage
+      await AsyncStorage.setItem('allUsers', JSON.stringify(userResponse));
     }
     
     // Update moderation items
-     const moderatedAnnounces = getAnnoncesToModerate();
+    const moderatedAnnounces = getAnnoncesToModerate();
     setAnnoncesToModerate(moderatedAnnounces);
     
     // Update total announces count
@@ -803,23 +798,11 @@ const getCategoryNameById = (categoryId) => {
         text: "Approuver", 
         onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem('authToken');
+            // Fonction API à créer suivant le même modèle
+            const response = await updateUserStatus(userId, 'active');
             
-            if (!token) {
-              Toast.show({
-                type: 'error',
-                text1: 'Session expirée',
-                text2: 'Veuillez vous reconnecter',
-                visibilityTime: 3000
-              });
-              return;
-            }
-            
-            // Call the API to update user status
-            const response = await updateUserStatus(userId, 'active', token);
-            
-            if (response && response.data && response.data.success) {
-              // Update the local state to reflect the change
+            if (response && response.success) {
+              // Mettre à jour l'état local
               const updatedUsers = allUsers.map(user => 
                 user._id === userId ? { ...user, status: 'active' } : user
               );
@@ -828,13 +811,16 @@ const getCategoryNameById = (categoryId) => {
               setPendingUsers(prev => prev - 1);
               setTotalUsers(prev => prev + 1);
               
+              // Mettre à jour AsyncStorage
+              await AsyncStorage.setItem('allUsers', JSON.stringify(updatedUsers));
+              
               Toast.show({
                 type: 'success',
                 text1: 'Utilisateur approuvé',
                 visibilityTime: 2000,
               });
             } else {
-              throw new Error(response?.data?.message || "Échec de l'approbation");
+              throw new Error(response?.message || "Échec de l'approbation");
             }
           } catch (error) {
             console.error("Erreur lors de l'approbation de l'utilisateur:", error);
@@ -865,23 +851,11 @@ const getCategoryNameById = (categoryId) => {
         text: "Rejeter", 
         onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem('authToken');
+            // Appel direct sans vérification de token
+            const response = await deleteUser(userId);
             
-            if (!token) {
-              Toast.show({
-                type: 'error',
-                text1: 'Session expirée',
-                text2: 'Veuillez vous reconnecter',
-                visibilityTime: 3000
-              });
-              return;
-            }
-            
-            // Call the API to delete the user
-            const response = await deleteUser(userId, token);
-            
-            if (response && response.data && response.data.success) {
-              // Update local state by removing the user
+            if (response && response.success) {
+              // Mettre à jour l'état local en supprimant l'utilisateur
               const updatedUsers = allUsers.filter(user => user._id !== userId);
               
               setAllUsers(updatedUsers);
@@ -892,13 +866,16 @@ const getCategoryNameById = (categoryId) => {
                 allUsers.find(user => user._id === userId)?.status === 'active' ? prev - 1 : prev
               );
               
+              // Mettre à jour AsyncStorage
+              await AsyncStorage.setItem('allUsers', JSON.stringify(updatedUsers));
+              
               Toast.show({
                 type: 'success',
                 text1: 'Utilisateur rejeté',
                 visibilityTime: 2000,
               });
             } else {
-              throw new Error(response?.data?.message || "Échec du rejet");
+              throw new Error(response?.message || "Échec du rejet");
             }
           } catch (error) {
             console.error("Erreur lors du rejet de l'utilisateur:", error);
@@ -1319,56 +1296,156 @@ const getCategoryNameById = (categoryId) => {
         </View>
         
         {userLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#39335E" />
-          </View>
-        ) : allUsers.filter(user => user.status === 'pending').length > 0 ? (
-          allUsers
-            .filter(user => user.status === 'pending')
-            .map(user => (
-              <View 
-                key={user._id} 
-                style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color="#39335E" />
+  </View>
+) : (
+  <View>
+    {/* Debug information - You can remove this in production */}
+    {/* <View style={{padding: 8, marginBottom: 10, backgroundColor: darkMode ? '#363636' : '#f5f5f5', borderRadius: 8}}>
+      <Text style={{color: theme.color, fontSize: 12}}>
+        Total users: {allUsers.length} | 
+        Format check: {allUsers.length > 0 ? JSON.stringify(Object.keys(allUsers[0]).slice(0, 5)) : 'No users'}
+      </Text>
+    </View> */}
+
+    {/* Pending Users Section */}
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
+        Utilisateurs en attente
+      </Text>
+      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+        {pendingUsers} utilisateur(s) en attente
+      </Text>
+    </View>
+
+    {allUsers.filter(user => 
+      user.status === 'pending' || 
+      (user.verified === false) || 
+      (user.verificationCode && !user.verified)
+    ).length > 0 ? (
+      allUsers
+        .filter(user => 
+          user.status === 'pending' || 
+          (user.verified === false) || 
+          (user.verificationCode && !user.verified)
+        )
+        .map(user => (
+          <View 
+            key={user._id || user.id} 
+            style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+          >
+            <View style={styles.userInfo}>
+              <Text style={[styles.userName, {color: theme.color}]}>
+                {(user.first_name || user.firstName) && (user.last_name || user.lastName) 
+                  ? `${user.first_name || user.firstName} ${user.last_name || user.lastName}` 
+                  : user.email?.split('@')[0] || 'Utilisateur'}
+              </Text>
+              <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                {user.email || 'Email non disponible'}
+              </Text>
+              <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                Demande le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
+              </Text>
+            </View>
+            
+            <View style={styles.userActions}>
+              <TouchableOpacity 
+                style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
+                onPress={() => approveUser(user._id || user.id)}
               >
-                <View style={styles.userInfo}>
-                  <Text style={[styles.userName, {color: theme.color}]}>
-                    {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 
-                     user.email.split('@')[0]}
-                  </Text>
-                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                    {user.email}
-                  </Text>
-                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                    Demande le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
-                  </Text>
-                </View>
-                
-                <View style={styles.userActions}>
-                  <TouchableOpacity 
-                    style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
-                    onPress={() => approveUser(user._id)}
-                  >
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    <Text style={styles.approveUserButtonText}>Approuver</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
-                    onPress={() => rejectUser(user._id)}
-                  >
-                    <Ionicons name="close" size={16} color="#FFFFFF" />
-                    <Text style={styles.rejectUserButtonText}>Rejeter</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-        ) : (
-          <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
-            <Ionicons name="warning-outline" size={48} color="#FF9800" />
-            <Text style={[styles.emptyText, {color: theme.color}]}>
-              Aucun utilisateur en attente
-            </Text>
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                <Text style={styles.approveUserButtonText}>Approuver</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
+                onPress={() => rejectUser(user._id || user.id)}
+              >
+                <Ionicons name="close" size={16} color="#FFFFFF" />
+                <Text style={styles.rejectUserButtonText}>Rejeter</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
+        ))
+    ) : (
+      <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+        <Ionicons name="warning-outline" size={48} color="#FF9800" />
+        <Text style={[styles.emptyText, {color: theme.color}]}>
+          Aucun utilisateur en attente
+        </Text>
+      </View>
+    )}
+
+    {/* Approved Users Section */}
+    <View style={{marginTop: 32}}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
+          Utilisateurs approuvés
+        </Text>
+        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+          {totalUsers} utilisateur(s) actif(s)
+        </Text>
+      </View>
+
+      {allUsers.filter(user => 
+        user.status === 'active' || 
+        user.verified === true ||
+        (!user.verificationCode && user.verified !== false)
+      ).length > 0 ? (
+        allUsers
+          .filter(user => 
+            user.status === 'active' || 
+            user.verified === true ||
+            (!user.verificationCode && user.verified !== false)
+          )
+          .map(user => (
+            <View 
+              key={user._id || user.id} 
+              style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+            >
+              <View style={styles.userInfo}>
+                <Text style={[styles.userName, {color: theme.color}]}>
+                  {(user.first_name || user.firstName) && (user.last_name || user.lastName) 
+                    ? `${user.first_name || user.firstName} ${user.last_name || user.lastName}` 
+                    : user.email?.split('@')[0] || 'Utilisateur'}
+                </Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                  {user.email || 'Email non disponible'}
+                </Text>
+                {(user.role || user.userType) && (
+                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                    Rôle: {(user.role || user.userType).charAt(0).toUpperCase() + (user.role || user.userType).slice(1)}
+                  </Text>
+                )}
+                {user.camp && user.camp.name && (
+                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                    Camp: {user.camp.name}
+                  </Text>
+                )}
+              </View>
+              
+              <View style={styles.userActions}>
+                <TouchableOpacity 
+                  style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
+                  onPress={() => rejectUser(user._id || user.id)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.rejectUserButtonText}>Supprimer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+      ) : (
+        <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+          <Ionicons name="warning-outline" size={48} color="#FF9800" />
+          <Text style={[styles.emptyText, {color: theme.color}]}>
+            Aucun utilisateur approuvé
+          </Text>
+        </View>
+      )}
+    </View>
+  </View>
+)}
 
         {/* Section for all approved users */}
         {allUsers.filter(user => user.status === 'active').length > 0 && (
