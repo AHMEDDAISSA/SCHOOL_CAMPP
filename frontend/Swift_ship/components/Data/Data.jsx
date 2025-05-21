@@ -1,6 +1,6 @@
-import ecole from  "../../assets/images/ecole.jpg";
-import R from "../../assets/images/R.jpg";
-import freepik from "../../assets/images/freepik.png";
+import main from  "../../assets/images/Main Scene.json";
+import R from "../../assets/images/parent.json";
+import freepik from "../../assets/images/tfoll.json";
 
 import Apple from "../../assets/images/Apple.svg";
 import Google from "../../assets/images/Google.svg";
@@ -49,26 +49,27 @@ import Dark_Profile_icon4 from "../../assets/images/dark_profile_icon4.svg";
 import Dark_Profile_icon5 from "../../assets/images/dark_profile_icon5.svg";
 import Dark_Profile_icon6 from "../../assets/images/dark_profile_icon6.svg";
 
+import LottieView from 'lottie-react-native';
+
 export const pages = [
     {
         id: 1,
-        image: ecole,
-        heading: 'Bienvenue sur Brillaz Camp ! Achetez ou prêtez facilement le matériel pour votre aventure. ',
-        // heading: 'Bienvenue sur Brillaz Camp ! Achetez ou prêtez facilement le matériel pour votre aventure. ',
+        image: freepik,
+        heading: 'Brillaz Camp : équipez votre aventure, simplement.',
+        isLottie: true // Add this property
     },
     {
         id: 2,
         image: R,
-        heading: 'Trouvez facilement le matériel de camp dont vous avez besoin, en quelques clics seulement.',
-        // heading: 'Trouvez facilement le matériel de camp dont vous avez besoin, en quelques clics seulement.',
-        
+        heading: 'Le matériel de camp qu’il vous faut, en un clic.',
+        isLottie: true 
     },
     {
         id: 3,
-        image: freepik,
-        heading: 'Votre camp, votre matériel, en toute simplicité. Appuyez sur Suivant pour en savoir plus !',
+        image: main,
+        heading: 'Matériel de camp sans prise de tête. Suivant pour en savoir plus.',
+        isLottie: true 
     },
-    // heading: 'Votre camp, votre matériel, en toute simplicité. Appuyez sur Suivant pour en savoir plus !',
 ];
 
 export const log_method = [

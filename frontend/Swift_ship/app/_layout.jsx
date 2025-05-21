@@ -6,6 +6,7 @@ import { MessageProvider } from '../message_context';
 import { AnnonceProvider } from '../contexts/AnnonceContext';
 import Toast, { BaseToast } from 'react-native-toast-message';
 import { AuthProvider } from '../services/AuthContext';
+import LottieView from 'lottie-react-native';
 
 const toastConfig = {
   success: ({ text1, text2, ...rest }) => (

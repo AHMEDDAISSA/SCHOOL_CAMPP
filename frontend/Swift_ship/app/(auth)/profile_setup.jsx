@@ -9,6 +9,7 @@ import Profile_setup_section2 from '../../components/Profile_setup/Profile_setup
 import ThemeContext from '../../theme/ThemeContext';
 import { router, useLocalSearchParams } from "expo-router";
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 

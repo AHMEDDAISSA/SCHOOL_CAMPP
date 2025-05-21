@@ -10,7 +10,7 @@ import { router, Link } from "expo-router";
 import Log_method from '../../components/Log_method/Log_method';  
 import Signup_section2 from '../../components/Signup/Signup_section2/Signup_section2';
 import ThemeContext from '../../theme/ThemeContext';
-import Toast, { BaseToast } from 'react-native-toast-message'; // Ajout de BaseToast
+import Toast, { BaseToast } from 'react-native-toast-message'; 
 import { API_URL } from '../../services/api';
 
 const toastConfig = {
