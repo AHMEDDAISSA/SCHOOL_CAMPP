@@ -6,13 +6,16 @@ import ThemeContext from '../../../theme/ThemeContext';
 import AnnonceContext from '../../../contexts/AnnonceContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking'; // Import Linking pour ouvrir les applications
+import * as Linking from 'expo-linking'; 
 
 const Inbox_section3 = () => {
   const { theme, darkMode } = useContext(ThemeContext);
   const { annonces } = useContext(AnnonceContext);
   const [messageData, setMessageData] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
+  const filteredAnnonces = annonces.filter(item => 
+  item.preferredContact === 'app' || item.inDiscussion
+);
   
   // Récupérer les infos du profil utilisateur
   useEffect(() => {

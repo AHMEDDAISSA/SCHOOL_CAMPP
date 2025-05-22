@@ -86,127 +86,127 @@ const Home = () => {
     };
 
     // Nouvelle fonction pour gérer les contacts selon le moyen préféré
-    const handleContact = (item) => {
-      const contactMethod = item.preferredContact || 'app';
+   const handleContact = (item) => {
+  const contactMethod = item.preferredContact || 'app';
+  
+  switch(contactMethod) {
+    case 'email':
+      // Ouvrir l'application email
+      const emailSubject = `À propos de votre annonce: ${item.title}`;
+      const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\nEst-ce toujours disponible?\n\nCordialement.`;
+      const emailUrl = `mailto:${item.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
       
-      switch(contactMethod) {
-        case 'email':
-          // Ouvrir l'application email
-          const emailSubject = `À propos de votre annonce: ${item.title}`;
-          const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\nEst-ce toujours disponible?\n\nCordialement.`;
-          const emailUrl = `mailto:${item.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-          
-          Linking.canOpenURL(emailUrl)
-            .then(supported => {
-              if (supported) {
-                return Linking.openURL(emailUrl);
-              } else {
-                Alert.alert(
-                  'Erreur',
-                  "Impossible d'ouvrir l'application email",
-                  [{ text: 'OK' }]
-                );
-              }
-            })
-            .catch(err => {
-              console.error('Erreur lors de l\'ouverture de l\'email:', err);
-              Alert.alert(
-                'Erreur',
-                "Une erreur est survenue lors de l'ouverture de l'application email",
-                [{ text: 'OK' }]
-              );
-            });
-          break;
-        
-        case 'phone':
-          // Afficher un dialogue pour choisir entre appeler ou WhatsApp
+      Linking.canOpenURL(emailUrl)
+        .then(supported => {
+          if (supported) {
+            return Linking.openURL(emailUrl);
+          } else {
+            Alert.alert(
+              'Erreur',
+              "Impossible d'ouvrir l'application email",
+              [{ text: 'OK' }]
+            );
+          }
+        })
+        .catch(err => {
+          console.error('Erreur lors de l\'ouverture de l\'email:', err);
           Alert.alert(
-            'Contacter par téléphone',
-            'Comment souhaitez-vous contacter cette personne?',
-            [
-              {
-                text: 'Appeler',
-                onPress: () => {
-                  const phoneUrl = `tel:${item.contactPhone}`;
-                  Linking.canOpenURL(phoneUrl)
-                    .then(supported => {
-                      if (supported) {
-                        return Linking.openURL(phoneUrl);
-                      } else {
-                        Alert.alert(
-                          'Erreur',
-                          "Impossible d'ouvrir l'application téléphone",
-                          [{ text: 'OK' }]
-                        );
-                      }
-                    })
-                    .catch(err => {
-                      console.error('Erreur lors de l\'appel:', err);
-                      Alert.alert(
-                        'Erreur',
-                        "Une erreur est survenue lors de l'ouverture de l'application téléphone",
-                        [{ text: 'OK' }]
-                      );
-                    });
-                }
-              },
-              {
-                text: 'WhatsApp',
-                onPress: () => {
-                  // Formater le numéro pour WhatsApp (enlever les espaces, etc.)
-                  let whatsappNumber = item.contactPhone?.replace(/\s+/g, '') || '';
-                  
-                  // Ajouter le code pays si nécessaire
-                  if (whatsappNumber.startsWith('0')) {
-                    whatsappNumber = `41${whatsappNumber.substring(1)}`;
-                  }
-                  
-                  const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`)}`;
-                  
-                  Linking.canOpenURL(whatsappUrl)
-                    .then(supported => {
-                      if (supported) {
-                        return Linking.openURL(whatsappUrl);
-                      } else {
-                        Alert.alert(
-                          'Erreur',
-                          "WhatsApp n'est pas installé sur votre appareil",
-                          [{ text: 'OK' }]
-                        );
-                      }
-                    })
-                    .catch(err => {
-                      console.error('Erreur lors de l\'ouverture de WhatsApp:', err);
-                      Alert.alert(
-                        'Erreur',
-                        "Une erreur est survenue lors de l'ouverture de WhatsApp",
-                        [{ text: 'OK' }]
-                      );
-                    });
-                }
-              },
-              {
-                text: 'Annuler',
-                style: 'cancel'
-              }
-            ]
+            'Erreur',
+            "Une erreur est survenue lors de l'ouverture de l'application email",
+            [{ text: 'OK' }]
           );
-          break;
-        
-        case 'app':
-        default:
-          // Ouvrir la conversation dans l'application
-          router.push({
-            pathname: '(screens)/chat_screen',
-            params: { 
-              id: Date.now(),
-              advertId: item.id,
-              name: item.ownerName || 'Propriétaire'
+        });
+      break;
+    
+    case 'phone':
+      // Afficher un dialogue pour choisir entre appeler ou WhatsApp
+      Alert.alert(
+        'Contacter par téléphone',
+        'Comment souhaitez-vous contacter cette personne?',
+        [
+          {
+            text: 'Appeler',
+            onPress: () => {
+              const phoneUrl = `tel:${item.contactPhone}`;
+              Linking.canOpenURL(phoneUrl)
+                .then(supported => {
+                  if (supported) {
+                    return Linking.openURL(phoneUrl);
+                  } else {
+                    Alert.alert(
+                      'Erreur',
+                      "Impossible d'ouvrir l'application téléphone",
+                      [{ text: 'OK' }]
+                    );
+                  }
+                })
+                .catch(err => {
+                  console.error('Erreur lors de l\'appel:', err);
+                  Alert.alert(
+                    'Erreur',
+                    "Une erreur est survenue lors de l'ouverture de l'application téléphone",
+                    [{ text: 'OK' }]
+                  );
+                });
             }
-          });
-          break;
-      }
-    };
+          },
+          {
+            text: 'WhatsApp',
+            onPress: () => {
+              // Formater le numéro pour WhatsApp (enlever les espaces, etc.)
+              let whatsappNumber = item.contactPhone?.replace(/\s+/g, '') || '';
+              
+              // Ajouter le code pays si nécessaire
+              if (whatsappNumber.startsWith('0')) {
+                whatsappNumber = `41${whatsappNumber.substring(1)}`;
+              }
+              
+              const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`)}`;
+              
+              Linking.canOpenURL(whatsappUrl)
+                .then(supported => {
+                  if (supported) {
+                    return Linking.openURL(whatsappUrl);
+                  } else {
+                    Alert.alert(
+                      'Erreur',
+                      "WhatsApp n'est pas installé sur votre appareil",
+                      [{ text: 'OK' }]
+                    );
+                  }
+                })
+                .catch(err => {
+                  console.error('Erreur lors de l\'ouverture de WhatsApp:', err);
+                  Alert.alert(
+                    'Erreur',
+                    "Une erreur est survenue lors de l'ouverture de WhatsApp",
+                    [{ text: 'OK' }]
+                  );
+                });
+            }
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          }
+        ]
+      );
+      break;
+    
+    case 'app':
+    default:
+      // Ouvrir la conversation dans l'application
+      router.push({
+        pathname: '(screens)/chat_screen',
+        params: { 
+          id: Date.now(),
+          advertId: item.id,
+          name: item.ownerName || 'Propriétaire'
+        }
+      });
+      break;
+  }
+};
 
     const getCategoryColor = (category) => {
       switch(category) {
@@ -280,14 +280,14 @@ const Home = () => {
     const campTypes = ['Tous', 'Camp De Ski', 'Camp Vert'];
     
     // Fonction pour obtenir l'icône du moyen de communication
-    const getContactIcon = (contactMethod) => {
-      switch(contactMethod) {
-        case 'email': return 'mail';
-        case 'phone': return 'call';
-        case 'app': 
-        default: return 'chatbubble';
-      }
-    };
+const getContactIcon = (contactMethod) => {
+  switch(contactMethod) {
+    case 'email': return 'mail';
+    case 'phone': return 'call';
+    case 'app': 
+    default: return 'chatbubble';
+  }
+};
 
     return (
       <View style={[styles.container, {backgroundColor: theme.background}]}> 
@@ -472,18 +472,22 @@ const Home = () => {
                       <Text style={[styles.cardDate, { color: darkMode ? '#808080' : '#9B9B9B' }]}>{formatDate(item.date)}</Text>
                       
                       {/* Bouton de contact modifié pour utiliser la fonction handleContact */}
-                      <TouchableOpacity 
-                        style={styles.contactButton} 
-                        onPress={() => handleContact(item)}
-                      >
-                        <Ionicons 
-                          name={getContactIcon(item.preferredContact)} 
-                          size={14} 
-                          color="white" 
-                          style={{marginRight: 4}} 
-                        />
-                        <Text style={styles.contactButtonText}>Contacter</Text>
-                      </TouchableOpacity>
+                     <TouchableOpacity 
+  style={styles.contactButton} 
+  onPress={() => handleContact(item)}
+>
+  <Ionicons 
+    name={getContactIcon(item.preferredContact)} 
+    size={14} 
+    color="white" 
+    style={{marginRight: 4}} 
+  />
+  <Text style={styles.contactButtonText}>
+    {item.preferredContact === 'phone' ? 'Appeler' : 
+     item.preferredContact === 'email' ? 'Email' : 'Message'}
+  </Text>
+</TouchableOpacity>
+
                     </View>
                   </TouchableOpacity>
                 ))}

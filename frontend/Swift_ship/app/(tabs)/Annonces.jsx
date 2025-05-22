@@ -65,19 +65,30 @@ const CategoryButton = ({ category, isActive, darkMode, onPress }) => (
     </Text>
   </TouchableOpacity>
 );
-
-const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
-  <TouchableOpacity 
-    style={[
-      styles.announceCard,
-      { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }
-    ]}
-    onPress={onPress} // Important : utilisez onPress directement
-    accessible={true}
-    accessibilityLabel={`Annonce: ${item.title}`}
-    accessibilityHint="Appuyez pour voir les détails de l'annonce"
-    accessibilityRole="button"
-  >
+ const getContactStyle = (contactMethod) => {
+  switch(contactMethod) {
+    case 'phone': 
+      return { backgroundColor: '#2196F3', icon: 'call-outline', text: 'Appeler' };
+    case 'email':
+      return { backgroundColor: '#4CAF50', icon: 'mail-outline', text: 'Email' };
+    default:
+      return { backgroundColor: '#39335E', icon: 'chatbubble-outline', text: 'Message' };
+  }
+};
+const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussion }) => {
+  // Déterminer si l'utilisateur actuel est le propriétaire de l'annonce
+  const isOwner = userEmail === item.email;
+  const contactMethod = item.preferredContact || 'app';
+  const { backgroundColor, icon , text} = getContactStyle(contactMethod);
+  
+   return (
+    <TouchableOpacity 
+      style={[
+        styles.announceCard,
+        { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }
+      ]}
+      onPress={onPress}
+    >
     <View style={[
       styles.cardImageContainer,
       { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }
@@ -118,32 +129,91 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete }) => (
       ]}>
         {item.type}
       </Text>
-      <View style={styles.cardFooter}>
-        <Text style={[
-          styles.cardDate, 
-          { color: darkMode ? '#AAAAAA' : '#666666' }
-        ]}>
+      {(item.category === 'Acheter' || item.category === 'Louer' || 
+  item.category === '4' || item.category === '5') && 
+  item.price && (
+  <Text style={[
+    styles.cardPrice, 
+    { color: darkMode ? '#FFFFFF' : '#EB001B' }
+  ]}>
+    Prix: {item.price}€
+  </Text>
+)}
+      
+      {/* Affichage de la durée pour les catégories Louer et Prêter */}
+      {(item.category === 'Louer' || item.category === 'Prêter' || 
+  item.category === '2' || item.category === '4') && 
+  item.duration && (
+  <Text style={[
+    styles.cardDuration, 
+    { color: darkMode ? '#AAAAAA' : '#666666' }
+  ]}>
+    Durée: {item.duration}
+  </Text>
+)}
+       <View style={styles.cardFooter}>
+        <Text style={[styles.cardDate, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
           {formatDate(item.date)}
         </Text>
         
         {/* Bouton de suppression avec stopPropagation */}
-        <TouchableOpacity 
-      style={styles.deleteButton}
-      onPress={(e) => {
-        e.stopPropagation(); // Empêche la navigation vers la page détail
-        onDelete();
-      }}
-      accessible={true}
-      accessibilityLabel="Supprimer l'annonce"
-      accessibilityRole="button"
-    >
-      <Ionicons name="trash-outline" size={14} color="white" />
-      <Text style={styles.deleteButtonText}>Effacer</Text>
-    </TouchableOpacity>
+      {isOwner && (
+          <TouchableOpacity 
+            style={styles.deleteButton} 
+            onPress={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Ionicons name="trash-outline" size={14} color="white" />
+            <Text style={styles.deleteButtonText}>Effacer</Text>
+          </TouchableOpacity>
+        )}
+
+       <TouchableOpacity 
+          style={[styles.contactButton, { backgroundColor }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            onPress();
+          }}
+        >
+          <Ionicons name={icon} size={14} color="white" />
+          <Text style={styles.contactButtonText}>
+            {contactMethod === 'phone' ? 'Appeler' : 
+             contactMethod === 'email' ? 'Email' : 'Message'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   </TouchableOpacity>
-);
+  
+  
+  );
+};
+
+const getContactButtonStyle = (contactMethod) => {
+  switch(contactMethod) {
+    case 'email':
+      return {
+        backgroundColor: '#4285F4',
+        icon: 'mail-outline',
+        text: 'Email'
+      };
+    case 'phone':
+      return {
+        backgroundColor: '#34A853',
+        icon: 'call-outline',
+        text: 'Téléphoner'
+      };
+    default:
+      return {
+        backgroundColor: '#836EFE',
+        icon: 'chatbubble-outline',
+        text: 'Message'
+      };
+  }
+};
+
 
 // Optimisations avec memo
 const MemoizedAnnonceCard = React.memo(AnnonceCard);
@@ -243,6 +313,8 @@ const Annonces = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  const [userEmail, setUserEmail] = useState('');
   
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -250,6 +322,21 @@ const Annonces = () => {
     Montserrat_600SemiBold,
     Montserrat_500Medium,
   });
+
+  useEffect(() => {
+  const loadUserEmail = async () => {
+    try {
+      const email = await AsyncStorage.getItem('userEmail');
+      if (email) {
+        setUserEmail(email);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de l\'email:', error);
+    }
+  };
+  
+  loadUserEmail();
+}, []);
   
   // Récupérer l'historique de recherche depuis AsyncStorage au chargement
   useEffect(() => {
@@ -540,6 +627,8 @@ const Annonces = () => {
     <MemoizedAnnonceCard 
       item={item}
       darkMode={darkMode}
+      userEmail={userEmail}
+      inDiscussion={item.inDiscussion} 
       onPress={() => {
         // Store ID in AsyncStorage as a guaranteed method
         AsyncStorage.setItem('currentAnnonceId', item._id.toString())
@@ -553,7 +642,7 @@ const Annonces = () => {
       onDelete={() => handleDeleteAnnonce(item._id)}
     />
   );
-}, [darkMode, handleDeleteAnnonce]);
+}, [darkMode, handleDeleteAnnonce, userEmail]);
   
   // Navigation
   const back = () => {
@@ -1189,5 +1278,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Montserrat_600SemiBold',
     marginLeft: 4,
-  }
+  },
+cardPrice: {
+  fontFamily: 'Montserrat_600SemiBold',
+  fontSize: 14,
+  marginTop: 5,
+  marginBottom: 2,
+},
+cardDuration: {
+  fontFamily: 'Montserrat_500Medium',
+  fontSize: 13,
+  marginBottom: 5,
+},
 });

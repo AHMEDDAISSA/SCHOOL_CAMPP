@@ -12,8 +12,11 @@ const PostSchema = new mongoose.Schema({
     camp: { type: String, required: true },
     published_by: { type: Schema.Types.ObjectId, ref: 'User'},
     images: [{ type: String }],
-    imageUrl: { type: String }
-});
+    imageUrl: { type: String },
+    // Assurez-vous que ces champs sont présents ici
+    price: { type: String },
+    duration: { type: String }
+}, { timestamps: true })
 
 PostSchema.pre('save', function(next) {
     if (this.images && this.images.length > 0) {

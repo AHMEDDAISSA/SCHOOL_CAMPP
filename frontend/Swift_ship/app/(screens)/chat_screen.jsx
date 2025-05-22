@@ -158,12 +158,12 @@ const Chat_screen = () => {
         </View>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconButton}>
+          {/* <TouchableOpacity style={styles.iconButton}>
             <Call />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton} onPress={toggleAdvertDetails}>
+          </TouchableOpacity> */}
+          {/* <TouchableOpacity style={styles.moreButton} onPress={toggleAdvertDetails}>
             <Text style={styles.moreButtonText}>•••</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
       

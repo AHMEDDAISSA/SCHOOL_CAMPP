@@ -158,7 +158,7 @@ export const updateUserStatus = async (userId, status) => {
 };
 // === EMAIL VERIFICATION METHODS ===
 
-// POST: Verify OTP with code
+// POST: Verify OTP with code  
 export const verifyOTP = async (userId, code) => {
   try {
     const response = await api.post('/auth/verify-email', { userId, code });
@@ -386,7 +386,6 @@ export const updateSystemSettings = async (token, settings) => {
 
 
 export const createAnnounce = async (payload) => {
-  
   const categoryMapping = {
     '1': 'Donner',
     '2': 'Prêter',
@@ -407,18 +406,20 @@ export const createAnnounce = async (payload) => {
   formData.append("description", payload.description);
   formData.append("category", categoryName);
   formData.append("camp", payload.camp);
-  formData.append("is_published", payload.is_published || true);
-  formData.append("contact_info", payload.contactPhone);
+  formData.append("is_published", payload.isActive.toString());
+  formData.append("contact_info", payload.contact_info || "");
   formData.append("type", payload.type);
+  formData.append("preferredContact", payload.preferredContact || "app");
+  
+  // Ajouter TOUJOURS le prix et la durée, quel que soit la catégorie
+  formData.append("price", payload.price || "");
+  formData.append("duration", payload.duration || "");
   
   // Ajouter les images
   if (payload.images && payload.images.length > 0) {
     payload.images.forEach((imageUri, index) => {
-      // Extraire le nom du fichier de l'URI
       const uriParts = imageUri.split('/');
       const fileName = uriParts[uriParts.length - 1];
-      
-      // Créer un objet de type fichier
       const fileType = imageUri.includes('.jpeg') ? 'image/jpeg' : 'image/png';
       
       formData.append('images', {
@@ -430,13 +431,17 @@ export const createAnnounce = async (payload) => {
   }
   
   try {
-    // Configurer les en-têtes pour FormData
+    // Afficher le contenu du formData pour déboguer
+    for (let [key, value] of formData._parts) {
+      console.log(`${key}: ${value}`);
+    }
+    
     const response = await api.post('/post/add', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       }
     });
-    console.log('jaweb', response);
+    console.log('Response data:', response);
     return response.data;
   } catch (error) {
     console.error('createAnnounce error:', error.message);

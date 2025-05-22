@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Switch, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Alert } from 'react-native';
-import React, { useContext, useState, useEffect,useRef } from 'react';
+import React, { useContext, useState, useEffect,useRef, useMemo  } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Ajout d'AsyncStorage
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
@@ -19,40 +19,54 @@ const PublierAnnonce = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext); 
   const { addAnnonce } = useContext(AnnonceContext);
   const phoneInput = useRef(null);
-  
+  const [missingFields, setMissingFields] = useState([]);
+
+   const updateMissingFields = (updater) => {
+    if (typeof setMissingFields === 'function') {
+      setMissingFields(updater);
+    } else {
+      console.error('setMissingFields is not a function');
+    }
+  };
+
+  const [countryCode, setCountryCode] = useState('+41'); // Default to Switzerland code, adjust as needed
+
+// Update the handleFormattedPhoneChange function
+
 
   const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFormattedText, containerStyle, textContainerStyle, textInputStyle, codeTextStyle, textInputProps, flagButtonStyle, hasError, theme }) => {
-    return (
-      <PhoneInput
-        defaultValue={defaultValue}
-        defaultCode={defaultCode}
-        layout="first"
-        onChangeText={onChangeText}
-        onChangeFormattedText={onChangeFormattedText}
-        containerStyle={[
-          containerStyle,
-          hasError && [styles.inputError, { borderColor: theme.log }]
-        ]}
-        textContainerStyle={[
-          textContainerStyle,
-          hasError && { backgroundColor: theme.background2 }
-        ]}
-        textInputStyle={textInputStyle}
-        codeTextStyle={codeTextStyle}
-        textInputProps={{
-          ...textInputProps,
-          placeholder: textInputProps.placeholder || 'Votre numéro de téléphone',
-        }}
-        flagButtonStyle={[
-          flagButtonStyle,
-          hasError && { backgroundColor: theme.background2 }
-        ]}
-        withDarkTheme={false}
-        withShadow={false}
-        autoFocus={false}
-      />
-    );
-  };
+  return (
+    <PhoneInput
+      ref={phoneInput}
+      defaultValue={defaultValue}
+      defaultCode={defaultCode}
+      layout="first"
+      onChangeText={onChangeText}
+      onChangeFormattedText={onChangeFormattedText}
+      containerStyle={[
+        containerStyle,
+        hasError && [styles.inputError, { borderColor: theme.log }]
+      ]}
+      textContainerStyle={[
+        textContainerStyle,
+        hasError && { backgroundColor: theme.background2 }
+      ]}
+      textInputStyle={textInputStyle}
+      codeTextStyle={codeTextStyle}
+      textInputProps={{
+        ...textInputProps,
+        placeholder: textInputProps.placeholder || 'Votre numéro de téléphone',
+      }}
+      flagButtonStyle={[
+        flagButtonStyle,
+        hasError && { backgroundColor: theme.background2 }
+      ]}
+      withDarkTheme={false}
+      withShadow={false}
+      autoFocus={false}
+    />
+  );
+};
   // Load fonts
   const [fontsLoaded] = useFonts({
     Montserrat_700Bold,
@@ -86,21 +100,48 @@ const PublierAnnonce = () => {
 
   const handlePhoneChange = (text) => {
     setPhoneNumber(text);
+     if (text && missingFields.includes('numéro de téléphone')) {
+    setMissingFields(prevFields => prevFields.filter(field => field !== 'numéro de téléphone'));
+  }
   };
+const phoneHasError = useMemo(() => {
+  return preferredContact === 'phone' && !phoneNumber && 
+    Array.isArray(missingFields) && missingFields.includes('numéro de téléphone');
+}, [preferredContact, phoneNumber, missingFields]);
   
-  const handleFormattedPhoneChange = (text) => {
-    const countryCode = phoneInput.current?.getCountryCode();
-    if (countryCode) {
-      setCountryCode(`+${countryCode}`);
-    }
-  };
+ const handleFormattedPhoneChange = (text) => {
+  const currentCountryCode = phoneInput.current?.getCountryCode();
+  if (currentCountryCode) {
+    setCountryCode(`+${currentCountryCode}`);
+  }
+};
 
   const handleContactMethodChange = (methodId) => {
-  setPreferredContact(methodId);
-  
-  // Réinitialisez les erreurs de validation liées au téléphone
-  if (methodId === 'phone' && !phoneNumber) {
-    // Assurez-vous que missingFields est bien un tableau avant de modifier
+  // Only update state if the selected method is different
+  if (preferredContact !== methodId) {
+    setPreferredContact(methodId);
+    
+    if (methodId === 'phone' && !phoneNumber) {
+      setMissingFields(prevFields => {
+        const updatedFields = Array.isArray(prevFields) ? [...prevFields] : [];
+        if (!updatedFields.includes('numéro de téléphone')) {
+          updatedFields.push('numéro de téléphone');
+        }
+        return updatedFields;
+      });
+    } else {
+      setMissingFields(prevFields => {
+        if (!Array.isArray(prevFields)) return [];
+        return prevFields.filter(field => field !== 'numéro de téléphone');
+      });
+    }
+  }
+};
+
+// Ajoutez cette validation dans handleSubmit
+useEffect(() => {
+  // This will only run when preferredContact or phoneNumber changes
+  if (preferredContact === 'phone' && !phoneNumber) {
     setMissingFields(prevFields => {
       const updatedFields = Array.isArray(prevFields) ? [...prevFields] : [];
       if (!updatedFields.includes('numéro de téléphone')) {
@@ -108,14 +149,14 @@ const PublierAnnonce = () => {
       }
       return updatedFields;
     });
-  } else {
-    // Retirez l'erreur du téléphone si une autre méthode est sélectionnée
+  } else if (preferredContact === 'phone' && phoneNumber) {
+    // Remove the error when phone number is provided
     setMissingFields(prevFields => {
       if (!Array.isArray(prevFields)) return [];
       return prevFields.filter(field => field !== 'numéro de téléphone');
     });
   }
-};
+}, [preferredContact, phoneNumber]);
 
   const isPhoneRequired = preferredContact === 'phone';
   const hasPhoneError = isPhoneRequired && !phoneNumber && Array.isArray(missingFields) && missingFields.includes('numéro de téléphone');
@@ -126,8 +167,10 @@ const PublierAnnonce = () => {
   const [otpError, setOtpError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Permet de passer la vérification OTP pour test
   
-  // Champs obligatoires
-  const [missingFields, setMissingFields] = useState([]);
+  
+// Change this line:
+
+
   
   // Catégories disponibles
   const categories = [
@@ -344,6 +387,7 @@ const PublierAnnonce = () => {
   if (!camp) missing.push('camp');
   if (images.length === 0) missing.push('photos');
   
+  
   if ((category === '4' || category === '5') && !price) {
     missing.push('prix');
   }
@@ -357,19 +401,20 @@ const PublierAnnonce = () => {
     missing.push('numéro de téléphone');
   }
   
-  setMissingFields(missing);
-  return missing.length === 0;
-};
+   updateMissingFields(missing);
+    return missing.length === 0;
+  };
   
   // Soumission du formulaire
   const handleSubmit = async () => {
     
-    if (preferredContact === 'phone' && !phoneNumber) {
-    setMissingFields(prevFields => {
-      if (!prevFields.includes('numéro de téléphone')) {
-        return [...prevFields, 'numéro de téléphone'];
+     if (preferredContact === 'phone' && !phoneNumber) {
+    updateMissingFields(prevFields => {
+      const fields = Array.isArray(prevFields) ? [...prevFields] : [];
+      if (!fields.includes('numéro de téléphone')) {
+        return [...fields, 'numéro de téléphone'];
       }
-      return prevFields;
+      return fields;
     });
     
     Toast.show({
@@ -407,33 +452,46 @@ const PublierAnnonce = () => {
     setLoading(true);
     
     try {
+
+       let contactInfo = '';
+        if (preferredContact === 'email') {
+            contactInfo = email;
+        } else if (preferredContact === 'phone') {
+            contactInfo = phoneNumber;
+        } else if (preferredContact === 'app') {
+            contactInfo = 'app';
+        }
+
     // Création de l'objet annonce
     const nouvelleAnnonce = {
-      id: Date.now().toString(), // Ajoutez un ID unique
-      title,
-      description,
-      category,
-      type,
-      condition,
-      camp, // Renommez en campType pour être cohérent avec Home.js
-      campType: camp, // Ajout pour la compatibilité avec le filtrage
-      price: category === 'Louer' || category === 'Acheter' ? price : '',
-      duration: category === 'Louer' || category === 'Prêter' ? duration : '',
-      images: images,
-      imageUrl: images.length > 0 ? images[0] : null, // Assurez-vous que imageUrl est défini
-      isActive,
-      date: new Date().toLocaleDateString('fr-FR'), 
-      
-      contactEmail: email,
-      contactPhone: phoneNumber,
-      contactName: userName,
-      showEmail: showEmail,
-      showPhone: showPhone,
-      showName: showName,
-      preferredContact: preferredContact,
-      createdAt: new Date().toISOString()
-    };
-      
+    id: Date.now().toString(), 
+    title,
+    description,
+    category,
+    type,
+    condition,
+    camp,
+    campType: camp,
+    
+    price: price, // Ne pas utiliser de condition ici
+    duration: duration, // Ne pas utiliser de condition ici
+    images: images,
+    imageUrl: images.length > 0 ? images[0] : null,
+    isActive,
+    date: new Date().toLocaleDateString('fr-FR'),
+    
+    contactEmail: email,
+    contactPhone: phoneNumber,
+    contactName: userName,
+    showEmail: showEmail,
+    showPhone: showPhone,
+    showName: showName,
+    preferredContact: preferredContact,
+    showInInbox: preferredContact === 'app',
+    contact_info: contactInfo, 
+    createdAt: new Date().toISOString()
+};
+
       // Ajouter l'annonce via le contexte
       const annonceAjoutee = createAnnounce(nouvelleAnnonce);      
       
@@ -782,45 +840,45 @@ const PublierAnnonce = () => {
         </View>
         
         {/* Afficher champs selon la catégorie sélectionnée */}
-        {(category === '2' || category === '4') && (
-          <View style={styles.formSection}>
-            <Text style={[styles.label, {color: theme.color}]}>
-              Durée disponible
-              {category === '4' && <Text style={styles.requiredStar}>*</Text>}
-            </Text>
-            <TextInput
-              style={[
-                styles.input, 
-                {backgroundColor: theme.cardbg2, color: theme.color},
-                category === '4' && !duration && missingFields.includes('durée') ? styles.inputError : null
-              ]}
-              placeholder="Ex: 1 semaine, 2 mois, etc."
-              placeholderTextColor="#A8A8A8"
-              value={duration}
-              onChangeText={setDuration}
-            />
-          </View>
-        )}
-        
-        {(category === '4' || category === '5') && (
-          <View style={styles.formSection}>
-            <Text style={[styles.label, {color: theme.color}]}>
-              Prix<Text style={styles.requiredStar}>*</Text>
-            </Text>
-            <TextInput
-              style={[
-                styles.input, 
-                {backgroundColor: theme.cardbg2, color: theme.color},
-                !price && missingFields.includes('prix') ? styles.inputError : null
-              ]}
-              placeholder="Ex: 10€, 50€, etc."
-              placeholderTextColor="#A8A8A8"
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="numeric"
-            />
-          </View>
-        )}
+       {(category === '4' || category === '5') && (
+  <View style={styles.formSection}>
+    <Text style={[styles.label, {color: theme.color}]}>
+      Prix<Text style={styles.requiredStar}>*</Text>
+    </Text>
+    <TextInput
+      style={[
+        styles.input, 
+        {backgroundColor: theme.cardbg2, color: theme.color},
+        !price && missingFields.includes('prix') ? styles.inputError : null
+      ]}
+      placeholder="Ex: 10€, 50€, etc."
+      placeholderTextColor="#A8A8A8"
+      value={price}
+      onChangeText={setPrice}
+      keyboardType="numeric"
+    />
+  </View>
+)}
+
+{(category === '2' || category === '4') && (
+  <View style={styles.formSection}>
+    <Text style={[styles.label, {color: theme.color}]}>
+      Durée disponible
+      {category === '4' && <Text style={styles.requiredStar}>*</Text>}
+    </Text>
+    <TextInput
+      style={[
+        styles.input, 
+        {backgroundColor: theme.cardbg2, color: theme.color},
+        category === '4' && !duration && missingFields.includes('durée') ? styles.inputError : null
+      ]}
+      placeholder="Ex: 1 semaine, 2 mois, etc."
+      placeholderTextColor="#A8A8A8"
+      value={duration}
+      onChangeText={setDuration}
+    />
+  </View>
+)}
         
         {/* NOUVELLES SECTIONS */}
         
@@ -869,50 +927,50 @@ const PublierAnnonce = () => {
           {/* Téléphone (facultatif) */}
           
           <View style={styles.contactField}>
-        <View style={styles.contactFieldRow}>
-          <Text style={[styles.label, {color: theme.color}]}>
-            Téléphone {isPhoneRequired ? '' : '(facultatif)'}
-            {isPhoneRequired && <Text style={styles.requiredStar}>*</Text>}
-          </Text>
-          <Switch
-            value={showPhone}
-            onValueChange={setShowPhone}
-            trackColor={{ false: "#767577", true: "#39335E" }}
-          />
-        </View>
+  <View style={styles.contactFieldRow}>
+    <Text style={[styles.label, {color: theme.color}]}>
+      Téléphone {isPhoneRequired ? '' : '(facultatif)'}
+      {isPhoneRequired && <Text style={styles.requiredStar}>*</Text>}
+    </Text>
+    <Switch
+      value={showPhone}
+      onValueChange={setShowPhone}
+      trackColor={{ false: "#767577", true: "#39335E" }}
+    />
+  </View>
         
         {/* Remplacer le TextInput par CustomPhoneInput */}
         <CustomPhoneInput
-            ref={phoneInput}
-            defaultValue={phoneNumber}
-            defaultCode="CH"
-            onChangeText={handlePhoneChange}
-            onChangeFormattedText={handleFormattedPhoneChange}
-            containerStyle={[
-              styles.phoneInputContainer, 
-              {
-                borderColor: theme.bordercolor,
-                backgroundColor: theme.cardbg,
-              },
-             hasPhoneError && styles.phoneInputError,
-           ]}
-          textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: theme.cardbg }]}
-          textInputStyle={[styles.phoneInputText, { color: theme.color }]}
-          codeTextStyle={{ color: theme.color }}
-          textInputProps={{
-            placeholderTextColor: theme.color3 || "#A8A8A8",
-          }}
-          flagButtonStyle={{ backgroundColor: theme.background }}
-          hasError={hasPhoneError}
-          theme={theme}
-        />
-        
-        {hasPhoneError && (
-  <Text style={styles.phoneErrorMessage}>
-    Le numéro de téléphone facultatif est obligatoire pour ce moyen de contact
-  </Text>
-)}
-      </View>
+    ref={phoneInput}
+    defaultValue={phoneNumber}
+    defaultCode="CH"
+    onChangeText={handlePhoneChange}
+    onChangeFormattedText={handleFormattedPhoneChange}
+    containerStyle={[
+      styles.phoneInputContainer, 
+      {
+        borderColor: theme.bordercolor,
+        backgroundColor: theme.cardbg,
+      },
+      phoneHasError && styles.phoneInputError,
+    ]}
+    textContainerStyle={[styles.phoneInputTextContainer, { backgroundColor: theme.cardbg }]}
+    textInputStyle={[styles.phoneInputText, { color: theme.color }]}
+    codeTextStyle={{ color: theme.color }}
+    textInputProps={{
+      placeholderTextColor: theme.color3 || "#A8A8A8",
+    }}
+    flagButtonStyle={{ backgroundColor: theme.background }}
+    hasError={phoneHasError}
+    theme={theme}
+  />
+  
+  {hasPhoneError && (
+    <Text style={styles.phoneErrorMessage}>
+      Le numéro de téléphone est obligatoire pour ce moyen de contact
+    </Text>
+  )}
+</View>
 
           
 
@@ -943,42 +1001,57 @@ const PublierAnnonce = () => {
           </View> */}
           {/* Moyen de communication préféré */}
           <View style={styles.formSection}>
-            <Text style={[styles.label, {color: theme.color, marginBottom: 20}]}>Moyen de communication préféré</Text>
-            <View style={styles.contactMethodsContainer}>
-             {contactMethods.map(method => (
-  <TouchableOpacity 
-    key={method.id}
-    style={[
-      styles.contactMethodButton, 
-      { backgroundColor: darkMode 
-        ? (preferredContact === method.id ? '#5D5FEF' : '#363636') 
-        : (preferredContact === method.id ? '#39335E' : '#F0F0F0') 
-      }
-    ]}
-    onPress={() => handleContactMethodChange(method.id)}
-  >
-    <Ionicons 
-      name={method.icon} 
-      size={20} 
-      color={preferredContact === method.id 
-        ? '#FFFFFF' 
-        : (darkMode ? '#FFFFFF' : '#39335E')
-      } 
-    />
-    <Text 
-      style={[
-        styles.contactMethodText, 
-        {color: preferredContact === method.id 
-          ? '#FFFFFF' 
-          : (darkMode ? '#FFFFFF' : '#39335E')
-        }
-      ]}
-    >
-      {method.name}
-    </Text>
-  </TouchableOpacity>
-))}
-            </View>
+  <Text style={[styles.label, {color: theme.color, marginBottom: 15}]}>
+    Comment souhaitez-vous être contacté(e) ?
+  </Text>
+  <View style={styles.contactMethodsContainer}>
+    {contactMethods.map(method => (
+      <TouchableOpacity 
+        key={method.id}
+        style={[
+          styles.contactMethodButton, 
+          { 
+            backgroundColor: darkMode 
+              ? (preferredContact === method.id ? '#5D5FEF' : '#363636') 
+              : (preferredContact === method.id ? '#39335E' : '#F0F0F0'),
+            // Add a border for the selected method for better visibility
+            borderWidth: preferredContact === method.id ? 2 : 0,
+            borderColor: preferredContact === method.id ? '#FFF' : 'transparent'
+          }
+        ]}
+        onPress={() => handleContactMethodChange(method.id)}
+      >
+        <Ionicons 
+          name={method.icon} 
+          size={24} // Increase icon size for better visibility
+          color={preferredContact === method.id 
+            ? '#FFFFFF' 
+            : (darkMode ? '#FFFFFF' : '#39335E')
+          } 
+        />
+        <Text 
+          style={[
+            styles.contactMethodText, 
+            {
+              color: preferredContact === method.id 
+                ? '#FFFFFF' 
+                : (darkMode ? '#FFFFFF' : '#39335E'),
+              fontSize: 9, // Slightly larger font
+              marginLeft: 8
+            }
+          ]}
+        >
+          {method.name}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+  <Text style={[styles.helpText, {color: darkMode ? '#A0A0A0' : '#777'}]}>
+    {preferredContact === 'email' ? 'Les intéressés vous contacteront par email' : 
+     preferredContact === 'phone' ? 'Les intéressés pourront vous appeler, envoyer un SMS ou utiliser WhatsApp' :
+     'Les intéressés vous contacteront via la messagerie de l\'application'}
+  </Text>
+  
           </View>
         </View>
         
@@ -1431,4 +1504,33 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 10,
   },
+  phoneInputContainer: {
+  width: '100%',
+  height: 50,
+  borderWidth: 1,
+  borderRadius: 8,
+  marginTop: 8,
+},
+phoneInputTextContainer: {
+  borderTopRightRadius: 8,
+  borderBottomRightRadius: 8,
+  paddingVertical: 0,
+},
+phoneInputText: {
+  fontSize: 16,
+  paddingVertical: 0,
+  height: 40,
+},
+phoneInputError: {
+  borderWidth: 2,
+  borderColor: '#EB001B',
+  backgroundColor: 'rgba(235, 0, 27, 0.05)',
+},
+phoneErrorMessage: {
+  color: '#EB001B',
+  fontFamily: 'Montserrat_500Medium',
+  fontSize: 12,
+  marginTop: 5,
+  marginBottom: 10,
+},
 });

@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 
 // Get screen width for responsive designs
 const { width } = Dimensions.get('window');
@@ -30,6 +31,7 @@ export default function AnnonceDetail() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
   
   // Form state variables (for edit mode)
   const [title, setTitle] = useState('');
@@ -56,7 +58,31 @@ export default function AnnonceDetail() {
     { id: '4', name: 'Louer', icon: 'cash-outline' },
     { id: '5', name: 'Acheter', icon: 'cart-outline' },
   ];
-  
+
+   const getContactButtonStyle = (contactMethod) => {
+    switch(contactMethod) {
+      case 'email':
+        return {
+          backgroundColor: '#4285F4',
+          icon: 'mail-outline',
+          text: 'Contacter par Email'
+        };
+      case 'phone':
+        return {
+          backgroundColor: '#34A853',
+          icon: 'call-outline',
+          text: 'Contacter par Téléphone'
+        };
+      default:
+        return {
+          backgroundColor: '#836EFE',
+          icon: 'chatbubble-outline',
+          text: 'Envoyer un Message'
+        };
+    }
+  };
+   const { backgroundColor, icon, text } = getContactButtonStyle(annonce?.preferredContact || 'app');
+
   // Types d'objets
   const itemTypes = [
     "Vêtement hiver", "Équipement ski", "Équipement neige", "Chaussures", "Décoration", "Outil", "Tente", "Autre"
@@ -76,6 +102,45 @@ export default function AnnonceDetail() {
   const campOptions = [
     "Camp De Ski", "Camp Vert"
   ];
+
+  const getContactButtonInfo = (contactMethod) => {
+  switch(contactMethod) {
+    case 'email':
+      return {
+        icon: 'mail-outline',
+        text: 'Email',
+        color: '#4285F4' // Couleur bleue pour email
+      };
+    case 'phone':
+      return {
+        icon: 'call-outline',
+        text: 'Téléphone',
+        color: '#34A853' // Couleur verte pour téléphone
+      };
+    case 'app':
+    default:
+      return {
+        icon: 'chatbubble-outline',
+        text: 'Message',
+        color: '#836EFE' // Couleur violette originale pour message app
+      };
+  }
+};
+
+  useEffect(() => {
+  const getUserEmail = async () => {
+    try {
+      const storedEmail = await AsyncStorage.getItem('userEmail');
+      if (storedEmail) {
+        setUserEmail(storedEmail);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'email:', error);
+    }
+  };
+  
+  getUserEmail();
+}, []);
   
   // Récupérer l'ID de l'annonce depuis les différentes sources possibles
   useEffect(() => {
@@ -255,6 +320,128 @@ export default function AnnonceDetail() {
     });
   };
 
+  const handleContact = (item) => {
+  const contactMethod = item.preferredContact || 'app';
+  
+  switch(contactMethod) {
+    case 'email':
+      // Open email app with pre-filled subject and body
+      const emailSubject = `À propos de votre annonce: ${item.title}`;
+      const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\nEst-ce toujours disponible?\n\nCordialement.`;
+      const emailUrl = `mailto:${item.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      
+      Linking.canOpenURL(emailUrl)
+        .then(supported => {
+          if (supported) {
+            return Linking.openURL(emailUrl);
+          } else {
+            Alert.alert(
+              'Erreur',
+              "Impossible d'ouvrir l'application email",
+              [{ text: 'OK' }]
+            );
+          }
+        })
+        .catch(err => {
+          console.error('Erreur lors de l\'ouverture de l\'email:', err);
+          Alert.alert(
+            'Erreur',
+            "Une erreur est survenue lors de l'ouverture de l'application email",
+            [{ text: 'OK' }]
+          );
+        });
+      break;
+    
+    case 'phone':
+      // Show options: Call, SMS, WhatsApp
+      Alert.alert(
+        'Contacter par téléphone',
+        'Comment souhaitez-vous contacter cette personne?',
+        [
+          {
+            text: 'Appeler',
+            onPress: () => {
+              const phoneUrl = `tel:${item.contactPhone}`;
+              Linking.canOpenURL(phoneUrl)
+                .then(supported => {
+                  if (supported) {
+                    return Linking.openURL(phoneUrl);
+                  } else {
+                    Alert.alert('Erreur', "Impossible d'ouvrir l'application téléphone");
+                  }
+                })
+                .catch(err => {
+                  console.error('Erreur lors de l\'appel:', err);
+                  Alert.alert('Erreur', "Une erreur est survenue");
+                });
+            }
+          },
+          {
+            text: 'SMS',
+            onPress: () => {
+              const smsUrl = `sms:${item.contactPhone}?body=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`)}`;
+              Linking.canOpenURL(smsUrl)
+                .then(supported => {
+                  if (supported) {
+                    return Linking.openURL(smsUrl);
+                  } else {
+                    Alert.alert('Erreur', "Impossible d'envoyer un SMS");
+                  }
+                })
+                .catch(err => {
+                  console.error('Erreur lors de l\'envoi du SMS:', err);
+                  Alert.alert('Erreur', "Une erreur est survenue");
+                });
+            }
+          },
+          {
+            text: 'WhatsApp',
+            onPress: () => {
+              // Format phone number for WhatsApp (remove spaces, add country code if needed)
+              let whatsappNumber = item.contactPhone?.replace(/\s+/g, '') || '';
+              if (whatsappNumber.startsWith('0')) {
+                whatsappNumber = `41${whatsappNumber.substring(1)}`;  // Add Swiss code for example
+              }
+              
+              const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`)}`;
+              
+              Linking.canOpenURL(whatsappUrl)
+                .then(supported => {
+                  if (supported) {
+                    return Linking.openURL(whatsappUrl);
+                  } else {
+                    Alert.alert('Erreur', "WhatsApp n'est pas installé sur votre appareil");
+                  }
+                })
+                .catch(err => {
+                  console.error('Erreur lors de l\'ouverture de WhatsApp:', err);
+                  Alert.alert('Erreur', "Une erreur est survenue");
+                });
+            }
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          }
+        ]
+      );
+      break;
+    
+    case 'app':
+    default:
+      // Navigate to in-app messaging
+      router.push({
+        pathname: '(screens)/chat_screen',
+        params: { 
+          id: Date.now(),  // Generate a unique ID
+          advertId: item.id,
+          name: item.contactName || 'Propriétaire'
+        }
+      });
+      break;
+  }
+};
+
   const handleDeleteAnnonce = useCallback(() => {
     Alert.alert(
       "Confirmation de suppression",
@@ -311,31 +498,40 @@ export default function AnnonceDetail() {
     }
   }, [annonce]);
 
+   const getContactIcon = (contactMethod) => {
+  switch(contactMethod) {
+    case 'email': return 'mail-outline';
+    case 'phone': return 'call-outline';
+    case 'app': 
+    default: return 'chatbubble-outline';
+  }
+};
+
   // Form validation
   const validateForm = () => {
-    const missing = [];
-    
-    if (!title) missing.push('titre');
-    if (!description) missing.push('description');
-    if (!category) missing.push('catégorie');
-    if (!type) missing.push('type d\'objet');
-    if (!camp) missing.push('camp'); 
-    if (!email) missing.push('email');
-    if (images.length === 0) missing.push('photos');
-    
-    // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
-    if ((category === 'Louer' || category === 'Acheter') && !price) {
-      missing.push('prix');
-    }
-    
-    // Vérifier la durée si la catégorie est "Louer" ou "Emprunter"
-    if ((category === 'Louer' || category === 'Emprunter') && !duration) {
-      missing.push('durée');
-    }
-    
-    setMissingFields(missing);
-    return missing.length === 0;
-  };
+  const missing = [];
+  
+  if (!title) missing.push('titre');
+  if (!description) missing.push('description');
+  if (!category) missing.push('catégorie');
+  if (!type) missing.push('type d\'objet');
+  if (!camp) missing.push('camp'); 
+  if (!email) missing.push('email');
+  if (images.length === 0) missing.push('photos');
+  
+  // Vérifier le prix si la catégorie est "Louer" ou "Acheter"
+  if ((category === 'Louer' || category === 'Acheter') && !price) {
+    missing.push('prix');
+  }
+  
+  // Vérifier la durée si la catégorie est "Louer" ou "Emprunter"
+  if ((category === 'Louer' || category === 'Emprunter') && !duration) {
+    missing.push('durée');
+  }
+  
+  setMissingFields(missing);
+  return missing.length === 0;
+};
 
   // Update annonce submission
   const handleSubmit = async () => {
@@ -375,6 +571,8 @@ export default function AnnonceDetail() {
       
       // Récupérer l'ID approprié de l'annonce
       const annonceId = annonce._id || annonce.id;
+      
+     
       
       // Mettre à jour l'annonce via le contexte
       const success = await updateAnnonce(annonceId, updatedAnnonce);
@@ -865,25 +1063,45 @@ export default function AnnonceDetail() {
             {/* Afficher champs selon la catégorie sélectionnée */}
             {/* Ajout de Prêter et Emprunter pour la durée */}
             {(category === 'Louer' || category === 'Prêter' || category === 'Emprunter') && (
-              <View style={styles.formSection}>
-                <Text style={[styles.label, {color: theme.color}]}>
-                  Durée disponible
-                  {(category === 'Louer' || category === 'Emprunter') && <Text style={styles.requiredStar}>*</Text>}
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input, 
-                    {backgroundColor: theme.cardbg2 || '#F5F5F5', color: theme.color},
-                    (category === 'Louer' || category === 'Emprunter') && !duration && missingFields.includes('durée') ? styles.inputError : null
-                  ]}
-                  placeholder="Ex: 1 semaine, 2 mois, etc."
-                  placeholderTextColor="#A8A8A8"
-                  value={duration}
-                  onChangeText={setDuration}
-                />
-              </View>
-            )}
-            
+  <View style={styles.formSection}>
+    <Text style={[styles.label, {color: theme.color}]}>
+      Durée disponible
+      {(category === 'Louer' || category === 'Emprunter') && <Text style={styles.requiredStar}>*</Text>}
+    </Text>
+    <TextInput
+      style={[
+        styles.input, 
+        {backgroundColor: theme.cardbg2 || '#F5F5F5', color: theme.color},
+        (category === 'Louer' || category === 'Emprunter') && !duration && missingFields.includes('durée') ? styles.inputError : null
+      ]}
+      placeholder="Ex: 1 semaine, 2 mois, etc."
+      placeholderTextColor="#A8A8A8"
+      value={duration}
+      onChangeText={setDuration}
+    />
+  </View>
+)}
+
+{/* Prix pour Louer et Acheter */}
+{(category === 'Louer' || category === 'Acheter') && (
+  <View style={styles.formSection}>
+    <Text style={[styles.label, {color: theme.color}]}>
+      Prix<Text style={styles.requiredStar}>*</Text>
+    </Text>
+    <TextInput
+      style={[
+        styles.input, 
+        {backgroundColor: theme.cardbg2 || '#F5F5F5', color: theme.color},
+        !price && missingFields.includes('prix') ? styles.inputError : null
+      ]}
+      placeholder="Ex: 10€, 50€, etc."
+      placeholderTextColor="#A8A8A8"
+      value={price}
+      onChangeText={setPrice}
+      keyboardType="numeric"
+    />
+  </View>
+)}
             {/* Prix pour Louer et Acheter */}
             {(category === 'Louer' || category === 'Acheter') && (
               <View style={styles.formSection}>
@@ -995,64 +1213,65 @@ export default function AnnonceDetail() {
               </View>
 
               <View style={styles.infoContainer}>
-                <View style={styles.infoRow}>
-                  <Ionicons name="pricetag-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                  <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                    Type: {annonce.type}
-                  </Text>
-                </View>
-                
-                {annonce.condition && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="shield-checkmark-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                    <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                      État: {annonce.condition}
-                    </Text>
-                  </View>
-                )}
+  {annonce.condition && (
+    <View style={styles.infoRow}>
+      <Ionicons name="shield-checkmark-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+      <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+        État: {annonce.condition}
+      </Text>
+    </View>
+  )}
 
-                {annonce.camp && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="bonfire-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                    <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                      Camp: {annonce.camp}
-                    </Text>
-                  </View>
-                )}
+  {annonce.camp && (
+    <View style={styles.infoRow}>
+      <Ionicons name="bonfire-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+      <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+        Camp: {annonce.camp}
+      </Text>
+    </View>
+  )}
 
-                {email && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="mail-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                    <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                      Email: {email}
-                    </Text>
-                  </View>
-                )}
-                
-                {(annonce.category === 'Louer' || annonce.category === 'Prêter' || annonce.category === 'Emprunter') && annonce.duration && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="time-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                    <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                      Durée: {annonce.duration}
-                    </Text>
-                  </View>
-                )}
-                {(annonce.category === 'Louer' || annonce.category === 'Acheter') && annonce.price && (
-                   <View style={styles.infoRow}>
-                     <Ionicons name="cash-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                     <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                       Prix: {annonce.price}€
-                     </Text>
-                   </View>
-                  )}
-                
-                <View style={styles.infoRow}>
-                  <Ionicons name="calendar-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
-                  <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                    Publié: {formatDate(annonce.date)}
-                  </Text>
-                </View>
-              </View>
+  {email && (
+    <View style={styles.infoRow}>
+      <Ionicons name="mail-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+      <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+        Email: {email}
+      </Text>
+    </View>
+  )}
+  
+  {/* Display duration for Louer, Prêter, and Emprunter categories */}
+  {(annonce.category === 'Louer' || 
+    annonce.category === 'Prêter' || 
+    annonce.category === 'Emprunter') && 
+    annonce.duration && (
+    <View style={styles.infoRow}>
+      <Ionicons name="time-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+      <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+        Durée: {annonce.duration}
+      </Text>
+    </View>
+  )}
+
+  {/* Display price for Louer and Acheter categories */}
+  {(annonce.category === 'Louer' || 
+    annonce.category === 'Acheter') && 
+    annonce.price && (
+    <View style={styles.infoRow}>
+      <Ionicons name="cash-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+      <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+        Prix: {annonce.price}€
+      </Text>
+    </View>
+  )}
+  
+ <View style={styles.infoRow}>
+  <Ionicons name="calendar-outline" size={18} color={darkMode ? '#AAAAAA' : '#666666'} />
+  <Text style={[styles.infoText, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+    Publié: {formatDate(annonce.date)}
+  </Text>
+</View>
+</View>
 
               <Text style={[styles.descriptionTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>
                 Description
@@ -1063,17 +1282,13 @@ export default function AnnonceDetail() {
             </View>
 
             <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={styles.contactButton}
-                onPress={() => router.push('/inbox')}
-                disabled={isDeleting}
-                accessible={true}
-                accessibilityLabel="Contacter l'annonceur"
-                accessibilityRole="button"
-              >
-                <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.contactButtonText}>Contacter</Text>
-              </TouchableOpacity>
+ <TouchableOpacity
+        style={[styles.contactButton, { backgroundColor }]}
+        onPress={() => handleContact(annonce)}
+      >
+        <Ionicons name={icon} size={20} color="white" />
+        <Text style={styles.contactButtonText}>{text}</Text>
+      </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.editButton}

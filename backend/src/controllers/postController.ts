@@ -7,20 +7,47 @@ import { PostType } from "../types/postTypes";
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export const createPost = async (req: Request<{}, {}, PostType>, res: Response) => {
     try {
-        const { email, title, description, category, published_by,camp,is_published= true,contact_info ,type} = req.body;
+        // Extraire tous les champs, y compris price et duration
+        const { 
+            email, 
+            title, 
+            description, 
+            category, 
+            published_by, 
+            camp, 
+            is_published = true, 
+            contact_info, 
+            type, 
+            price, // Récupérer le prix
+            duration // Récupérer la durée
+        } = req.body;
+        
         const uploadedFiles = req.files as Express.Multer.File[] || [];
         const imageFilenames = uploadedFiles.map((file) => file.filename);
-        const newPost = new Post({ email, title, description, category, published_by,camp,is_published,contact_info,type,images: imageFilenames });
+        
+        // Ajouter les champs dans l'objet à enregistrer
+        const newPost = new Post({ 
+            email, 
+            title, 
+            description, 
+            category, 
+            published_by, 
+            camp,
+            is_published, 
+            contact_info, 
+            type, 
+            images: imageFilenames,
+            price, // Inclure le prix
+            duration // Inclure la durée
+        });
 
-        await newPost.save();
-
-        res.status(201).json(newPost);
-
+        // Enregistrer et retourner le nouveau post
+        const savedPost = await newPost.save();
+        res.status(201).json(savedPost);
     } catch (error) {
+        console.error("Error in createPost:", error);
         res.status(500).json({ message: "Error creating post", error });
-
     }
-
 };
 
 interface TransformedPost {
