@@ -193,30 +193,58 @@ const rejectAnnounce = async (announceId) => {
 };
   
  
-  const deleteAnnonceMeth = async (id) => {
-    
-    
-    console.log("ANNContext",id);
+ const deleteAnnonceMeth = async (id, userEmail) => {
+  console.log("ANNContext - Deleting ID:", id, "User:", userEmail);
   try {
+    const success = await deleteAnnounce(id, userEmail);
     
-    const success = await deleteAnnounce(id);
-    
-    if (success) {
-      const updatedAnnonces = annonces.filter(annonce => annonce.id !== id);
+    if (success && success.success) {
+      // Utiliser _id pour la comparaison
+      const updatedAnnonces = annonces.filter(annonce => 
+        annonce._id !== id && annonce.id !== id
+      );
       
       if (isMounted.current) {
         setAnnonces(updatedAnnonces);
         await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
       }
-      return true;
+      return { success: true, message: success.message };
     }
-    return false;
+    return { success: false, message: success.message || "Erreur lors de la suppression" };
   } catch (error) {
     console.error('Erreur lors de la suppression de l\'annonce:', error);
-    return false;
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Erreur lors de la suppression de l\'annonce' 
+    };
   }
 };
 
+  const updateAnnonceMeth = async (id, updateData, userEmail) => {
+  try {
+    const success = await updateAnnounce(id, updateData, userEmail);
+    
+    if (success && success.success) {
+      // Mettre à jour l'annonce dans le state local
+      const updatedAnnonces = annonces.map(annonce => 
+        (annonce._id === id || annonce.id === id) ? { ...annonce, ...updateData } : annonce
+      );
+      
+      if (isMounted.current) {
+        setAnnonces(updatedAnnonces);
+        await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
+      }
+      return { success: true, message: success.message };
+    }
+    return { success: false, message: success.message || "Erreur lors de la mise à jour" };
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'annonce:', error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Erreur lors de la mise à jour de l\'annonce' 
+    };
+  }
+};
 
   // Mettre à jour une annonce
   const updateAnnonce = async (id, updatedData) => {
@@ -292,7 +320,7 @@ const rejectAnnounce = async (announceId) => {
         addAnnonce,
         deleteAnnonceMeth,
         updateAnnonce,
-        // cleanOldAnnonces,
+        updateAnnonceMeth,
         updateNewStatus,
         refreshAnnonces,
         getAnnonceById

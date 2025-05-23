@@ -12,13 +12,15 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
+import { updateAnnounce } from '../../../services/api';
+
 
 // Get screen width for responsive designs
 const { width } = Dimensions.get('window');
 
 export default function AnnonceDetail() {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
-  const { annonces, deleteAnnonce, updateAnnonce } = useContext(AnnonceContext);
+  const { annonces, deleteAnnonce: deleteAnnonceMeth, updateAnnonce } = useContext(AnnonceContext);
   
   // Utiliser useLocalSearchParams pour récupérer l'ID depuis l'URL
   const params = useLocalSearchParams();
@@ -48,7 +50,7 @@ export default function AnnonceDetail() {
 
   // ID state to store the valid ID from different sources
   const [id, setId] = useState(null);
-  
+  const [isOwner, setIsOwner] = useState(false);
   // Catégories disponibles
   const categories = [
     { id: '1', name: 'Donner', icon: 'gift-outline' },
@@ -126,6 +128,13 @@ export default function AnnonceDetail() {
       };
   }
 };
+useEffect(() => {
+    if (annonce && userEmail) {
+      const ownershipStatus = userEmail === annonce.email;
+      setIsOwner(ownershipStatus);
+      console.log("Ownership check:", { userEmail, annonceEmail: annonce.email, isOwner: ownershipStatus });
+    }
+  }, [annonce, userEmail]);
 
   useEffect(() => {
   const getUserEmail = async () => {
@@ -454,26 +463,31 @@ export default function AnnonceDetail() {
           onPress: async () => {
             setIsDeleting(true);
             try {
-              // Utiliser la bonne propriété ID selon l'annonce
               const annonceId = annonce._id || annonce.id;
-              const success = await deleteAnnonce(annonceId);
+              const result = await deleteAnnonceMeth(annonceId, userEmail);
               
-              if (success) {
+              if (result.success) {
                 Toast.show({
                   type: 'success',
-                  text1: 'Annonce supprimée avec succès',
-                  visibilityTime: 2000,
+                  text1: result.message || 'Annonce supprimée avec succès',
+                  visibilityTime: 3000,
                 });
                 router.back();
               } else {
-                throw new Error("Échec de la suppression");
+                Toast.show({
+                  type: 'error',
+                  text1: 'Erreur',
+                  text2: result.message || 'Impossible de supprimer cette annonce',
+                  visibilityTime: 3000,
+                });
               }
             } catch (error) {
               console.error("Erreur lors de la suppression:", error);
               Toast.show({
                 type: 'error',
-                text1: 'Erreur lors de la suppression',
-                visibilityTime: 2000,
+                text1: 'Erreur',
+                text2: 'Une erreur inattendue s\'est produite',
+                visibilityTime: 3000,
               });
             } finally {
               setIsDeleting(false);
@@ -482,7 +496,7 @@ export default function AnnonceDetail() {
         }
       ]
     );
-  }, [annonce, deleteAnnonce]);
+  }, [annonce, deleteAnnonceMeth, userEmail]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -535,7 +549,6 @@ export default function AnnonceDetail() {
 
   // Update annonce submission
   const handleSubmit = async () => {
-    // Validation
     if (!validateForm()) {
       Toast.show({
         type: 'error',
@@ -550,9 +563,9 @@ export default function AnnonceDetail() {
     setIsSubmitting(true);
     
     try {
-      // Créer l'objet annonce mis à jour
-      const updatedAnnonce = {
-        ...annonce,
+      const annonceId = annonce._id || annonce.id;
+      
+      const updatedData = {
         title,
         description,
         category,
@@ -563,43 +576,36 @@ export default function AnnonceDetail() {
         images,
         camp,
         email,
-        contact: annonce.contact ? {
-          ...annonce.contact,
-          email: email
-        } : { email: email }
       };
       
-      // Récupérer l'ID approprié de l'annonce
-      const annonceId = annonce._id || annonce.id;
+      const result = await updateAnnonceMeth(annonceId, updatedData, userEmail);
       
-     
-      
-      // Mettre à jour l'annonce via le contexte
-      const success = await updateAnnonce(annonceId, updatedAnnonce);
-      
-      if (success) {
-        // Mettre à jour l'état local
-        setAnnonce(updatedAnnonce);
-        
-        // Fermer le mode édition
+      if (result.success) {
         setIsEditMode(false);
-        
         Toast.show({
           type: 'success',
-          text1: 'Annonce mise à jour !',
-          text2: 'Votre annonce a été mise à jour avec succès.',
+          text1: result.message || 'Annonce mise à jour avec succès',
           position: 'bottom',
           visibilityTime: 3000
         });
+        
+        // Recharger les données
+        await refreshAnnonces();
       } else {
-        throw new Error("Échec de la mise à jour");
+        Toast.show({
+          type: 'error',
+          text1: 'Erreur',
+          text2: result.message || 'Impossible de mettre à jour cette annonce',
+          position: 'bottom',
+          visibilityTime: 3000
+        });
       }
     } catch (error) {
       console.error("Erreur lors de la mise à jour de l'annonce:", error);
       Toast.show({
         type: 'error',
         text1: 'Erreur',
-        text2: 'Une erreur est survenue lors de la mise à jour.',
+        text2: 'Une erreur inattendue s\'est produite',
         position: 'bottom',
         visibilityTime: 3000
       });
@@ -1282,44 +1288,61 @@ export default function AnnonceDetail() {
             </View>
 
             <View style={styles.actionButtons}>
- <TouchableOpacity
-        style={[styles.contactButton, { backgroundColor }]}
-        onPress={() => handleContact(annonce)}
-      >
-        <Ionicons name={icon} size={20} color="white" />
-        <Text style={styles.contactButtonText}>{text}</Text>
-      </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={toggleEditMode}
-                disabled={isDeleting}
-                accessible={true}
-                accessibilityLabel="Modifier l'annonce"
-                accessibilityRole="button"
-              >
-                <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.editButtonText}>Modifier</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.deleteButton, { opacity: isDeleting ? 0.5 : 1 }]}
-                onPress={handleDeleteAnnonce}
-                disabled={isDeleting}
-                accessible={true}
-                accessibilityLabel="Supprimer l'annonce"
-                accessibilityRole="button"
-              >
-                {isDeleting ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.deleteButtonText}>Supprimer</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+        {/* Bouton de contact - visible seulement si ce n'est pas le propriétaire */}
+        {!isOwner && (
+          <TouchableOpacity
+            style={[styles.contactButton, { backgroundColor }]}
+            onPress={() => handleContact(annonce)}
+          >
+            <Ionicons name={icon} size={20} color="white" />
+            <Text style={styles.contactButtonText}>{text}</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Boutons Modifier/Supprimer - visibles seulement pour le propriétaire */}
+        {isOwner && (
+          <>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={toggleEditMode}
+              disabled={isDeleting}
+              accessible={true}
+              accessibilityLabel="Modifier l'annonce"
+              accessibilityRole="button"
+            >
+              <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.editButtonText}>Modifier</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.deleteButton, { opacity: isDeleting ? 0.5 : 1 }]}
+              onPress={handleDeleteAnnonce}
+              disabled={isDeleting}
+              accessible={true}
+              accessibilityLabel="Supprimer l'annonce"
+              accessibilityRole="button"
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.deleteButtonText}>Supprimer</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+      
+      {/* Message informatif si l'utilisateur n'est pas propriétaire */}
+      {!isOwner && isEditMode && (
+        <View style={styles.notOwnerMessage}>
+          <Text style={[styles.notOwnerText, { color: theme.color }]}>
+            Vous ne pouvez pas modifier cette annonce car vous n'en êtes pas le propriétaire.
+          </Text>
+        </View>
+      )}
           </ScrollView>
         )}
       </KeyboardAvoidingView>
@@ -1725,5 +1748,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Montserrat_600SemiBold',
     marginLeft: 10,
+  },
+   notOwnerMessage: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFE69C',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 15,
+    margin: 20,
+    marginTop: 0,
+  },
+  notOwnerText: {
+    textAlign: 'center',
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 14,
+    color: '#856404',
   },
 });

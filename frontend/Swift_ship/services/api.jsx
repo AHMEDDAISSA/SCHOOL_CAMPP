@@ -450,62 +450,6 @@ export const createAnnounce = async (payload) => {
 };
 
 
-
-// export const getPosts = async (params = {}) => {
-//   try {
-    
-//     const queryParams = new URLSearchParams();
-    
-//     if (params.search) queryParams.append('search', params.search);
-//     if (params.category) queryParams.append('category', params.category);
-//     if (params.camp) queryParams.append('camp', params.camp);
-//     if (params.page) queryParams.append('page', params.page);
-//     if (params.limit) queryParams.append('limit', params.limit);
-    
-//     const queryString = queryParams.toString();
-//     const url = queryString ? `/post/get?${queryString}` : '/post/get';
-    
-//     const response = await api.get(url);
-//     // console.log('getPosts response:', response);
-//     return response;
-//   } catch (error) {
-//     console.error('getPosts error:', error.message);
-//     throw error;
-//   }
-// };
-
-// export const deletePost = async (id) => {
-//   try {
-    
-//     const token = await AsyncStorage.getItem('authToken');
-    
-//     const response = await api.delete(`/post/delete/`, {
-//       headers: {
-//         Authorization: token ? `Bearer ${token}` : '',
-//       }
-//     });
-    
-//     console.log('deletePost response:', response);
-//     return response.data;
-//   } catch (error) {
-//     console.error('deletePost error:', error.message);
-//     throw error;
-//   }
-// };
-
-// export const deleteAnnounce = async (postId) => {
-//   console.log(postId)
-//   try {
-    
-//     const response = await axios.delete(`http://192.168.168.65:3001/post/delete/${postId}`);
-//     console.log('deletePost response:', response);
-//     return response.data;
-//   } catch (error) {
-//     console.error('deleteAnnounce error:', error.message);
-//     throw error;
-//   }
-// };
-
 export const getPosts = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams();
@@ -528,18 +472,64 @@ export const getPosts = async (params = {}) => {
   }
 };
 
-// For deleteAnnounce - using the proper DELETE endpoint
-export const deleteAnnounce = async (postId) => {
-  console.log("api",postId);
+export const updateAnnounce = async (postId, updateData, userEmail) => {
+  console.log("Updating post with ID:", postId, "Data:", updateData);
   try {
-    // Use the configured api instance, not direct axios
-    const response = await api.delete(`/post/delete/${postId}`);
+    const formData = new FormData();
+    
+    // Ajouter l'email de l'utilisateur pour vérification
+    formData.append('email', userEmail);
+    
+    // Ajouter les données textuelles
+    Object.keys(updateData).forEach(key => {
+      if (key === 'images') {
+        // Traiter les images
+        if (updateData.images && updateData.images.length > 0) {
+          updateData.images.forEach((imageUri) => {
+            // Vérifier si c'est une nouvelle image (locale) ou existante (URL)
+            if (imageUri.startsWith('file://') || imageUri.startsWith('content://')) {
+              const uriParts = imageUri.split('/');
+              const fileName = uriParts[uriParts.length - 1];
+              const fileType = imageUri.includes('.jpeg') ? 'image/jpeg' : 'image/png';
+              
+              formData.append('images', {
+                uri: imageUri,
+                name: fileName,
+                type: fileType
+              });
+            }
+          });
+        }
+      } else if (updateData[key] !== undefined && updateData[key] !== null) {
+        formData.append(key, updateData[key].toString());
+      }
+    });
+
+    const response = await api.put(`/post/update/${postId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    
+    console.log('updateAnnounce response:', response);
+    return response;
+  } catch (error) {
+    console.error('updateAnnounce error:', error.message);
+    throw error;
+  }
+};
+
+// CORRECTION pour deleteAnnounce - déjà correct
+export const deleteAnnounce = async (postId, userEmail) => {
+  console.log("Deleting post with ID:", postId);
+  try {
+    const response = await api.delete(`/post/delete/${postId}?email=${encodeURIComponent(userEmail)}`);
+    console.log('deleteAnnounce response:', response);
     return response;
   } catch (error) {
     console.error('deleteAnnounce error:', error.message);
     throw error;
   }
 };
-
 
 export default api;

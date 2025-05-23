@@ -81,7 +81,7 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussio
   const contactMethod = item.preferredContact || 'app';
   const { backgroundColor, icon , text} = getContactStyle(contactMethod);
   
-   return (
+  return (
     <TouchableOpacity 
       style={[
         styles.announceCard,
@@ -151,13 +151,13 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussio
     Durée: {item.duration}
   </Text>
 )}
-       <View style={styles.cardFooter}>
+        <View style={styles.cardFooter}>
         <Text style={[styles.cardDate, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
           {formatDate(item.date)}
         </Text>
         
-        {/* Bouton de suppression avec stopPropagation */}
-      {isOwner && (
+        {/* CORRECTION: Affichage conditionnel du bouton de suppression */}
+        {isOwner && (
           <TouchableOpacity 
             style={styles.deleteButton} 
             onPress={(e) => {
@@ -170,19 +170,22 @@ const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussio
           </TouchableOpacity>
         )}
 
-       <TouchableOpacity 
-          style={[styles.contactButton, { backgroundColor }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onPress();
-          }}
-        >
-          <Ionicons name={icon} size={14} color="white" />
-          <Text style={styles.contactButtonText}>
-            {contactMethod === 'phone' ? 'Appeler' : 
-             contactMethod === 'email' ? 'Email' : 'Message'}
-          </Text>
+        {/* CORRECTION: Ne montrer le bouton de contact que si ce n'est pas le propriétaire */}
+        {!isOwner && (
+          <TouchableOpacity 
+            style={[styles.contactButton, { backgroundColor }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              onPress();
+            }}
+          >
+            <Ionicons name={icon} size={14} color="white" />
+            <Text style={styles.contactButtonText}>
+              {contactMethod === 'phone' ? 'Appeler' : 
+               contactMethod === 'email' ? 'Email' : 'Message'}
+            </Text>
         </TouchableOpacity>
+        )}
       </View>
     </View>
   </TouchableOpacity>
@@ -543,58 +546,54 @@ const Annonces = () => {
   
   // Fonction pour confirmer et gérer la suppression
   const handleDeleteAnnonce = useCallback((id) => {
-    Alert.alert(
-      "Confirmation de suppression",
-      "Êtes-vous sûr de vouloir supprimer cette annonce ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              // Afficher un indicateur de chargement pendant la suppression
-              setLoading(true);
-              console.log("card", id);
-              
-              // Appeler la fonction de suppression du contexte
-              const success = await deleteAnnonceMeth(id);
-              
-              // Afficher un message de succès ou d'erreur
-              if (success) {
-                Toast.show({
-                  type: 'success',
-                  text1: 'Annonce supprimée avec succès',
-                  visibilityTime: 2000,
-                });
-              } else {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Erreur lors de la suppression',
-                  text2: 'Veuillez réessayer',
-                  visibilityTime: 2000,
-                });
-              }
-            } catch (error) {
-              console.error('Erreur lors de la suppression:', error);
+  Alert.alert(
+    "Confirmation de suppression",
+    "Êtes-vous sûr de vouloir supprimer cette annonce ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setLoading(true);
+            console.log("Frontend - Deleting ID:", id);
+            
+            const result = await deleteAnnonceMeth(id, userEmail);
+            
+            if (result.success) {
+              Toast.show({
+                type: 'success',
+                text1: result.message || 'Annonce supprimée avec succès',
+                visibilityTime: 3000,
+              });
+            } else {
               Toast.show({
                 type: 'error',
-                text1: 'Erreur lors de la suppression',
-                text2: 'Veuillez réessayer',
-                visibilityTime: 2000,
+                text1: 'Erreur',
+                text2: result.message || 'Impossible de supprimer cette annonce',
+                visibilityTime: 3000,
               });
-            } finally {
-              setLoading(false);
             }
+          } catch (error) {
+            console.error('Erreur lors de la suppression:', error);
+            Toast.show({
+              type: 'error',
+              text1: 'Erreur',
+              text2: 'Une erreur inattendue s\'est produite',
+              visibilityTime: 3000,
+            });
+          } finally {
+            setLoading(false);
           }
         }
-      ]
-    );
-  }, [deleteAnnonceMeth]);
+      }
+    ]
+  );
+}, [deleteAnnonceMeth, userEmail]);
   
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
