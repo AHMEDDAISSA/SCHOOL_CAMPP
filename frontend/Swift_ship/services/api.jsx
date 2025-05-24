@@ -457,15 +457,23 @@ export const getPosts = async (params = {}) => {
     if (params.search) queryParams.append('search', params.search);
     if (params.category) queryParams.append('category', params.category);
     if (params.camp) queryParams.append('camp', params.camp);
-    // if (params.page) queryParams.append('page', params.page);
-    // if (params.limit) queryParams.append('limit', params.limit);
     
     const queryString = queryParams.toString();
     const url = queryString ? `/post/get?${queryString}` : '/post/get';
     
+    console.log("Requête API vers:", url);
     const response = await api.get(url);
-    // Important: Return response.data (the actual data from the API)    
-    return response;
+    
+    // CORRECTION: Vérifiez la structure exacte de la réponse
+    console.log("Structure de la réponse:", Object.keys(response));
+    
+    // Si vous utilisez axios, la propriété data contient la réponse du serveur
+    // Si vous avez déjà modifié la réponse dans un intercepteur, ajustez en conséquence
+    if (response.data) {
+      return response.data; // Retourner les données, pas l'objet de réponse complet
+    }
+    
+    return response; // Si votre interceptor a déjà extrait les données
   } catch (error) {
     console.error('getPosts error:', error.message);
     throw error;

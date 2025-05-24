@@ -13,10 +13,27 @@ const PostSchema = new mongoose.Schema({
     published_by: { type: Schema.Types.ObjectId, ref: 'User'},
     images: [{ type: String }],
     imageUrl: { type: String },
-    // Assurez-vous que ces champs sont présents ici
     price: { type: String },
-    duration: { type: String }
+    duration: { type: String },
+    preferredContact: { 
+        type: String, 
+        enum: ['email', 'phone', 'app'], 
+        default: 'email' 
+    },
+    contactEmail: { type: String },
+    contactPhone: { type: String },
+    contactName: { type: String },
+    
+    
+    contactStatus: {
+    type: String,
+    enum: ['available', 'in_contact', 'reserved', 'sold'],
+    default: 'available'
+},
+activeContacts: [{ type: Schema.Types.ObjectId, ref: 'Contact' }]
 }, { timestamps: true })
+
+
 
 PostSchema.pre('save', function(next) {
     if (this.images && this.images.length > 0) {

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform, Alert, TextInput} from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, FlatList, ActivityIndicator, RefreshControl, SafeAreaView, Dimensions, Platform, Alert, TextInput } from 'react-native';
 import React, { useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
@@ -13,6 +13,7 @@ import AnnonceContext from '../../contexts/AnnonceContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { debounce } from 'lodash'; 
+import * as Linking from 'expo-linking';
 
 // Screen dimensions for responsive layouts
 const { width } = Dimensions.get('window');
@@ -75,124 +76,238 @@ const CategoryButton = ({ category, isActive, darkMode, onPress }) => (
       return { backgroundColor: '#39335E', icon: 'chatbubble-outline', text: 'Message' };
   }
 };
-const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussion }) => {
+const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussion , onInitiateContact }) => {
   // Déterminer si l'utilisateur actuel est le propriétaire de l'annonce
   const isOwner = userEmail === item.email;
-  const contactMethod = item.preferredContact || 'app';
-  const { backgroundColor, icon , text} = getContactStyle(contactMethod);
+    const isInContact = item.contactStatus === 'in_contact';
+const isUnavailable = item.contactStatus && ['reserved', 'sold'].includes(item.contactStatus);
+   const cardStyle = {
+    opacity: isInContact || isUnavailable ? 0.6 : 1.0,
+    backgroundColor: darkMode ? '#363636' : '#F9F9F9'
+  };
+  const contactEmail = item.contactEmail || item.email || '';
+  
+    
+    const getContactButtonInfo = () => {
+        const method = item.preferredContact || 'email';
+        switch(method) {
+            case 'email':
+                return {
+                    icon: 'mail-outline',
+                    text: 'Email',
+                    color: '#4285F4'
+                };
+            case 'phone':
+                return {
+                    icon: 'call-outline', 
+                    text: 'Appeler',
+                    color: '#34A853'
+                };
+            case 'app':
+            default:
+                return {
+                    icon: 'chatbubble-outline',
+                    text: 'Message',
+                    color: '#836EFE'
+                };
+        }
+    };
+    
+    const handleContact = async () => {
+        if (isOwner) return;
+        
+        const contactMethod = item.preferredContact || 'email';
+        
+        try {
+            // Initier le contact en base de données
+            await onInitiateContact(item._id, userEmail, contactMethod);
+            
+            // Exécuter l'action de contact selon la méthode
+            switch(contactMethod) {
+                case 'email':
+                    const emailSubject = `À propos de votre annonce: ${item.title}`;
+                    const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\n\nCordialement.`;
+                    const emailUrl = `mailto:${item.contactEmail || item.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                    
+                    const supported = await Linking.canOpenURL(emailUrl);
+                    if (supported) {
+                        await Linking.openURL(emailUrl);
+                    } else {
+                        Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
+                    }
+                    break;
+                    
+                case 'phone':
+                    showPhoneOptions(item);
+                    break;
+                    
+                case 'app':
+                default:
+                    // Navigation vers la messagerie interne
+                    onPress();
+                    break;
+            }
+        } catch (error) {
+            console.error('Erreur lors du contact:', error);
+            Alert.alert('Erreur', 'Impossible d\'initier le contact');
+        }
+    };
+    
+    const showPhoneOptions = (item) => {
+        Alert.alert(
+            'Contacter par téléphone',
+            'Comment souhaitez-vous contacter cette personne?',
+            [
+                {
+                    text: 'Appeler',
+                    onPress: () => Linking.openURL(`tel:${item.contactPhone}`)
+                },
+                {
+                    text: 'SMS',
+                    onPress: () => {
+                        const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}".`;
+                        Linking.openURL(`sms:${item.contactPhone}?body=${encodeURIComponent(message)}`);
+                    }
+                },
+                {
+                    text: 'WhatsApp',
+                    onPress: () => {
+                        const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}".`;
+                        const whatsappUrl = `whatsapp://send?phone=${item.contactPhone}&text=${encodeURIComponent(message)}`;
+                        Linking.openURL(whatsappUrl);
+                    }
+                },
+                { text: 'Annuler', style: 'cancel' }
+            ]
+        );
+    };
+    
+    const { icon, text, color } = getContactButtonInfo();
   
   return (
-    <TouchableOpacity 
-      style={[
-        styles.announceCard,
-        { backgroundColor: darkMode ? '#363636' : '#F9F9F9' }
-      ]}
-      onPress={onPress}
-    >
-    <View style={[
-      styles.cardImageContainer,
-      { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }
-    ]}>
-      {(item.imageUrl || (item.images && item.images.length > 0)) ? (
-        <Image 
-          source={{ uri: item.imageUrl || item.images[0] }} 
-          style={styles.cardImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.placeholderImageContainer}>
-          <Ionicons 
-            name={getCategoryIcon(item.category)} 
-            size={30} 
-            color={darkMode ? '#666666' : '#CCCCCC'} 
-          />
-        </View>
-      )}
-      <View style={[
-        styles.categoryBadgeContainer, 
-        {backgroundColor: getCategoryColor(item.category)}
-      ]}>
-        <Text style={styles.categoryBadge}>{item.category}</Text>
-      </View>
-    </View>
     
-    <View style={styles.cardContent}>
-      <Text style={[
-        styles.cardTitle, 
-        { color: darkMode ? '#FFFFFF' : '#39335E' }
-      ]} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <Text style={[
-        styles.cardType, 
-        { color: darkMode ? '#AAAAAA' : '#666666' }
-      ]}>
-        {item.type}
-      </Text>
-      {(item.category === 'Acheter' || item.category === 'Louer' || 
-  item.category === '4' || item.category === '5') && 
-  item.price && (
-  <Text style={[
-    styles.cardPrice, 
-    { color: darkMode ? '#FFFFFF' : '#EB001B' }
-  ]}>
-    Prix: {item.price}€
-  </Text>
-)}
-      
-      {/* Affichage de la durée pour les catégories Louer et Prêter */}
-      {(item.category === 'Louer' || item.category === 'Prêter' || 
-  item.category === '2' || item.category === '4') && 
-  item.duration && (
-  <Text style={[
-    styles.cardDuration, 
-    { color: darkMode ? '#AAAAAA' : '#666666' }
-  ]}>
-    Durée: {item.duration}
-  </Text>
-)}
-        <View style={styles.cardFooter}>
-        <Text style={[styles.cardDate, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-          {formatDate(item.date)}
-        </Text>
-        
-        {/* CORRECTION: Affichage conditionnel du bouton de suppression */}
-        {isOwner && (
-          <TouchableOpacity 
-            style={styles.deleteButton} 
-            onPress={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Ionicons name="trash-outline" size={14} color="white" />
-            <Text style={styles.deleteButtonText}>Effacer</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* CORRECTION: Ne montrer le bouton de contact que si ce n'est pas le propriétaire */}
-        {!isOwner && (
-          <TouchableOpacity 
-            style={[styles.contactButton, { backgroundColor }]}
-            onPress={(e) => {
-              e.stopPropagation();
-              onPress();
-            }}
-          >
-            <Ionicons name={icon} size={14} color="white" />
-            <Text style={styles.contactButtonText}>
-              {contactMethod === 'phone' ? 'Appeler' : 
-               contactMethod === 'email' ? 'Email' : 'Message'}
-            </Text>
+    <TouchableOpacity 
+            style={[styles.announceCard, cardStyle]}
+            onPress={onPress}
+        >
+            <View style={[styles.cardImageContainer, { backgroundColor: darkMode ? '#444444' : '#E0E0E0' }]}>
+                {(item.imageUrl || (item.images && item.images.length > 0)) ? (
+                    <Image 
+                        source={{ uri: item.imageUrl || item.images[0] }} 
+                        style={styles.cardImage}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={styles.placeholderImageContainer}>
+                        <Ionicons 
+                            name="document-outline" 
+                            size={30} 
+                            color={darkMode ? '#666666' : '#CCCCCC'} 
+                        />
+                    </View>
+                )}
+                
+                {/* Badge de statut */}
+                <View style={[styles.statusBadge, getStatusBadgeStyle(item.contactStatus)]}>
+                    <Text style={styles.statusBadgeText}>
+                        {getStatusText(item.contactStatus)}
+                    </Text>
+                </View>
+            </View>
+            
+            <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: darkMode ? '#FFFFFF' : '#39335E' }]} numberOfLines={2}>
+                    {item.title}
+                </Text>
+                <Text style={[styles.cardType, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                    {item.type}
+                </Text>
+                
+                {/* Prix et durée */}
+                {item.price && (
+                    <Text style={[styles.cardPrice, { color: darkMode ? '#FFFFFF' : '#EB001B' }]}>
+                        Prix: {item.price}€
+                    </Text>
+                )}
+                
+                {item.duration && (
+                    <Text style={[styles.cardDuration, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                        Durée: {item.duration}
+                    </Text>
+                )}
+                
+                <View style={styles.cardFooter}>
+                    <Text style={[styles.cardDate, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+                        {formatDate(item.date)}
+                    </Text>
+                    
+                    {/* Bouton de suppression pour le propriétaire */}
+                    {isOwner && (
+                        <TouchableOpacity 
+                            style={styles.deleteButton} 
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                onDelete();
+                            }}
+                        >
+                            <Ionicons name="trash-outline" size={14} color="white" />
+                            <Text style={styles.deleteButtonText}>Effacer</Text>
+                        </TouchableOpacity>
+                    )}
+                    
+                    {/* Bouton de contact pour les non-propriétaires */}
+                    {!isOwner && (
+                        <TouchableOpacity 
+                            style={[
+                                styles.contactButton, 
+                                { backgroundColor: color },
+                                (isInContact || isUnavailable) && styles.contactButtonDisabled
+                            ]}
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                handleContact();
+                            }}
+                            disabled={isUnavailable}
+                        >
+                            <Ionicons name={icon} size={14} color="white" />
+                            <Text style={styles.contactButtonText}>
+                                {isInContact ? 'En contact' : 
+                                 isUnavailable ? 'Non disponible' : text}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
         </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  </TouchableOpacity>
-  
-  
-  );
+    );
 };
+const getStatusBadgeStyle = (status) => {
+    switch(status) {
+        case 'in_contact':
+            return { backgroundColor: '#FF9800' };
+        case 'reserved':
+            return { backgroundColor: '#9C27B0' };
+        case 'sold':
+            return { backgroundColor: '#F44336' };
+        default:
+            return { backgroundColor: '#4CAF50' };
+    }
+};
+
+const getStatusText = (status) => {
+    switch(status) {
+        case 'in_contact':
+            return 'En contact';
+        case 'reserved':
+            return 'Réservé';
+        case 'sold':
+            return 'Vendu';
+        default:
+            return 'Disponible';
+    }
+};
+
+
 
 const getContactButtonStyle = (contactMethod) => {
   switch(contactMethod) {
@@ -356,6 +471,40 @@ const Annonces = () => {
     
     loadSearchHistory();
   }, []);
+
+  const handleInitiateContact = useCallback(async (postId, buyerEmail, contactMethod) => {
+  try {
+    const response = await fetch('/api/contacts/initiate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        postId,
+        buyerEmail,
+        contactMethod
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      // Rafraîchir la liste des annonces
+      await refreshAnnonces();
+      Toast.show({
+        type: 'success',
+        text1: 'Contact initié',
+        text2: 'Vous pouvez maintenant contacter le vendeur'
+      });
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Erreur:', error);
+    throw error;
+  }
+}, [refreshAnnonces]); 
+
 
   // Fonction pour sauvegarder une recherche dans l'historique
   const saveSearchToHistory = async (term) => {
@@ -597,11 +746,20 @@ const Annonces = () => {
   
   // Filter annonces based on category and search
   const filteredAnnonces = useMemo(() => {
-    if (!annonces || !Array.isArray(annonces)) return [];
+  if (!annonces || !Array.isArray(annonces)) {
+    console.log("Aucune annonce à filtrer ou format invalide");
+    return [];
+  }
     
     return annonces.filter(item => {
       // Vérifier que item est un objet valide
-      if (!item) return false;
+       if (!item) {
+      console.log("Élément d'annonce invalide détecté");
+      return false;
+    }
+    if (annonces.indexOf(item) < 3) {
+      console.log("Exemple d'annonce:", JSON.stringify(item, null, 2));
+    }
       
       const matchesCategory = activeFilter === '0' || 
         item.category === categories.find(cat => cat.id === activeFilter)?.name;
@@ -622,26 +780,25 @@ const Annonces = () => {
   const keyExtractor = useCallback((item) => item.id?.toString() || Math.random().toString(), []);
   
  const renderItem = useCallback(({ item }) => {
+  console.log("Rendu de l'annonce:", item._id || item.id);
   return (
     <MemoizedAnnonceCard 
       item={item}
       darkMode={darkMode}
       userEmail={userEmail}
-      inDiscussion={item.inDiscussion} 
+      inDiscussion={item.inDiscussion}
+      onInitiateContact={handleInitiateContact}
       onPress={() => {
-        // Store ID in AsyncStorage as a guaranteed method
-        AsyncStorage.setItem('currentAnnonceId', item._id.toString())
-          .then(() => {
-            console.log("Navigating to annonce with ID:", item._id);
-            // Use the simpler navigation approach
-            router.push(`/annonce/${item._id}`);
-          })
+        const annonceId = item._id || item.id;
+        console.log("Navigation vers annonce avec ID:", annonceId);
+        AsyncStorage.setItem('currentAnnonceId', annonceId.toString())
+          .then(() => router.push(`/annonce/${annonceId}`))
           .catch(err => console.error("Error storing ID:", err));
       }}
-      onDelete={() => handleDeleteAnnonce(item._id)}
+      onDelete={() => handleDeleteAnnonce(item._id || item.id)}
     />
   );
-}, [darkMode, handleDeleteAnnonce, userEmail]);
+}, [darkMode, handleDeleteAnnonce, userEmail, handleInitiateContact]);
   
   // Navigation
   const back = () => {
@@ -1289,4 +1446,20 @@ cardDuration: {
   fontSize: 13,
   marginBottom: 5,
 },
+statusBadge: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    statusBadgeText: {
+        color: 'white',
+        fontSize: 10,
+        fontFamily: 'Montserrat_600SemiBold',
+    },
+    contactButtonDisabled: {
+        opacity: 0.7,
+    }
 });

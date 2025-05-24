@@ -29,9 +29,12 @@ const Home = () => {
       
     const recentAnnounces = useMemo(() => {
       // Filtrer par catégorie
-      let filteredAnnonces = selectedCategory === 'Tous' 
-        ? [...annonces] 
-        : [...annonces].filter(annonce => annonce.category === selectedCategory);
+     let filteredAnnonces = [...annonces];
+
+  // Filtre par catégorie
+  if (selectedCategory !== 'Tous') {
+    filteredAnnonces = filteredAnnonces.filter(annonce => annonce.category === selectedCategory);
+  }
       
       // Filtrer par type d'objet
       if (selectedType !== 'Tous') {
@@ -276,7 +279,7 @@ const Home = () => {
       { id: '6', name: 'Échanger', icon: 'repeat-outline' }
     ];
 
-    const types = ['Tous', 'Vêtement', 'Équipement', 'Chaussures', 'Accessoire'];
+    const types = ['Tous',"Vêtement hiver", "Équipement ski", "Équipement neige", "Chaussures", "Décoration", "Outil", "Tente", "Autre"];
     const campTypes = ['Tous', 'Camp De Ski', 'Camp Vert'];
     
     // Fonction pour obtenir l'icône du moyen de communication

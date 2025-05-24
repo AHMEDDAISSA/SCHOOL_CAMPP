@@ -1,15 +1,15 @@
-import React, { createContext, useState, useEffect , useRef } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getPosts, deleteAnnounce } from '../services/api';
-
+import { getPosts, deleteAnnonce } from '../services/api';
 
 const AnnonceContext = createContext();
 
 export const AnnonceProvider = ({ children }) => {
   const [annonces, setAnnonces] = useState([]);
   const [loading, setLoading] = useState(false);
- const isMounted = useRef(true); // Initialiser avec true
-  
+  const isMounted = useRef(true);
+  const dataFetchedRef = useRef(false); // Référence pour éviter les doubles chargements
+
   // Nettoyage lors du démontage
   useEffect(() => {
     return () => {
@@ -17,18 +17,61 @@ export const AnnonceProvider = ({ children }) => {
     };
   }, []);
 
+  // Fonction garantie pour transformer les données d'API
+  const normalizeAnnonces = (data) => {
+    if (!data) return [];
 
-  
+    let annoncesList = [];
+    
+    // Traiter différentes structures d'API possibles
+    if (Array.isArray(data)) {
+      annoncesList = data;
+    } else if (data.posts && Array.isArray(data.posts)) {
+      annoncesList = data.posts;
+    } else if (data.data && Array.isArray(data.data)) {
+      annoncesList = data.data;
+    } else {
+      console.warn("Format de données inconnu:", data);
+      return [];
+    }
+
+    // Normaliser chaque annonce pour garantir une structure cohérente
+    return annoncesList.map(item => ({
+      ...item,
+      id: item._id || item.id || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      _id: item._id || item.id || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      title: item.title || "Sans titre",
+      description: item.description || "",
+      category: typeof item.category === 'string' ? item.category : 
+                (item.category === 1 || item.category === '1') ? 'Donner' : 
+                (item.category === 4 || item.category === '4') ? 'Louer' : 
+                (item.category === 6 || item.category === '6') ? 'Échanger' :
+                (item.category === 2 || item.category === '2') ? 'Prêter' :
+                (item.category === 3 || item.category === '3') ? 'Emprunter' :
+                (item.category === 5 || item.category === '5') ? 'Acheter' : "Autre",
+      type: item.type || "Non spécifié",
+      email: item.email || "",
+      contactEmail: item.contactEmail || item.email || "",
+      camp: item.camp || "",
+      images: item.images || [],
+      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : 
+            item.date ? item.date : new Date().toLocaleDateString('fr-FR'),
+      isNew: true
+    }));
+  };
+
   // Charger les annonces depuis AsyncStorage
- const loadAnnonces = async () => {
+  const loadAnnonces = async () => {
     try {
       setLoading(true);
       const storedAnnonces = await AsyncStorage.getItem('annonces');
+      
       if (storedAnnonces && isMounted.current) {
         const parsedAnnonces = JSON.parse(storedAnnonces);
         // Vérifier que les données sont valides
         if (Array.isArray(parsedAnnonces)) {
-          setAnnonces(parsedAnnonces);
+          setAnnonces(normalizeAnnonces(parsedAnnonces));
+          console.log(`${parsedAnnonces.length} annonces chargées depuis le stockage local`);
         } else {
           console.warn("Format d'annonces invalide dans AsyncStorage");
           setAnnonces([]);
@@ -42,9 +85,9 @@ export const AnnonceProvider = ({ children }) => {
       }
     }
   };
-  
+
   // Sauvegarder les annonces dans AsyncStorage
- const saveAnnonces = async (newAnnonces) => {
+  const saveAnnonces = async (newAnnonces) => {
     try {
       await AsyncStorage.setItem('annonces', JSON.stringify(newAnnonces));
       return true;
@@ -53,253 +96,128 @@ export const AnnonceProvider = ({ children }) => {
       return false;
     }
   };
-  const approveAnnounce = async (announceId) => {
-  try {
-    // Update the announcement in your database
-    const updatedAnnonce = { ...annonces.find(a => a.id === announceId), needsModeration: false, status: 'approved' };
-    // Call your API endpoint or database update function here
-    
-    // Update local state
-    const updatedAnnounces = annonces.map(a => a.id === announceId ? updatedAnnonce : a);
-    setAnnonces(updatedAnnounces);
-    
-    // Update the moderation list
-    const updatedModerateList = annoncesToModerate.filter(a => a.id !== announceId);
-    setAnnoncesToModerate(updatedModerateList);
-    setFlaggedAnnounces(updatedModerateList.length);
-    
-    return true;
-  } catch (error) {
-    console.error('Error approving announcement:', error);
-    return false;
-  }
-};
 
-const rejectAnnounce = async (announceId) => {
-  try {
-    // Call your delete function or API endpoint
-    const success = await deleteAnnonce(announceId);
-    
-    if (success) {
-      // Update the moderation list
-      const updatedModerateList = annoncesToModerate.filter(a => a.id !== announceId);
-      setAnnoncesToModerate(updatedModerateList);
-      setFlaggedAnnounces(updatedModerateList.length);
-    }
-    
-    return success;
-  } catch (error) {
-    console.error('Error rejecting announcement:', error);
-    return false;
-  }
-};
-  
-  // Ajouter une nouvelle annonce
- const addAnnonce = async (nouvelleAnnonce) => {
-   try {
+  // Version améliorée de refreshAnnonces qui gère correctement les données
+  const refreshAnnonces = async () => {
+    try {
+      console.log("Début du rafraîchissement des annonces");
+      setLoading(true);
       
-      const storedAnnonces = await AsyncStorage.getItem('annonces');
-      const currentAnnonces = storedAnnonces ? JSON.parse(storedAnnonces) : [];
+      const response = await getPosts();
       
-      
-      if (!nouvelleAnnonce.id) {
-        nouvelleAnnonce.id = Date.now().toString();
+      if (response) {
+        console.log("Données reçues de l'API:", JSON.stringify(response).substring(0, 200) + "...");
+        
+        // Utiliser la fonction de normalisation pour garantir un format cohérent
+        const normalizedData = normalizeAnnonces(response);
+        
+        console.log(`${normalizedData.length} annonces normalisées pour l'affichage`);
+        
+        if (normalizedData.length > 0) {
+          if (isMounted.current) {
+            // IMPORTANT: Utilisez une fonction pour mettre à jour l'état
+            // pour éviter les problèmes de closure
+            setAnnonces(normalizedData);
+            await saveAnnonces(normalizedData);
+            console.log("Annonces mises à jour et sauvegardées avec succès");
+          }
+          return true;
+        }
       }
-      
-      
-      nouvelleAnnonce.createdAt = nouvelleAnnonce.createdAt || new Date().toISOString();
-      nouvelleAnnonce.date = nouvelleAnnonce.date || new Date().toLocaleDateString('fr-FR');
-      nouvelleAnnonce.isNew = true;
-
-      nouvelleAnnonce.needsModeration = true; 
-      
-      
-      const updatedAnnonces = [nouvelleAnnonce, ...currentAnnonces];
-      
-      
-      const saveSuccess = await saveAnnonces(updatedAnnonces);
-      
-      if (!saveSuccess) {
-        throw new Error("Erreur lors de la sauvegarde des annonces");
-      }
-      
-      // Mettre à jour l'état seulement si le composant est toujours monté
-      if (isMounted.current) {
-        setAnnonces(updatedAnnonces);
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout de l\'annonce:', error);
       return false;
-    }
-  };
-
-  const transformApiData = (apiData) => {
-  if (!apiData || !apiData.posts || !Array.isArray(apiData.posts)) return [];
-  console.log('Invalid API data format:', apiData);
-
-  return apiData.posts.map(post => ({
-    id: post._id,
-    title: post.title,
-    description: post.description,
-    category: typeof post.category === 'string' ? post.category : 
-              (post.category === '1' ? 'Donner' : 
-              post.category === '4' ? 'Louer' : 
-              post.category === '6' ? 'Échanger' : post.category),
-    type: post.type,
-    email: post.email,
-    camp: post.camp,
-    is_published: post.is_published,
-    contact_info: post.contact_info,
-    date: post.createdAt ? new Date(post.createdAt).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
-    isNew: true,
-    needsModeration: post.needsModeration || true // Préserver ou définir par défaut
-  }));
-};
-  
-    const refreshAnnonces = async () => {
-  try {
-    setLoading(true);
-    const response = await getPosts();
-    
-    if (response) {
-      console.log("Données reçues de l'API:", response);
-      
-      if (response.posts && Array.isArray(response.posts)) {
-        // Stocker toutes les annonces sans se soucier de la pagination
-        setAnnonces(response.posts);
-        await AsyncStorage.setItem('annonces', JSON.stringify(response.posts));
-        return true;
-      }
-    }
-    return false;
-  } catch (error) {
-    console.error('Erreur lors du chargement des annonces:', error);
-    
-    try {
-      const storedAnnonces = await AsyncStorage.getItem('annonces');
-      
-      if (storedAnnonces) {
-        setAnnonces(JSON.parse(storedAnnonces));
-      }
-    } catch (e) {
-      console.error('Erreur lors de la récupération depuis AsyncStorage:', e);
-    }
-    return false;
-  } finally {
-    setLoading(false);
-  }
-};
-  
- 
- const deleteAnnonceMeth = async (id, userEmail) => {
-  console.log("ANNContext - Deleting ID:", id, "User:", userEmail);
-  try {
-    const success = await deleteAnnounce(id, userEmail);
-    
-    if (success && success.success) {
-      // Utiliser _id pour la comparaison
-      const updatedAnnonces = annonces.filter(annonce => 
-        annonce._id !== id && annonce.id !== id
-      );
-      
-      if (isMounted.current) {
-        setAnnonces(updatedAnnonces);
-        await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
-      }
-      return { success: true, message: success.message };
-    }
-    return { success: false, message: success.message || "Erreur lors de la suppression" };
-  } catch (error) {
-    console.error('Erreur lors de la suppression de l\'annonce:', error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || 'Erreur lors de la suppression de l\'annonce' 
-    };
-  }
-};
-
-  const updateAnnonceMeth = async (id, updateData, userEmail) => {
-  try {
-    const success = await updateAnnounce(id, updateData, userEmail);
-    
-    if (success && success.success) {
-      // Mettre à jour l'annonce dans le state local
-      const updatedAnnonces = annonces.map(annonce => 
-        (annonce._id === id || annonce.id === id) ? { ...annonce, ...updateData } : annonce
-      );
-      
-      if (isMounted.current) {
-        setAnnonces(updatedAnnonces);
-        await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
-      }
-      return { success: true, message: success.message };
-    }
-    return { success: false, message: success.message || "Erreur lors de la mise à jour" };
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'annonce:', error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || 'Erreur lors de la mise à jour de l\'annonce' 
-    };
-  }
-};
-
-  // Mettre à jour une annonce
-  const updateAnnonce = async (id, updatedData) => {
-    try {
-      const updatedAnnonces = annonces.map(annonce => 
-        annonce.id === id ? { ...annonce, ...updatedData } : annonce
-      );
-      setAnnonces(updatedAnnonces);
-      await saveAnnonces(updatedAnnonces);
-      return true; 
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'annonce:', error);
-      return false; 
+      console.error('Erreur lors du rafraîchissement des annonces:', error);
+      
+      // En cas d'erreur, essayer de charger depuis le stockage local
+      try {
+        const storedAnnonces = await AsyncStorage.getItem('annonces');
+        
+        if (storedAnnonces && isMounted.current) {
+          const parsedAnnonces = JSON.parse(storedAnnonces);
+          setAnnonces(normalizeAnnonces(parsedAnnonces));
+          console.log(`${parsedAnnonces.length} annonces récupérées depuis AsyncStorage après erreur`);
+        }
+      } catch (e) {
+        console.error('Erreur lors de la récupération depuis AsyncStorage:', e);
+      }
+      return false;
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Supprimer une annonce avec gestion garantie des IDs
+  const deleteAnnonceMeth = async (id, userEmail) => {
+    console.log("AnnonceContext - Deleting ID:", id, "User:", userEmail);
+    try {
+      const success = await deleteAnnonce(id, userEmail);
+      
+      if (success && success.success) {
+        // Mise à jour immédiate du state local 
+        setAnnonces(prevAnnonces => 
+          prevAnnonces.filter(annonce => 
+            annonce._id !== id && annonce.id !== id
+          )
+        );
+        
+        // Mise à jour du stockage local
+        const updatedAnnonces = annonces.filter(annonce => 
+          annonce._id !== id && annonce.id !== id
+        );
+        
+        if (isMounted.current) {
+          await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
+        }
+        return { success: true, message: success.message || "Annonce supprimée avec succès" };
+      }
+      return { success: false, message: success.message || "Erreur lors de la suppression" };
+    } catch (error) {
+      console.error('Erreur lors de la suppression de l\'annonce:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Erreur lors de la suppression de l\'annonce' 
+      };
     }
   };
   
-  // Nettoyer les anciennes annonces (plus vieilles que maxAgeDays)
-   const cleanOldAnnonces = async (daysLimit) => {
-    try {
-      const currentDate = new Date();
-      const limitDate = new Date();
-      limitDate.setDate(currentDate.getDate() - daysLimit);
+
+  // Initialiser les données au montage du composant
+  useEffect(() => {
+    if (!dataFetchedRef.current) {
+      dataFetchedRef.current = true;
+      console.log("Chargement initial des données");
       
-      const filteredAnnonces = annonces.filter(annonce => {
-        const annonceDate = new Date(annonce.date);//.split('/').reverse().join('-'));
-        return annonceDate >= limitDate;
+      // Séquence garantie: d'abord charger depuis stockage local, puis depuis l'API
+      loadAnnonces().then(() => {
+        setTimeout(() => {
+          if (isMounted.current) {
+            refreshAnnonces();
+          }
+        }, 500); // Petit délai pour éviter les conflits de rendu
       });
-      
-      const deletedCount = annonces.length - filteredAnnonces.length;
-      
-      if (deletedCount > 0) {
-        setAnnonces(filteredAnnonces);
-        await AsyncStorage.setItem('annonces', JSON.stringify(filteredAnnonces));
-      }
-      
-      return deletedCount;
-    } catch (error) {
-      console.error('Erreur lors du nettoyage des annonces:', error);
-      return 0;
     }
-  };
+    
+    return () => {
+      console.log("Nettoyage du contexte des annonces");
+    };
+  }, []);
 
-  
-  // Retirer le statut "nouveau" après un certain temps
+  // Mettre à jour le statut "nouveau" après un certain temps
   const updateNewStatus = async () => {
     try {
       const viewedAnnoncesStr = await AsyncStorage.getItem('viewedAnnonces') || '[]';
       const viewedAnnonces = JSON.parse(viewedAnnoncesStr);
       
-      const updatedAnnonces = annonces.map(annonce => ({
-        ...annonce,
-        isNew: !viewedAnnonces.includes(annonce.id)
-      }));
+      setAnnonces(prevAnnonces => {
+        const updatedAnnonces = prevAnnonces.map(annonce => ({
+          ...annonce,
+          isNew: !viewedAnnonces.includes(annonce.id) && !viewedAnnonces.includes(annonce._id)
+        }));
+        return updatedAnnonces;
+      });
       
-      setAnnonces(updatedAnnonces);
       return true;
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut "nouveau":', error);
@@ -307,20 +225,21 @@ const rejectAnnounce = async (announceId) => {
     }
   };
   
+  
   // Récupérer une annonce par son ID
   const getAnnonceById = (id) => {
-    return annonces.find(annonce => annonce.id === id) || null;
+    const annonce = annonces.find(annonce => 
+      (annonce.id === id || annonce._id === id)
+    );
+    return annonce || null;
   };
-  
-   return (
+
+  return (
     <AnnonceContext.Provider
       value={{
         annonces,
         loading,
-        addAnnonce,
         deleteAnnonceMeth,
-        updateAnnonce,
-        updateAnnonceMeth,
         updateNewStatus,
         refreshAnnonces,
         getAnnonceById
@@ -332,3 +251,4 @@ const rejectAnnounce = async (announceId) => {
 };
 
 export default AnnonceContext;
+ 

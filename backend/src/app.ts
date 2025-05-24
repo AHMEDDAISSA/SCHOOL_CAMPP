@@ -8,6 +8,7 @@ import adminRouter from "./routes/categoryRoutes";
 import userRouter from "./routes/userRoutes";
 import dotenv from "dotenv";
 import path from 'path';
+// import contactRoutes from './routes/contacts.js';
 
 dotenv.config();
 
@@ -27,6 +28,8 @@ app.use('/cat',categoryRouter);
 app.use('/admin',adminRouter);
 //acquiring users
 app.use('/user',userRouter);
+
+// app.use('/api/contacts', contactRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
