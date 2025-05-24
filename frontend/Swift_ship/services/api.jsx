@@ -480,38 +480,55 @@ export const getPosts = async (params = {}) => {
   }
 };
 
-export const updateAnnounce = async (postId, updateData, userEmail) => {
+export const updateAnnonce = async (postId, updateData, userEmail) => {
   console.log("Updating post with ID:", postId, "Data:", updateData);
   try {
     const formData = new FormData();
     
     // Ajouter l'email de l'utilisateur pour vérification
-    formData.append('email', userEmail);
+    formData.append('userEmail', userEmail); // Changé de 'email' à 'userEmail' pour éviter la confusion
     
-    // Ajouter les données textuelles
+    // Ajouter les données textuelles en excluant l'email et les images
     Object.keys(updateData).forEach(key => {
-      if (key === 'images') {
-        // Traiter les images
-        if (updateData.images && updateData.images.length > 0) {
-          updateData.images.forEach((imageUri) => {
-            // Vérifier si c'est une nouvelle image (locale) ou existante (URL)
-            if (imageUri.startsWith('file://') || imageUri.startsWith('content://')) {
-              const uriParts = imageUri.split('/');
-              const fileName = uriParts[uriParts.length - 1];
-              const fileType = imageUri.includes('.jpeg') ? 'image/jpeg' : 'image/png';
-              
-              formData.append('images', {
-                uri: imageUri,
-                name: fileName,
-                type: fileType
-              });
-            }
-          });
-        }
+      if (key === 'images' || key === 'email') {
+        // Exclure les images et l'email de cette boucle
+        return;
       } else if (updateData[key] !== undefined && updateData[key] !== null) {
         formData.append(key, updateData[key].toString());
       }
     });
+
+    // Traiter les images séparément
+    if (updateData.images && updateData.images.length > 0) {
+      updateData.images.forEach((imageUri, index) => {
+        // Si c'est une URL existante sur le serveur
+        if (imageUri.startsWith('http')) {
+          // Extraire le nom de fichier de l'URL
+          const fileName = imageUri.split('/').pop();
+          formData.append('existingImages', fileName);
+        } else {
+          // C'est une nouvelle image locale
+          const uriParts = imageUri.split('/');
+          const fileName = uriParts[uriParts.length - 1];
+          const fileType = imageUri.includes('.jpeg') ? 'image/jpeg' : 
+                          imageUri.includes('.jpg') ? 'image/jpeg' : 
+                          imageUri.includes('.png') ? 'image/png' : 
+                          'image/jpeg';
+          
+          formData.append('images', {
+            uri: imageUri,
+            name: fileName,
+            type: fileType
+          });
+        }
+      });
+    }
+
+    // Afficher le contenu du FormData pour debug
+    console.log("FormData content:");
+    for (let pair of formData._parts) {
+      console.log(pair[0], pair[1]);
+    }
 
     const response = await api.put(`/post/update/${postId}`, formData, {
       headers: {
@@ -519,10 +536,13 @@ export const updateAnnounce = async (postId, updateData, userEmail) => {
       }
     });
     
-    console.log('updateAnnounce response:', response);
+    console.log('updateAnnonce response:', response);
     return response;
   } catch (error) {
-    console.error('updateAnnounce error:', error.message);
+    console.error('updateAnnounce error:', error);
+    if (error.response) {
+      console.error('Response error data:', error.response.data);
+    }
     throw error;
   }
 };

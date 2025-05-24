@@ -445,6 +445,7 @@ const Annonces = () => {
   const loadUserEmail = async () => {
     try {
       const email = await AsyncStorage.getItem('userEmail');
+      console.log("Email chargé depuis AsyncStorage:", email);
       if (email) {
         setUserEmail(email);
       }
@@ -780,7 +781,11 @@ const Annonces = () => {
   const keyExtractor = useCallback((item) => item.id?.toString() || Math.random().toString(), []);
   
  const renderItem = useCallback(({ item }) => {
-  console.log("Rendu de l'annonce:", item._id || item.id);
+  console.log("=== DEBUG ANNONCE ===");
+  console.log("ID annonce:", item._id || item.id);
+  console.log("Email annonce:", item.email);
+  console.log("Email utilisateur:", userEmail);
+  console.log("===================");
   return (
     <MemoizedAnnonceCard 
       item={item}

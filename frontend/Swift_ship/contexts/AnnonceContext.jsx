@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getPosts, deleteAnnonce } from '../services/api';
+import { getPosts, deleteAnnounce, updateAnnonce } from '../services/api';
+
 
 const AnnonceContext = createContext();
 
@@ -152,7 +153,7 @@ export const AnnonceProvider = ({ children }) => {
   const deleteAnnonceMeth = async (id, userEmail) => {
     console.log("AnnonceContext - Deleting ID:", id, "User:", userEmail);
     try {
-      const success = await deleteAnnonce(id, userEmail);
+      const success = await deleteAnnounce(id, userEmail);
       
       if (success && success.success) {
         // Mise à jour immédiate du state local 
@@ -181,6 +182,57 @@ export const AnnonceProvider = ({ children }) => {
       };
     }
   };
+
+
+  const updateAnnonceMeth = async (id, updateData, userEmail) => {
+  console.log("AnnonceContext - Updating ID:", id, "User:", userEmail, "Data:", updateData);
+  
+  try {
+    // Trouver l'annonce pour vérifier l'email
+    const currentAnnonce = annonces.find(annonce => 
+      (annonce._id === id || annonce.id === id)
+    );
+    
+    if (!currentAnnonce) {
+      return { 
+        success: false, 
+        message: "Annonce non trouvée" 
+      };
+    }
+    
+    // Utiliser l'email de l'annonce ou l'email de l'utilisateur
+    const emailToUse = currentAnnonce.email || userEmail;
+    console.log("Email utilisé pour la mise à jour:", emailToUse);
+    
+    const response = await updateAnnonce(id, updateData, emailToUse); 
+    
+    if (response && response.success) {
+      // Mettre à jour le state local avec les nouvelles données
+      setAnnonces(prevAnnonces => {
+        const updatedAnnonces = prevAnnonces.map(annonce => 
+          (annonce._id === id || annonce.id === id) ? { ...annonce, ...updateData } : annonce
+        );
+        
+        // Mettre à jour le stockage local avec les nouvelles données
+        if (isMounted.current) {
+          AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
+        }
+        
+        return updatedAnnonces;
+      });
+      
+      return { success: true, message: response.message || "Annonce mise à jour avec succès" };
+    }
+    
+    return { success: false, message: response.message || "Erreur lors de la mise à jour" };
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'annonce:', error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Erreur lors de la mise à jour de l\'annonce' 
+    };
+  }
+};
   
 
   // Initialiser les données au montage du composant
@@ -235,19 +287,20 @@ export const AnnonceProvider = ({ children }) => {
   };
 
   return (
-    <AnnonceContext.Provider
-      value={{
-        annonces,
-        loading,
-        deleteAnnonceMeth,
-        updateNewStatus,
-        refreshAnnonces,
-        getAnnonceById
-      }}
-    >
-      {children}
-    </AnnonceContext.Provider>
-  );
+  <AnnonceContext.Provider
+    value={{
+      annonces,
+      loading,
+      deleteAnnonceMeth,
+      updateNewStatus,
+      refreshAnnonces,
+      getAnnonceById,
+      updateAnnonce: updateAnnonceMeth  // Vous exportez updateAnnonceMeth sous le nom updateAnnonce
+    }}
+  >
+    {children}
+  </AnnonceContext.Provider>
+); 
 };
 
 export default AnnonceContext;

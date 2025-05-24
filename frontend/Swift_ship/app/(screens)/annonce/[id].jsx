@@ -12,7 +12,8 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
-import { updateAnnounce } from '../../../services/api';
+import { updateAnnonce } from '../../../services/api'; 
+
 
 
 // Get screen width for responsive designs
@@ -20,7 +21,7 @@ const { width } = Dimensions.get('window');
 
 export default function AnnonceDetail() {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
-  const { annonces, deleteAnnonce: deleteAnnonceMeth, updateAnnonce } = useContext(AnnonceContext);
+  const { annonces, deleteAnnonceMeth, refreshAnnonces } = useContext(AnnonceContext);
   
   // Utiliser useLocalSearchParams pour récupérer l'ID depuis l'URL
   const params = useLocalSearchParams();
@@ -548,71 +549,76 @@ useEffect(() => {
 };
 
   // Update annonce submission
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      Toast.show({
-        type: 'error',
-        text1: 'Champs obligatoires manquants',
-        text2: `Veuillez remplir les champs suivants: ${missingFields.join(', ')}.`,
-        position: 'bottom',
-        visibilityTime: 4000
-      });
-      return;
-    }
+ const handleSubmit = async () => {
+  if (!validateForm()) {
+    Toast.show({
+      type: 'error',
+      text1: 'Champs obligatoires manquants',
+      text2: `Veuillez remplir les champs suivants: ${missingFields.join(', ')}.`,
+      position: 'bottom',
+      visibilityTime: 4000
+    });
+    return;
+  }
+  
+  setIsSubmitting(true);
+  
+  try {
+    const annonceId = annonce._id || annonce.id;
     
-    setIsSubmitting(true);
+    const updatedData = {
+      title,
+      description,
+      category,
+      type,
+      condition,
+      price,
+      duration,
+      images,
+      camp,
+      email,
+    };
     
-    try {
-      const annonceId = annonce._id || annonce.id;
-      
-      const updatedData = {
-        title,
-        description,
-        category,
-        type,
-        condition,
-        price,
-        duration,
-        images,
-        camp,
-        email,
-      };
-      
-      const result = await updateAnnonceMeth(annonceId, updatedData, userEmail);
-      
-      if (result.success) {
-        setIsEditMode(false);
-        Toast.show({
-          type: 'success',
-          text1: result.message || 'Annonce mise à jour avec succès',
-          position: 'bottom',
-          visibilityTime: 3000
-        });
-        
-        // Recharger les données
-        await refreshAnnonces();
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Erreur',
-          text2: result.message || 'Impossible de mettre à jour cette annonce',
-          position: 'bottom',
-          visibilityTime: 3000
-        });
-      }
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour de l'annonce:", error);
+    const result = await updateAnnonce(annonceId, updatedData, userEmail);
+    
+    if (result.success) {
+      setIsEditMode(false);
       Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Une erreur inattendue s\'est produite',
+        type: 'success',
+        text1: result.message || 'Annonce mise à jour avec succès',
         position: 'bottom',
         visibilityTime: 3000
       });
-    } finally {
-      setIsSubmitting(false);
+      
+      // Recharger l'annonce après mise à jour
+      setTimeout(() => {
+        refreshAnnonces().then(() => {
+          // Réinitialiser l'index d'image actif pour éviter des problèmes d'affichage
+          setActiveImageIndex(0);
+        });
+      }, 500);
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: result.message || 'Impossible de mettre à jour cette annonce',
+        position: 'bottom',
+        visibilityTime: 3000
+      });
     }
-  };
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de l'annonce:", error);
+    Toast.show({
+      type: 'error',
+      text1: 'Erreur',
+      text2: 'Une erreur inattendue s\'est produite',
+      position: 'bottom',
+      visibilityTime: 3000
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const getCategoryIcon = (category) => {
     switch(category) {

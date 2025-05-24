@@ -9,17 +9,30 @@ import { PostType } from "../types/postTypes";
 
 const checkPostOwnership = async (req: Request, res: Response, postId: string, userEmail: string) => {
     try {
+        console.log("Checking ownership for post:", postId, "user:", userEmail);
+        
         const post = await Post.findById(postId);
         if (!post) {
+            console.log("Post not found");
             return { authorized: false, message: "Post not found" };
         }
         
-        if (post.email !== userEmail) {
+        console.log("Post email:", post.email);
+        console.log("User email:", userEmail);
+        
+        // Normaliser les emails pour la comparaison (supprimer espaces, mettre en minuscules)
+        const postEmail = post.email?.trim().toLowerCase();
+        const requestUserEmail = userEmail?.trim().toLowerCase();
+        
+        if (postEmail !== requestUserEmail) {
+            console.log("Email mismatch - Post:", postEmail, "User:", requestUserEmail);
             return { authorized: false, message: "Vous n'êtes pas autorisé à modifier cette annonce" };
         }
         
+        console.log("Ownership verified successfully");
         return { authorized: true, post };
     } catch (error) {
+        console.error("Error in checkPostOwnership:", error);
         return { authorized: false, message: "Erreur lors de la vérification" };
     }
 };
@@ -172,7 +185,11 @@ export const getPostById = async (req: Request<{id: string}, {}, {}>, res: Respo
 export const updatePost = async (req: Request<{id: string}, {}, any>, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
-        const { email: userEmail } = req.body; // Email de l'utilisateur qui fait la requête
+        const { userEmail, ...updateFields } = req.body; // Changé ici
+        
+        console.log("Backend - ID:", id);
+        console.log("Backend - UserEmail:", userEmail);
+        console.log("Backend - UpdateFields:", updateFields);
         
         // Vérifier si l'ID est valide
         if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -186,6 +203,7 @@ export const updatePost = async (req: Request<{id: string}, {}, any>, res: Respo
         // Vérifier si l'utilisateur est autorisé
         const ownershipCheck = await checkPostOwnership(req, res, id, userEmail);
         if (!ownershipCheck.authorized) {
+            console.log("Ownership check failed:", ownershipCheck.message);
             res.status(403).json({ 
                 success: false,
                 message: ownershipCheck.message 
@@ -195,11 +213,26 @@ export const updatePost = async (req: Request<{id: string}, {}, any>, res: Respo
         
         // Vérifier si des fichiers ont été uploadés
         const uploadedFiles = req.files as Express.Multer.File[] || [];
-        let updateData = { ...req.body };
+        let updateData = { ...updateFields }; // Utiliser updateFields au lieu de req.body
         
-        // Si de nouvelles images sont uploadées, les ajouter
-        if (uploadedFiles.length > 0) {
-            const imageFilenames = uploadedFiles.map((file) => file.filename);
+        // Gérer les images existantes et nouvelles
+        if (req.body.existingImages || uploadedFiles.length > 0) {
+            let imageFilenames: string[] = [];
+            
+            // Ajouter les images existantes
+            if (req.body.existingImages) {
+                const existingImages = Array.isArray(req.body.existingImages) 
+                    ? req.body.existingImages 
+                    : [req.body.existingImages];
+                imageFilenames = [...imageFilenames, ...existingImages];
+            }
+            
+            // Ajouter les nouvelles images
+            if (uploadedFiles.length > 0) {
+                const newImageFilenames = uploadedFiles.map((file) => file.filename);
+                imageFilenames = [...imageFilenames, ...newImageFilenames];
+            }
+            
             updateData.images = imageFilenames;
         }
         
