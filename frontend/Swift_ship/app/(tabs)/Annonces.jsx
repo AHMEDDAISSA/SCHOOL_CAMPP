@@ -15,6 +15,7 @@ import Toast from 'react-native-toast-message';
 import { debounce } from 'lodash'; 
 import * as Linking from 'expo-linking';
 
+
 // Screen dimensions for responsive layouts
 const { width } = Dimensions.get('window');
 
@@ -76,6 +77,40 @@ const CategoryButton = ({ category, isActive, darkMode, onPress }) => (
       return { backgroundColor: '#39335E', icon: 'chatbubble-outline', text: 'Message' };
   }
 };
+const getContactButtonStyle = (contactMethod) => {
+  switch(contactMethod) {
+    case 'email':
+      return {
+        backgroundColor: '#4285F4',
+        icon: 'mail-outline',
+        text: 'Email'
+      };
+    case 'phone':
+      return {
+        backgroundColor: '#34A853',
+        icon: 'call-outline',
+        text: 'Téléphoner'
+      };
+    case 'whatsapp':
+      return {
+        backgroundColor: '#25D366',
+        icon: 'logo-whatsapp',
+        text: 'WhatsApp'
+      };
+    case 'sms':
+      return {
+        backgroundColor: '#FF9800',
+        icon: 'chatbox-outline',
+        text: 'SMS'
+      };
+    default:
+      return {
+        backgroundColor: '#836EFE',
+        icon: 'chatbubble-outline',
+        text: 'Message'
+      };
+  }
+};
 const AnnonceCard = ({ item, darkMode, onPress, onDelete, userEmail, inDiscussion , onInitiateContact }) => {
   // Déterminer si l'utilisateur actuel est le propriétaire de l'annonce
   const isOwner = userEmail === item.email;
@@ -89,98 +124,122 @@ const isUnavailable = item.contactStatus && ['reserved', 'sold'].includes(item.c
   
     
     const getContactButtonInfo = () => {
-        const method = item.preferredContact || 'email';
-        switch(method) {
+    const method = item.preferredContact || 'email';
+    switch(method) {
+        case 'email':
+            return {
+                icon: 'mail-outline',
+                text: 'Email',
+                color: '#4285F4'
+            };
+        case 'phone':
+            return {
+                icon: 'call-outline', 
+                text: 'Appeler',
+                color: '#34A853'
+            };
+        case 'whatsapp':
+            return {
+                icon: 'logo-whatsapp',
+                text: 'WhatsApp',
+                color: '#25D366'
+            };
+        case 'sms':
+            return {
+                icon: 'chatbox-outline',
+                text: 'SMS',
+                color: '#FF9800'
+            };
+        case 'app':
+        default:
+            return {
+                icon: 'chatbubble-outline',
+                text: 'Message',
+                color: '#836EFE'
+            };
+    }
+};
+
+    
+   const handleContact = async () => {
+    if (isOwner) return;
+    
+    const contactMethod = item.preferredContact || 'email';
+    const contactInfo = contactMethod === 'email' 
+        ? item.contactEmail || item.email 
+        : item.contactPhone;
+    
+    if (!contactInfo) {
+        Alert.alert('Erreur', 'Information de contact manquante');
+        return;
+    }
+    
+    try {
+        // Initier le contact en base de données
+        await onInitiateContact(item._id, userEmail, contactMethod);
+        
+        // Exécuter l'action de contact selon la méthode
+        switch(contactMethod) {
             case 'email':
-                return {
-                    icon: 'mail-outline',
-                    text: 'Email',
-                    color: '#4285F4'
-                };
+                const emailSubject = `À propos de votre annonce: ${item.title}`;
+                const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\n\nCordialement.`;
+                const emailUrl = `mailto:${contactInfo}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                
+                const supported = await Linking.canOpenURL(emailUrl);
+                if (supported) {
+                    await Linking.openURL(emailUrl);
+                } else {
+                    Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
+                }
+                break;
+                
             case 'phone':
-                return {
-                    icon: 'call-outline', 
-                    text: 'Appeler',
-                    color: '#34A853'
-                };
+                showPhoneOptions(item);
+                break;
+                
             case 'app':
             default:
-                return {
-                    icon: 'chatbubble-outline',
-                    text: 'Message',
-                    color: '#836EFE'
-                };
+                onPress();
+                break;
         }
-    };
-    
-    const handleContact = async () => {
-        if (isOwner) return;
-        
-        const contactMethod = item.preferredContact || 'email';
-        
-        try {
-            // Initier le contact en base de données
-            await onInitiateContact(item._id, userEmail, contactMethod);
-            
-            // Exécuter l'action de contact selon la méthode
-            switch(contactMethod) {
-                case 'email':
-                    const emailSubject = `À propos de votre annonce: ${item.title}`;
-                    const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\n\nCordialement.`;
-                    const emailUrl = `mailto:${item.contactEmail || item.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-                    
-                    const supported = await Linking.canOpenURL(emailUrl);
-                    if (supported) {
-                        await Linking.openURL(emailUrl);
-                    } else {
-                        Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
-                    }
-                    break;
-                    
-                case 'phone':
-                    showPhoneOptions(item);
-                    break;
-                    
-                case 'app':
-                default:
-                    // Navigation vers la messagerie interne
-                    onPress();
-                    break;
-            }
-        } catch (error) {
-            console.error('Erreur lors du contact:', error);
-            Alert.alert('Erreur', 'Impossible d\'initier le contact');
-        }
-    };
-    
-    const showPhoneOptions = (item) => {
-        Alert.alert(
-            'Contacter par téléphone',
-            'Comment souhaitez-vous contacter cette personne?',
-            [
-                {
-                    text: 'Appeler',
-                    onPress: () => Linking.openURL(`tel:${item.contactPhone}`)
-                },
-                {
-                    text: 'SMS',
-                    onPress: () => {
-                        const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}".`;
-                        Linking.openURL(`sms:${item.contactPhone}?body=${encodeURIComponent(message)}`);
-                    }
-                },
-                {
-                    text: 'WhatsApp',
-                    onPress: () => {
-                        const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}".`;
-                        const whatsappUrl = `whatsapp://send?phone=${item.contactPhone}&text=${encodeURIComponent(message)}`;
-                        Linking.openURL(whatsappUrl);
-                    }
-                },
-                { text: 'Annuler', style: 'cancel' }
-            ]
-        );
-    };
+    } catch (error) {
+        console.error('Erreur lors du contact:', error);
+        Alert.alert('Erreur', 'Impossible d\'initier le contact');
+    }
+};
+
+// Fonction pour afficher les options de contact téléphonique
+const showPhoneOptions = (item) => {
+    Alert.alert(
+        'Contacter par téléphone',
+        'Comment souhaitez-vous contacter cette personne?',
+        [
+            {
+                text: 'Appeler',
+                onPress: () => Linking.openURL(`tel:${item.contactPhone}`)
+            },
+            {
+                text: 'SMS',
+                onPress: () => {
+                    const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}".`;
+                    Linking.openURL(`sms:${item.contactPhone}?body=${encodeURIComponent(message)}`);
+                }
+            },
+            {
+                text: 'WhatsApp',
+                onPress: () => {
+                    const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}".`;
+                    // Le numéro doit être au format international sans le + au début
+                    const formattedNumber = item.contactPhone.startsWith('+') 
+                        ? item.contactPhone.substring(1) 
+                        : item.contactPhone;
+                    Linking.openURL(`whatsapp://send?phone=${formattedNumber}&text=${encodeURIComponent(message)}`);
+                }
+            },
+            { text: 'Annuler', style: 'cancel' }
+        ]
+    );
+};
     
     const { icon, text, color } = getContactButtonInfo();
   
@@ -257,80 +316,64 @@ const isUnavailable = item.contactStatus && ['reserved', 'sold'].includes(item.c
                     
                     {/* Bouton de contact pour les non-propriétaires */}
                     {!isOwner && (
-                        <TouchableOpacity 
-                            style={[
-                                styles.contactButton, 
-                                { backgroundColor: color },
-                                (isInContact || isUnavailable) && styles.contactButtonDisabled
-                            ]}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                handleContact();
-                            }}
-                            disabled={isUnavailable}
-                        >
-                            <Ionicons name={icon} size={14} color="white" />
-                            <Text style={styles.contactButtonText}>
-                                {isInContact ? 'En contact' : 
-                                 isUnavailable ? 'Non disponible' : text}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
+    <TouchableOpacity 
+        style={[
+            styles.contactButton, 
+            { backgroundColor: getContactButtonStyle(item.preferredContact).backgroundColor },
+            (isInContact || isUnavailable) && styles.contactButtonDisabled
+        ]}
+        onPress={(e) => {
+            e.stopPropagation();
+            handleContact();
+        }}
+        disabled={isUnavailable}
+    >
+        <Ionicons 
+            name={getContactButtonStyle(item.preferredContact).icon} 
+            size={14} 
+            color="white" 
+        />
+        <Text style={styles.contactButtonText}>
+            {isInContact ? 'En contact' : 
+             isUnavailable ? 'Non disponible' : 
+             getContactButtonStyle(item.preferredContact).text}
+        </Text>
+    </TouchableOpacity>
+)}
                 </View>
             </View>
         </TouchableOpacity>
     );
 };
 const getStatusBadgeStyle = (status) => {
-    switch(status) {
-        case 'in_contact':
-            return { backgroundColor: '#FF9800' };
-        case 'reserved':
-            return { backgroundColor: '#9C27B0' };
-        case 'sold':
-            return { backgroundColor: '#F44336' };
-        default:
-            return { backgroundColor: '#4CAF50' };
-    }
+  switch(status) {
+    case 'in_contact':
+      return { backgroundColor: '#FF9800' };
+    case 'reserved':
+      return { backgroundColor: '#9C27B0' };
+    case 'sold':
+      return { backgroundColor: '#F44336' };
+    default:
+      return { backgroundColor: '#4CAF50' };
+  }
 };
 
 const getStatusText = (status) => {
-    switch(status) {
-        case 'in_contact':
-            return 'En contact';
-        case 'reserved':
-            return 'Réservé';
-        case 'sold':
-            return 'Vendu';
-        default:
-            return 'Disponible';
-    }
-};
-
-
-
-const getContactButtonStyle = (contactMethod) => {
-  switch(contactMethod) {
-    case 'email':
-      return {
-        backgroundColor: '#4285F4',
-        icon: 'mail-outline',
-        text: 'Email'
-      };
-    case 'phone':
-      return {
-        backgroundColor: '#34A853',
-        icon: 'call-outline',
-        text: 'Téléphoner'
-      };
+  switch(status) {
+    case 'in_contact':
+      return 'En contact';
+    case 'reserved':
+      return 'Réservé';
+    case 'sold':
+      return 'Vendu';
     default:
-      return {
-        backgroundColor: '#836EFE',
-        icon: 'chatbubble-outline',
-        text: 'Message'
-      };
+      return 'Disponible';
   }
 };
+
+
+
+
 
 
 // Optimisations avec memo
@@ -1452,19 +1495,20 @@ cardDuration: {
   marginBottom: 5,
 },
 statusBadge: {
-        position: 'absolute',
-        top: 5,
-        right: 5,
-        borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-    },
-    statusBadgeText: {
-        color: 'white',
-        fontSize: 10,
-        fontFamily: 'Montserrat_600SemiBold',
-    },
-    contactButtonDisabled: {
-        opacity: 0.7,
-    }
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  statusBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  contactButtonDisabled: {
+    opacity: 0.7,
+  }
+
 });

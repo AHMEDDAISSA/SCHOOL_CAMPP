@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Switch, Modal, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, Switch, StatusBar } from 'react-native';
 import React, { useContext, useState } from 'react';
 import Back from "../../assets/images/back.svg";
 import Dark_back from "../../assets/images/dark_back.svg";
@@ -16,12 +16,15 @@ const Profile = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={back}>
+        <TouchableOpacity onPress={back} style={styles.backButton}>
           {darkMode ? <Dark_back /> : <Back />}
         </TouchableOpacity>
         <Text style={[styles.heading, { color: theme.color }]}>Profile</Text>
-        <Search />
+        <TouchableOpacity style={styles.searchButton}>
+          <Search />
+        </TouchableOpacity>
       </View>
       <Profile_section2 />
     </View>
@@ -40,6 +43,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    padding: 5,
+  },
+  searchButton: {
+    padding: 5,
   },
   heading: {
     fontSize: 24,
@@ -48,5 +58,4 @@ const styles = StyleSheet.create({
     color: '#121212',
     textTransform: 'capitalize',
   },
-  
 });

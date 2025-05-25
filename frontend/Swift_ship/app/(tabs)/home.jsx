@@ -8,7 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import AnnonceContext from '../../contexts/AnnonceContext';
 import * as Linking from 'expo-linking'; // Ajout de l'import Linking pour ouvrir les applications externes
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Added AsyncStorage import for storing ID
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import DynamicContactButton from'../../components/DynamicContactButton/DynamicContactButton'
 
 const Home = () => {
     const { theme, darkMode, profileData } = useContext(ThemeContext);
@@ -89,12 +90,36 @@ const Home = () => {
     };
 
     // Nouvelle fonction pour gérer les contacts selon le moyen préféré
-   const handleContact = (item) => {
+   const getContactButtonInfo = (contactMethod) => {
+  switch(contactMethod) {
+    case 'email':
+      return {
+        icon: 'mail-outline',
+        text: 'Email',
+        color: '#4285F4'
+      };
+    case 'phone':
+      return {
+        icon: 'call-outline',
+        text: 'Téléphone',
+        color: '#34A853'
+      };
+    case 'app':
+    default:
+      return {
+        icon: 'chatbubble-outline',
+        text: 'Message',
+        color: '#836EFE'
+      };
+  }
+};
+
+// Fonction pour gérer le contact
+const handleContact = (item) => {
   const contactMethod = item.preferredContact || 'app';
   
   switch(contactMethod) {
     case 'email':
-      // Ouvrir l'application email
       const emailSubject = `À propos de votre annonce: ${item.title}`;
       const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${item.title}".\nEst-ce toujours disponible?\n\nCordialement.`;
       const emailUrl = `mailto:${item.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
@@ -104,107 +129,53 @@ const Home = () => {
           if (supported) {
             return Linking.openURL(emailUrl);
           } else {
-            Alert.alert(
-              'Erreur',
-              "Impossible d'ouvrir l'application email",
-              [{ text: 'OK' }]
-            );
+            Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
           }
         })
-        .catch(err => {
-          console.error('Erreur lors de l\'ouverture de l\'email:', err);
-          Alert.alert(
-            'Erreur',
-            "Une erreur est survenue lors de l'ouverture de l'application email",
-            [{ text: 'OK' }]
-          );
-        });
+        .catch(err => console.error('Erreur email:', err));
       break;
     
     case 'phone':
-      // Afficher un dialogue pour choisir entre appeler ou WhatsApp
       Alert.alert(
         'Contacter par téléphone',
         'Comment souhaitez-vous contacter cette personne?',
         [
           {
             text: 'Appeler',
+            onPress: () => Linking.openURL(`tel:${item.contactPhone}`)
+          },
+          {
+            text: 'SMS',
             onPress: () => {
-              const phoneUrl = `tel:${item.contactPhone}`;
-              Linking.canOpenURL(phoneUrl)
-                .then(supported => {
-                  if (supported) {
-                    return Linking.openURL(phoneUrl);
-                  } else {
-                    Alert.alert(
-                      'Erreur',
-                      "Impossible d'ouvrir l'application téléphone",
-                      [{ text: 'OK' }]
-                    );
-                  }
-                })
-                .catch(err => {
-                  console.error('Erreur lors de l\'appel:', err);
-                  Alert.alert(
-                    'Erreur',
-                    "Une erreur est survenue lors de l'ouverture de l'application téléphone",
-                    [{ text: 'OK' }]
-                  );
-                });
+              const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`;
+              Linking.openURL(`sms:${item.contactPhone}?body=${encodeURIComponent(message)}`);
             }
           },
           {
             text: 'WhatsApp',
             onPress: () => {
-              // Formater le numéro pour WhatsApp (enlever les espaces, etc.)
               let whatsappNumber = item.contactPhone?.replace(/\s+/g, '') || '';
-              
-              // Ajouter le code pays si nécessaire
               if (whatsappNumber.startsWith('0')) {
                 whatsappNumber = `41${whatsappNumber.substring(1)}`;
               }
-              
-              const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`)}`;
-              
-              Linking.canOpenURL(whatsappUrl)
-                .then(supported => {
-                  if (supported) {
-                    return Linking.openURL(whatsappUrl);
-                  } else {
-                    Alert.alert(
-                      'Erreur',
-                      "WhatsApp n'est pas installé sur votre appareil",
-                      [{ text: 'OK' }]
-                    );
-                  }
-                })
-                .catch(err => {
-                  console.error('Erreur lors de l\'ouverture de WhatsApp:', err);
-                  Alert.alert(
-                    'Erreur',
-                    "Une erreur est survenue lors de l'ouverture de WhatsApp",
-                    [{ text: 'OK' }]
-                  );
-                });
+              const message = `Bonjour, je suis intéressé(e) par votre annonce "${item.title}". Est-ce toujours disponible?`;
+              Linking.openURL(`whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`);
             }
           },
-          {
-            text: 'Annuler',
-            style: 'cancel'
-          }
+          { text: 'Annuler', style: 'cancel' }
         ]
       );
       break;
     
     case 'app':
     default:
-      // Ouvrir la conversation dans l'application
+      // Navigation vers la messagerie interne
       router.push({
         pathname: '(screens)/chat_screen',
         params: { 
           id: Date.now(),
           advertId: item.id,
-          name: item.ownerName || 'Propriétaire'
+          name: item.contactName || 'Propriétaire'
         }
       });
       break;

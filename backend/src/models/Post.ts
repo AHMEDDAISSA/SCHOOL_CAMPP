@@ -22,7 +22,7 @@ const PostSchema = new mongoose.Schema({
     },
     contactEmail: { type: String },
     contactPhone: { type: String },
-    contactName: { type: String },
+    
     
     
     contactStatus: {

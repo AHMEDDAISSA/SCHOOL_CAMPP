@@ -8,11 +8,9 @@ import Toast from 'react-native-toast-message';
 const Profile_section4 = () => {
   const [modalVisible, setModalVisible] = useState(false);
   
-  
   const themeContext = useContext(ThemeContext);
   
   if (!themeContext) {
-    
     return (
       <View style={styles.logout_container}>
         <Text>Chargement...</Text>
@@ -20,29 +18,29 @@ const Profile_section4 = () => {
     );
   }
   
-  const { theme, resetProfileImage, clearProfileData } = themeContext;
+  const { theme, resetProfileImage, clearProfileData, darkMode } = themeContext;
 
   const handleLogout = async () => {
     setModalVisible(true);
-    await clearProfileData();
   };
 
-  const confirmLogout = () => {
-    
-    if (typeof resetProfileImage === 'function') {
-      resetProfileImage();
+  const confirmLogout = async () => {
+    if (typeof clearProfileData === 'function') {
+      await clearProfileData();
+      
+      if (typeof resetProfileImage === 'function') {
+        resetProfileImage();
+      }
       
       Toast.show({
         type: 'success',
         text1: 'Déconnexion réussie',
         text2: 'À bientôt !',
       });
-    } else {
-      console.error("resetProfileImage n'est pas une fonction");
     }
     
     setModalVisible(false);
-    router.replace('/lets'); 
+    router.replace('/lets');
   };
   
   const cancelLogout = () => {
@@ -50,27 +48,45 @@ const Profile_section4 = () => {
   };
 
   return (
-    <View>
+    <View style={styles.container}>
       <View style={styles.logout_container}>
-        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
-          <Text style={[styles.logout_text, { color: theme.text }]}>Déconnexion</Text>
+        <TouchableOpacity 
+          style={[styles.logout, { 
+            backgroundColor: '#836EFE',
+            shadowColor: darkMode ? 'rgba(131, 110, 254, 0.5)' : 'rgba(131, 110, 254, 0.3)',
+          }]} 
+          onPress={handleLogout}
+        >
+          <Text style={[styles.logout_text, { color: '#FFFFFF' }]}>Déconnexion</Text>
         </TouchableOpacity>
       </View>
+      
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={cancelLogout}
       >
         <View style={styles.modalContainer}>
-          <View style={[styles.modalView, { backgroundColor: theme.cardbg2 }]}>
-            <Text style={styles.modalText}>Êtes-vous sûr de vouloir vous déconnecter ?</Text>
+          <View style={[styles.modalView, { 
+            backgroundColor: darkMode ? '#222' : '#fff',
+            shadowColor: darkMode ? '#000' : '#000',
+          }]}>
+            <Text style={[styles.modalText, { color: darkMode ? '#fff' : '#000' }]}>
+              Êtes-vous sûr de vouloir vous déconnecter ?
+            </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.button} onPress={confirmLogout}>
-                <Text style={styles.buttonText}>Oui</Text>
+              <TouchableOpacity 
+                style={[styles.button, styles.buttonCancel]} 
+                onPress={cancelLogout}
+              >
+                <Text style={styles.buttonText}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, styles.buttonCancel]} onPress={cancelLogout}>
-                <Text style={styles.buttonText}>Non</Text>
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: '#836EFE' }]} 
+                onPress={confirmLogout}
+              >
+                <Text style={styles.buttonText}>Déconnexion</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -83,11 +99,13 @@ const Profile_section4 = () => {
 export default Profile_section4;
 
 const styles = StyleSheet.create({
+  container: {
+    marginBottom: 30,
+  },
   logout_container: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 50,
+    paddingVertical: 10,
   },
   logout: {
     alignItems: 'center',
@@ -97,14 +115,16 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 50,
     minHeight: 56,
-    maxHeight: 56,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    width: '80%',
   },
   logout_text: {
     fontSize: 16,
-    lineHeight: 26,
     fontFamily: 'Montserrat_600SemiBold',
-    color: '#000000',
-    textTransform: 'capitalize',
+    color: '#FFFFFF',
   },
   modalContainer: {
     flex: 1,
@@ -113,38 +133,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalView: {
-    backgroundColor: 'white',
     borderRadius: 20,
-    padding: 35,
+    padding: 30,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     elevation: 5,
+    width: '80%',
+    maxWidth: 320,
   },
   modalText: {
     fontSize: 18,
-    marginBottom: 15,
+    marginBottom: 25,
     textAlign: 'center',
+    fontFamily: 'Montserrat_600SemiBold',
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 10,
+    justifyContent: 'space-between',
+    width: '100%',
   },
   buttonCancel: {
     backgroundColor: '#757575',
   },
   button: {
-    backgroundColor: '#FF007E',
-    borderRadius: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    minWidth: 120,
+    alignItems: 'center',
   },
   buttonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 14,
   },
 });

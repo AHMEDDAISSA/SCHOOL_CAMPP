@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Back from "../../assets/images/back.svg";
 import { Montserrat_700Bold } from '@expo-google-fonts/montserrat';
 import Profile from "../../assets/images/anny.jpg";
-import Edit from "../../assets/images/Edit.svg";
+import Edit from "../../assets/images/editttttt.svg";
 import Profile_setup_section2 from '../../components/Profile_setup/Profile_setup_section2';
 import ThemeContext from '../../theme/ThemeContext';
 import { router, useLocalSearchParams } from "expo-router";
