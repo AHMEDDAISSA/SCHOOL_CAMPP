@@ -4,6 +4,7 @@ import ThemeContext from '../../theme/ThemeContext';
 import { Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const Profile_section4 = () => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -24,24 +25,28 @@ const Profile_section4 = () => {
     setModalVisible(true);
   };
 
-  const confirmLogout = async () => {
-    if (typeof clearProfileData === 'function') {
-      await clearProfileData();
-      
-      if (typeof resetProfileImage === 'function') {
-        resetProfileImage();
-      }
-      
-      Toast.show({
-        type: 'success',
-        text1: 'Déconnexion réussie',
-        text2: 'À bientôt !',
-      });
-    }
+ const confirmLogout = async () => {
+  if (typeof clearProfileData === 'function') {
+    await clearProfileData();
     
-    setModalVisible(false);
-    router.replace('/lets');
-  };
+    if (typeof resetProfileImage === 'function') {
+      resetProfileImage();
+    }
+
+    Toast.show({
+      type: 'success',
+      position: 'top',
+      text1: 'Déconnexion réussie 👋',
+      text2: 'Vous avez été déconnecté avec succès.',
+      visibilityTime: 3000,
+      autoHide: true,
+      topOffset: 50,
+    });
+  }
+
+  setModalVisible(false);
+  router.replace('/lets');
+};
   
   const cancelLogout = () => {
     setModalVisible(false);
@@ -72,6 +77,15 @@ const Profile_section4 = () => {
             backgroundColor: darkMode ? '#222' : '#fff',
             shadowColor: darkMode ? '#000' : '#000',
           }]}>
+
+            {/* Icône d'avertissement */}
+            <Ionicons 
+              name="alert-circle-outline" 
+              size={40} 
+              color={darkMode ? '#ff6b6b' : '#d32f2f'} 
+              style={{ marginBottom: 15 }} 
+            />
+
             <Text style={[styles.modalText, { color: darkMode ? '#fff' : '#000' }]}>
               Êtes-vous sûr de vouloir vous déconnecter ?
             </Text>
@@ -83,7 +97,7 @@ const Profile_section4 = () => {
                 <Text style={styles.buttonText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.button, { backgroundColor: '#836EFE' }]} 
+                style={[styles.button, { backgroundColor: '#901010' }]} 
                 onPress={confirmLogout}
               >
                 <Text style={styles.buttonText}>Déconnexion</Text>
@@ -106,6 +120,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+    marginTop: -10, // Remonte un peu le bouton
   },
   logout: {
     alignItems: 'center',
@@ -133,40 +148,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalView: {
-    borderRadius: 20,
-    padding: 30,
+    borderRadius: 24,
+    paddingVertical: 35,
+    paddingHorizontal: 25,
     alignItems: 'center',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 5,
-    width: '80%',
-    maxWidth: 320,
+    elevation: 6,
+    width: '85%',
+    maxWidth: 340,
   },
   modalText: {
-    fontSize: 18,
-    marginBottom: 25,
+    fontSize: 17,
+    marginBottom: 30,
     textAlign: 'center',
     fontFamily: 'Montserrat_600SemiBold',
+    lineHeight: 26,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    gap: 10,
   },
   buttonCancel: {
-    backgroundColor: '#757575',
+    backgroundColor: '#D1D1D1',
   },
   button: {
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    minWidth: 120,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    flex: 1,
     alignItems: 'center',
   },
   buttonText: {
     color: '#FFFFFF',
     fontFamily: 'Montserrat_600SemiBold',
-    fontSize: 14,
+    fontSize: 11,
   },
 });

@@ -11,6 +11,8 @@ const UserSchema = new mongoose.Schema(
         canPost: { type: Boolean, default: false },
         verificationCode: { type: String, default: null },
         isVerified: { type: Boolean, default: true },
+        profileImage: { type: String, default: '' },
+        profileImageUrl: { type: String },
         createdAt: { type: Date, default: Date.now },
     },
     { timestamps: true }
@@ -22,6 +24,14 @@ UserSchema.index({ email: 1, camp: 1 }, { unique: true });
 //normalize the email (e.g., convert to lowercase) before saving
 UserSchema.pre('save', function (next) {
     this.email = this.email.toLowerCase();
+    next();
+});
+
+UserSchema.pre('save', function(next) {
+    if (this.profileImage) {
+        // Cette URL sera complétée dans le contrôleur avec le baseUrl
+        this.profileImageUrl = this.profileImage;
+    }
     next();
 });
 

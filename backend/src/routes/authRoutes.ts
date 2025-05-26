@@ -5,13 +5,15 @@ import { authenticateToken } from '../middleware/authMiddleware';
 import { loginHandler, registerHandler ,  verifyEmailHandler, 
     resendOTPHandler } from "../controllers/authController";
 import { requestOTPByEmail } from "../controllers/otpController";
+import upload from "../middleware/upload";
+
 
 const router = express.Router();
 router.post('/resend-otp', resendOTPHandler);
 
 
 router.post('/resend-verification', resendOTPHandler);
-
+router.post("/register", upload.single('profileImage'), registerHandler);
 
 
 // Public routes

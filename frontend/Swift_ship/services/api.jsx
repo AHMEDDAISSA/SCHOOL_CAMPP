@@ -117,11 +117,44 @@ export const getAllUsers = async () => {
   }
 };
 
-// POST: Register user
+
 export const registerUser = async (userData) => {
   try {
     console.log('Registering user with data:', userData);
-    const response = await api.post('/auth/register', { user: userData });
+    
+    // **NOUVEAU : Créer FormData pour inclure l'image**
+    const formData = new FormData();
+    
+    // Ajouter les données utilisateur
+    Object.keys(userData).forEach(key => {
+      if (key !== 'profileImage' && userData[key] !== undefined && userData[key] !== null) {
+        formData.append(`user[${key}]`, userData[key].toString());
+      }
+    });
+    
+    // **NOUVEAU : Ajouter l'image de profil si elle existe**
+    if (userData.profileImage && userData.profileImage.startsWith('file://')) {
+  // It's a local file URI, we need to append it as a file
+  const uriParts = userData.profileImage.split('/');
+  const fileName = uriParts[uriParts.length - 1];
+      const fileType = userData.profileImage.includes('.jpeg') ? 'image/jpeg' : 
+                     userData.profileImage.includes('.jpg') ? 'image/jpeg' : 
+                     userData.profileImage.includes('.png') ? 'image/png' : 
+                     'image/jpeg';
+      
+      formData.append('profileImage', {
+        uri: userData.profileImage,
+        name: fileName,
+        type: fileType
+      });
+    }
+
+    const response = await api.post('/auth/register', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    
     return response;
   } catch (error) {
     console.error('registerUser error:', error);

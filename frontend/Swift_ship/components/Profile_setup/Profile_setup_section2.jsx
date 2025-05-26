@@ -120,7 +120,7 @@ const RoleSelector = ({ selectedRole, onRoleSelect, theme, hasError }) => {
 };
 
 const Profile_setup_section2 = (data) => {  
-  const { theme, updateProfileData } = useContext(ThemeContext);
+  const { theme, updateProfileData, profileData } = useContext(ThemeContext);
   const phoneInput = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -229,9 +229,11 @@ const Profile_setup_section2 = (data) => {
  const handleContinue = async () => {
   if (validateForm()) {
     const fullName = `${formData.first_name} ${formData.last_name}`;
+    
+    // Afficher le toast de succès pour la validation
     Toast.show({
       type: 'success',
-      text1: 'Profil mis à jour',
+      text1: 'Compte créé avec succès',
       text2: `Profil ${formData.role === 'parent' ? 'Parent' : 
              formData.role === 'admin' ? 'Administrateur' : 
              formData.role === 'exploitant' ? 'Exploitant' : ''} sélectionné`,
@@ -240,7 +242,12 @@ const Profile_setup_section2 = (data) => {
       autoHide: true,
       topOffset: 70,
     });
-       const userData = {
+
+    // **CORRECTION : Vérification de sécurité pour profileData**
+    const profileImage = profileData?.profileImage || null;
+    
+    // Préparer les données utilisateur avec l'image de profil
+    const userData = {
       userId: formData.userId,
       fullName: fullName,
       email: formData.email,
@@ -251,27 +258,16 @@ const Profile_setup_section2 = (data) => {
       countryCode: formData.countryCode,
       role: formData.role,
       lastUpdated: new Date().toISOString(),
-      camp: formData.camp
+      camp: formData.camp,
+      profileImage: profileImage // Utiliser la variable vérifiée
     };
-      const response = await registerUser({
-        userId: formData.userId,
-        fullName: fullName,
-        email: formData.email,
-        phone: formData.phone,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        nickName: formData.nickName,
-        countryCode: formData.countryCode,
-        role: formData.role,
-        lastUpdated: new Date().toISOString(),
-        camp: formData.camp
-      });
-       try {
-      // 1. Enregistrer sur le serveur
+
+    try {
+      // 1. Enregistrer sur le serveur avec l'image
       const response = await registerUser(userData);
       
-      // 2. Mettre à jour le contexte local (décommentez et utilisez cette ligne)
-      updateProfileData({
+      // 2. Mettre à jour le contexte local avec les données retournées du serveur
+      const contextData = {
         fullName: fullName,
         email: formData.email,
         phoneNumber: formData.phone,
@@ -281,23 +277,50 @@ const Profile_setup_section2 = (data) => {
         countryCode: formData.countryCode,
         role: formData.role,
         lastUpdated: new Date().toISOString(),
-      });
+        // **CORRECTION : Vérification de sécurité**
+        profileImage: response.user?.profileImage || profileImage,
+        profileImageUrl: response.user?.profileImageUrl || null
+      };
       
-      // 3. Enregistrer dans AsyncStorage les informations de l'utilisateur
+      updateProfileData(contextData);
+      
+      // 3. Enregistrer dans AsyncStorage les informations complètes de l'utilisateur
+      const storageData = {
+        ...userData,
+        profileImage: response.user?.profileImage || profileImage,
+        profileImageUrl: response.user?.profileImageUrl || null,
+        userId: response.user?.id || userData.userId
+      };
+      
       try {
-        await AsyncStorage.setItem('userInfo', JSON.stringify(userData));
+        await AsyncStorage.setItem('userInfo', JSON.stringify(storageData));
+        console.log('Données utilisateur sauvegardées dans AsyncStorage');
       } catch (storageError) {
         console.error('Erreur lors de la sauvegarde des données utilisateur:', storageError);
       }
       
+      // 4. Vérifier la réponse du serveur et rediriger
       if (response.status === "success") {
-        router.push('/login');
+        Toast.show({
+          type: 'success',
+          text1: 'Inscription réussie',
+          text2: 'Votre profil a été créé avec succès',
+          position: 'top',
+          visibilityTime: 3000,
+          autoHide: true,
+          topOffset: 70,
+        });
+        
+        // Petite pause pour laisser le toast s'afficher
+        setTimeout(() => {
+          router.push('/login');
+        }, 1500);
       } else {
-        console.log("réponse erreur", response);
+        console.log("Réponse erreur du serveur:", response);
         Toast.show({
           type: 'error',
           text1: 'Erreur',
-          text2: 'Une erreur est survenue lors de l\'enregistrement du profil',
+          text2: response.message || 'Une erreur est survenue lors de l\'enregistrement du profil',
           position: 'top',
           visibilityTime: 4000,
           autoHide: true,
@@ -306,10 +329,30 @@ const Profile_setup_section2 = (data) => {
       }
     } catch (error) {
       console.error("Erreur lors de l'enregistrement du profil:", error);
+      
+      // Gestion d'erreur plus détaillée
+      let errorMessage = 'Une erreur est survenue lors de l\'enregistrement du profil';
+      
+      if (error.response) {
+        // Erreur de réponse du serveur
+        if (error.response.status === 400) {
+          errorMessage = error.response.data?.message || 'Données invalides';
+        } else if (error.response.status === 409) {
+          errorMessage = 'Un utilisateur avec cet email existe déjà';
+        } else if (error.response.status === 500) {
+          errorMessage = 'Erreur serveur. Veuillez réessayer plus tard';
+        } else {
+          errorMessage = error.response.data?.message || errorMessage;
+        }
+      } else if (error.request) {
+        // Erreur de réseau
+        errorMessage = 'Problème de connexion. Vérifiez votre réseau';
+      }
+      
       Toast.show({
         type: 'error',
-        text1: 'Erreur',
-        text2: 'Une erreur est survenue lors de l\'enregistrement du profil',
+        text1: 'Erreur d\'inscription',
+        text2: errorMessage,
         position: 'top',
         visibilityTime: 4000,
         autoHide: true,

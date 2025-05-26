@@ -4,23 +4,30 @@ import {
     getUser, 
     getUserByEmail, 
     addUser, 
-    getAllUsers,  // Add these new functions
+    getAllUsers,
     updateUserStatus,
-    deleteUser
+    deleteUser,
+    updateUserProfile
 } from "../controllers/userController";
 import { authenticateToken } from "../middleware/authMiddleware";
+import upload from "../middleware/upload";
 
 const router = express.Router();
 
+// Modified route for adding user with profile image
+router.post("/", upload.single('profileImage'), addUser); 
+
 // Existing routes
-router.post("/", addUser);
 router.get("/add-user", getUserByEmail);
 router.post('/get-users', getUsers);
 router.post('/get-user', authenticateToken, getUser);
 
-// New admin routes for user management
+// Admin routes for user management
 router.get("/all-users", getAllUsers);
-router.put("/update-status/:id", authenticateToken, updateUserStatus); // Update user status (approve/reject)
-router.delete("/delete/:id", authenticateToken, deleteUser); // Delete user
+router.put("/update-status/:id", authenticateToken, updateUserStatus);
+router.delete("/delete/:id", authenticateToken, deleteUser);
+
+// Route pour mettre à jour le profil utilisateur avec image
+router.put("/update-profile/:id", upload.single('profileImage'), updateUserProfile);
 
 export default router;

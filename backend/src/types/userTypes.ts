@@ -14,5 +14,7 @@ export interface IUser {
     verificationCode?: string | null;
     verificationCodeExpires?: Date; 
     isVerified: boolean;
+    profileImage?: string;
+    profileImageUrl?: string;
     // Add other fields as needed
   }
