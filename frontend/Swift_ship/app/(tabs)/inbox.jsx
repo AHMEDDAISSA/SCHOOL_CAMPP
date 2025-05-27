@@ -29,77 +29,54 @@ const Inbox = () => {
     setSearchVisible(!searchVisible);
   }
   
-  return (
-    <View style={[styles.container, {backgroundColor: theme.background}]}>
-      <View style={[styles.header]}>
-        <TouchableOpacity onPress={back}>
-          {darkMode ? <Dark_back /> : <Back />}
-        </TouchableOpacity>
-        <Text style={[styles.heading, {color:theme.color}]}>Messages</Text>
-        <TouchableOpacity onPress={toggleSearch}>
-          <Search />
-        </TouchableOpacity>
-      </View>
-      
-      {searchVisible && (
-        <View style={styles.searchContainer}>
-          <TextInput 
-            style={[styles.searchInput, {backgroundColor: theme.cardbg, color: theme.color}]}
-            placeholder="Rechercher un message..." 
-            placeholderTextColor={theme.placeholderColor}
-          />
-          <TouchableOpacity style={styles.filterButton}>
-            <Filter />
-          </TouchableOpacity>
-        </View>
-      )}
-      
-      <View style={styles.tab_container}>
-        {
-          inbox_tab_data.map((d) => (
-            <TouchableOpacity 
-              style={[styles.tab, activetab === d.id && styles.activetab]} 
-              key={d.id} 
-              onPress={() => {press(d.id)}}
-            >
-              <Text style={[styles.tab_text, activetab === d.id && styles.activetab_text]}>
-                {d.text}
-              </Text>
-              {d.count > 0 && (
-                <View style={styles.countBadge}>
-                  <Text style={styles.countText}>{d.count}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))
-        }
-      </View>
-      
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {activetab === 1 ? 
-          <Inbox_section3 /> : 
-          <Inbox_section2 />
-        }
-        
-        {/* Message informatif pour l'utilisateur */}
-        {(activetab === 1 || activetab === 2) && (
-          <View style={[styles.infoCard, {backgroundColor: theme.cardbg}]}>
-            <Text style={[styles.infoText, {color: theme.secondaryColor}]}>
-              Les messages sont visibles pendant 30 jours après la dernière activité de l'annonce
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-      
-      {/* Bouton flottant pour créer un nouveau message */}
-      <TouchableOpacity 
-        style={styles.newMessageButton}
-        onPress={() => router.push('(screens)/new_message')}
-      >
-        <Text style={styles.newMessageButtonText}>+</Text>
+ return (
+  <View style={[styles.container, {backgroundColor: theme.background}]}>
+    <View style={[styles.header]}>
+      <TouchableOpacity onPress={back}>
+        {darkMode ? <Dark_back /> : <Back />}
+      </TouchableOpacity>
+      <Text style={[styles.heading, {color:theme.color}]}>Messages</Text>
+      <TouchableOpacity onPress={toggleSearch}>
+        <Search />
       </TouchableOpacity>
     </View>
-  );
+    
+    {searchVisible && (
+      <View style={styles.searchContainer}>
+        <TextInput 
+          style={[styles.searchInput, {backgroundColor: theme.cardbg, color: theme.color}]}
+          placeholder="Rechercher un message..." 
+          placeholderTextColor={theme.placeholderColor}
+        />
+        <TouchableOpacity style={styles.filterButton}>
+          <Filter />
+        </TouchableOpacity>
+      </View>
+    )}
+    
+    {/* Ajout d'un espace entre le titre et le contenu */}
+    <View style={{ marginTop: 20 }} />
+    
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Inbox_section3 />
+      
+      {/* Message informatif pour l'utilisateur */}
+      <View style={[styles.infoCard, {backgroundColor: theme.cardbg}]}>
+        <Text style={[styles.infoText, {color: theme.secondaryColor}]}>
+          Les messages sont visibles pendant 30 jours après la dernière activité de l'annonce
+        </Text>
+      </View>
+    </ScrollView>
+    
+    {/* Bouton flottant pour créer un nouveau message */}
+    <TouchableOpacity 
+      style={styles.newMessageButton}
+      onPress={() => router.push('(screens)/new_message')}
+    >
+      <Text style={styles.newMessageButtonText}>+</Text>
+    </TouchableOpacity>
+  </View>
+);
 }
 
 export default Inbox;

@@ -1,22 +1,27 @@
-import messaging from '@react-native-firebase/messaging';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Demander les permissions de notification
 export const requestNotificationPermission = async () => {
-  const authStatus = await messaging().requestPermission();
-  return authStatus === messaging.AuthorizationStatus.AUTHORIZED || 
-         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
 };
 
-// Enregistrer le token FCM de l'utilisateur dans votre backend
+// Enregistrer le token Expo de l'utilisateur
 export const registerDeviceForNotifications = async (email) => {
   try {
-    const token = await messaging().getToken();
+    if (!Device.isDevice) {
+      throw new Error("Les notifications ne sont pas disponibles sur les émulateurs");
+    }
+
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
     
     // Sauvegarder le token localement
-    await AsyncStorage.setItem('fcmToken', token);
+    await AsyncStorage.setItem('expoPushToken', token);
     
-    // Envoyer le token au backend pour l'associer à l'utilisateur
+    // Envoyer le token au backend
     const response = await fetch('/api/users/register-device', {
       method: 'POST',
       headers: {
@@ -37,75 +42,71 @@ export const registerDeviceForNotifications = async (email) => {
 };
 
 // Configurer la gestion des notifications
-export const setupNotifications = async () => {
-  // Gérer les notifications lorsque l'application est en arrière-plan
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('Message handled in the background:', remoteMessage);
-    // Sauvegarder la notification pour l'afficher plus tard
-    await saveNotification(remoteMessage);
+export const setupNotifications = () => {
+  // Écouteur pour les notifications en arrière-plan
+  Notifications.addNotificationResponseReceivedListener(response => {
+    handleNotificationNavigation(response.notification);
   });
-  
-  // Gérer les notifications lorsque l'application est au premier plan
-  const unsubscribe = messaging().onMessage(async remoteMessage => {
-    console.log('Notification reçue au premier plan:', remoteMessage);
+
+  // Écouteur pour les notifications au premier plan
+  const subscription = Notifications.addNotificationReceivedListener(notification => {
+    console.log('Notification reçue au premier plan:', notification);
     
-    // Sauvegarder la notification
-    await saveNotification(remoteMessage);
+    saveNotification(notification);
     
-    // Montrer la notification dans l'application
-    // Vous pouvez utiliser React Native Toast pour cela
+    // Afficher le toast
     Toast.show({
       type: 'info',
-      text1: remoteMessage.notification.title,
-      text2: remoteMessage.notification.body,
-      onPress: () => {
-        // Naviguer vers la conversation ou l'annonce concernée
-        if (remoteMessage.data && remoteMessage.data.postId) {
-          router.push(`/annonce/${remoteMessage.data.postId}`);
-        } else if (remoteMessage.data && remoteMessage.data.conversationId) {
-          router.push(`(screens)/chat_screen?id=${remoteMessage.data.conversationId}`);
-        }
-      }
+      text1: notification.request.content.title,
+      text2: notification.request.content.body,
+      onPress: () => handleNotificationNavigation(notification)
     });
   });
-  
-  return unsubscribe;
+
+  return () => subscription.remove();
 };
 
-// Sauvegarder une notification pour l'historique
+// Gestion de la navigation pour les notifications
+const handleNotificationNavigation = (notification) => {
+  const data = notification.request.content.data;
+  
+  if (data?.postId) {
+    router.push(`/annonce/${data.postId}`);
+  } else if (data?.conversationId) {
+    router.push(`(screens)/chat_screen?id=${data.conversationId}`);
+  }
+};
+
+// Sauvegarder une notification
 const saveNotification = async (notification) => {
   try {
     const storedNotifications = await AsyncStorage.getItem('notifications');
     const notifications = storedNotifications ? JSON.parse(storedNotifications) : [];
     
-    // Ajouter la nouvelle notification
     notifications.unshift({
-      id: Date.now().toString(),
-      title: notification.notification.title,
-      body: notification.notification.body,
-      data: notification.data,
+      id: notification.identifier || Date.now().toString(),
+      title: notification.request.content.title,
+      body: notification.request.content.body,
+      data: notification.request.content.data,
       timestamp: Date.now(),
       read: false,
     });
     
-    // Limiter à 50 notifications max
-    if (notifications.length > 50) {
-      notifications.splice(50);
-    }
+    if (notifications.length > 50) notifications.splice(50);
     
     await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
   } catch (error) {
-    console.error('Erreur lors de la sauvegarde de la notification:', error);
+    console.error('Erreur lors de la sauvegarde:', error);
   }
 };
 
-// Récupérer toutes les notifications sauvegardées
+// Récupérer les notifications (inchangé)
 export const getNotifications = async () => {
   try {
     const storedNotifications = await AsyncStorage.getItem('notifications');
     return storedNotifications ? JSON.parse(storedNotifications) : [];
   } catch (error) {
-    console.error('Erreur lors de la récupération des notifications:', error);
+    console.error('Erreur lors de la récupération:', error);
     return [];
   }
 };

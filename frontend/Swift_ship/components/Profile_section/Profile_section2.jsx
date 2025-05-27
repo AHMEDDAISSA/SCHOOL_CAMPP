@@ -9,7 +9,7 @@ import Camera from '../../assets/images/camera.svg';
 import { router } from 'expo-router';
 // Importez ici des icônes pour améliorer l'interface
 import ProfileIcon from '../../assets/images/profillleeeeee.svg'; // À créer ou importer
-import EmailIcon from '../../assets/images/email.svg'; // À créer ou importer
+import EmailIcon from '../../assets/images/mail.svg'; // À créer ou importer
 import PhoneIcon from '../../assets/images/phonee.svg'; // À créer ou importer
 
 const Profile_section2 = () => {
@@ -63,10 +63,10 @@ const Profile_section2 = () => {
             </View>
             
             <View style={styles.infoItem}>
-              <PhoneIcon width={16} height={16} color={darkMode ? "#ccc" : "#666"} />
+              {/* <PhoneIcon width={16} height={16} color={darkMode ? "#ccc" : "#666"} />
               <Text style={[styles.infoText, { color: theme.color4 }]}>
                 {profileData.phoneNumber || 'Numéro non défini'}
-              </Text>
+              </Text> */}
             </View>
           </View>
           
@@ -88,12 +88,7 @@ const Profile_section2 = () => {
               </View>
             )}
             
-            <TouchableOpacity 
-              style={[styles.editButton, { backgroundColor: darkMode ? 'rgba(131, 110, 254, 0.2)' : '#f0f0ff' }]} 
-              onPress={() => router.push('/profile-setup')}
-            >
-              <Text style={styles.editButtonText}>Modifier</Text>
-            </TouchableOpacity>
+           
           </View>
           
           {profileData.lastUpdated && (

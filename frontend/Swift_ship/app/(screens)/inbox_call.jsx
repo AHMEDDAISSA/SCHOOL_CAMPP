@@ -8,7 +8,7 @@ const Inbox_call = () => {
   const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
   return (
     <View>
-      <Image source={Call} alt='image' style={styles.image} />
+      {/* <Image source={Call} alt='image' style={styles.image} />
       <View style={styles.row}>
         {call_row_data.map((d) => {
           let backgroundColor;
@@ -28,7 +28,7 @@ const Inbox_call = () => {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </View> */}
     </View>
   );
 };

@@ -43,7 +43,7 @@ const TabsLayout = () => {
           return {
             tabBarShowLabel: false,
             tabBarButton: (props) => (
-              <TabBarButton {...props} title={route.name} />
+                <TabBarButton {...props} title={route.params?.title || route.options?.title || route.name} />
             ),
             tabBarStyle: [styles.tabBar, { backgroundColor: theme.background }],
             headerShown: false,
@@ -71,9 +71,9 @@ const TabsLayout = () => {
           };
         }}
       >
-        <Tabs.Screen name="home" options={{ title: 'Home' }} />
+        <Tabs.Screen name="home" options={{ title: 'Accueil' }} />
         <Tabs.Screen name="Annonces" options={{ title: 'Annonces' }} />
-        <Tabs.Screen name="inbox" options={{ title: 'Inbox' }} />
+        <Tabs.Screen name="inbox" options={{ title: 'Messages' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
     </View>

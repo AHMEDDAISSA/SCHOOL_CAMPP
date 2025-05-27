@@ -11,8 +11,17 @@ import Index3 from "../components/Index/Index3/Index3";
 import { SourceSansPro_400Regular, SourceSansPro_600SemiBold, SourceSansPro_700Bold } from "@expo-google-fonts/source-sans-pro";
 import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import LottieView from 'lottie-react-native'; 
+import * as Notifications from 'expo-notifications';
 const { width } = Dimensions.get('window');
 SplashScreen.preventAutoHideAsync();
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function App() {
   const { theme, darkMode } = useContext(ThemeContext);

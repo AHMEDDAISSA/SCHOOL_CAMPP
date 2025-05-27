@@ -59,7 +59,7 @@ export const loginUser = async (email) => {
   }
 };
 
-// GET: Authenticate or add user
+
 export const addUser = async (email) => {
   try {
     const response = await api.post('/user/add-user', { params: { email } });

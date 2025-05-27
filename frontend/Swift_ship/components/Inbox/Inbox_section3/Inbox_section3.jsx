@@ -283,7 +283,7 @@ const Inbox_section3 = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionTitle, {color: theme.color}]}>Messages liés aux annonces</Text>
+      {/* <Text style={[styles.sectionTitle, {color: theme.color}]}>Messages liés aux annonces</Text> */}
       
       {messageData.length === 0 ? (
         <View style={[styles.emptyState, {backgroundColor: theme.cardbg}]}>
@@ -389,6 +389,7 @@ export default Inbox_section3;
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 20,
+    margingTop: 20
   },
   sectionTitle: {
     fontSize: 16,

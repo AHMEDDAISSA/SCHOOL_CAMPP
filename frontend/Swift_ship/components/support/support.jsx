@@ -29,12 +29,8 @@ const Support = () => {
       answer: 'Pour modifier votre profil, accédez à la page Profil et appuyez sur le bouton "Modifier" à côté de vos informations personnelles.'
     },
     { 
-      question: 'Comment changer mon mot de passe ?',
-      answer: 'Allez dans Paramètres du compte > Sécurité > Changer le mot de passe et suivez les instructions à l\'écran.'
-    },
-    { 
       question: 'Comment contacter le support technique ?',
-      answer: 'Vous pouvez nous contacter en utilisant le formulaire de contact dans l\'onglet "Contact" de cette page ou par email à support@example.com.'
+      answer: 'Vous pouvez nous contacter en utilisant le formulaire de contact dans l\'onglet "Contact" de cette page ou par email à ahmedaissa575@gmail.com.'
     },
     {
       question: 'L\'application est-elle disponible sur iOS et Android ?',
@@ -215,7 +211,7 @@ const Support = () => {
               onPress={() => {/* Ouvrir l'email */}}
             >
               <Text style={[styles.resourceName, { color: theme.color }]}>Email</Text>
-              <Text style={[styles.resourceDesc, { color: '#836EFE' }]}>support@example.com</Text>
+              <Text style={[styles.resourceDesc, { color: '#836EFE' }]}>ahmedaissa575@gmail.com</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -223,7 +219,7 @@ const Support = () => {
               onPress={() => {/* Ouvrir l'appel téléphonique */}}
             >
               <Text style={[styles.resourceName, { color: theme.color }]}>Téléphone</Text>
-              <Text style={[styles.resourceDesc, { color: '#836EFE' }]}>+33 1 23 45 67 89</Text>
+              <Text style={[styles.resourceDesc, { color: '#836EFE' }]}>+44 96339287</Text>
             </TouchableOpacity>
           </View>
         )}

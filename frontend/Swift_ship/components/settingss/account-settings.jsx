@@ -28,10 +28,10 @@ const AccountSettings = () => {
   
   // États pour les informations utilisateur
   const [userInfo, setUserInfo] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+33 6 12 34 56 78',
+    firstName: 'ahmed',
+    lastName: 'aissa',
+    email: 'aisssaahmed9@gmail.com',
+    phone: '+44 963392877',
   });
   
   const [isEditing, setIsEditing] = useState(false);
@@ -57,13 +57,13 @@ const AccountSettings = () => {
       id: 2,
       title: 'Sécurité',
       items: [
-        {
-          id: 'password',
-          name: 'Changer le mot de passe',
-          icon: <SecurityIcon width={20} height={20} />,
-          type: 'navigation',
-          onPress: () => Alert.alert('Info', 'Fonctionnalité à implémenter')
-        },
+        // {
+        //   id: 'password',
+        //   name: 'Changer le mot de passe',
+        //   icon: <SecurityIcon width={20} height={20} />,
+        //   type: 'navigation',
+        //   onPress: () => Alert.alert('Info', 'Fonctionnalité à implémenter')
+        // },
         {
           id: 'twofa',
           name: 'Authentification à deux facteurs',

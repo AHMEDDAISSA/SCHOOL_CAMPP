@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'react-native';
 import React, { useContext } from 'react';
-import Phone from "../../../assets/images/phone.svg";
-import { call_data } from '../../Data/Data';
+// import Phone from "../../../assets/images/phone.svg";
+// import { call_data } from '../../Data/Data';
 import { Montserrat_500Medium, Montserrat_700Bold } from '@expo-google-fonts/montserrat';
 import ThemeContext from '../../../theme/ThemeContext';
 
@@ -9,7 +9,7 @@ const Inbox_section2 = () => {
     const { theme, darkMode, toggleTheme } = useContext(ThemeContext);
   return (
     <View>
-      <View style={styles.stack_container}>
+      {/* <View style={styles.stack_container}>
         {
             call_data.map((d) => (
                 <TouchableOpacity style={[styles.stack, {backgroundColor:theme.cardbg}]} key={d.id}>
@@ -24,7 +24,7 @@ const Inbox_section2 = () => {
                 </TouchableOpacity>
             ))
         }
-      </View>
+      </View> */}
     </View>
   )
 }
