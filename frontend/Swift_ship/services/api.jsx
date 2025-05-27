@@ -52,9 +52,56 @@ api.interceptors.response.use(
 export const loginUser = async (email) => {
   try {
     const response = await api.post('/auth/login', { email });
+    
+    if (response.data && response.data.user) {
+      const userData = response.data.user;
+      const mappedData = {
+        fullName: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+        firstName: userData.first_name || '',
+        lastName: userData.last_name || '',
+        email: userData.email || '',
+        phoneNumber: userData.phone || '',
+        // **CORRECTION : Utiliser profileImageUrl ou construire l'URL**
+        profileImage: userData.profileImageUrl || userData.profileImage || null,
+        role: userData.role || '',
+        camp: userData.camp || '',
+        isVerified: userData.isVerified || false,
+        canPost: userData.canPost || false,
+      };
+      response.data.user = { ...userData, ...mappedData };
+    }
+    
     return response;
   } catch (error) {
     console.error('loginUser error:', error.message);
+    throw error;
+  }
+};
+
+export const getUserByEmailApi = async (email) => {
+  try {
+    const response = await api.get(`/user/add-user?email=${encodeURIComponent(email)}`);
+    
+    if (response.data) {
+      const userData = response.data;
+      const mappedData = {
+        fullName: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+        firstName: userData.first_name || '',
+        lastName: userData.last_name || '',
+        email: userData.email || '',
+        phoneNumber: userData.phone || '',
+        profileImage: userData.profileImageUrl || userData.profileImage || null,
+        role: userData.role || '',
+        camp: userData.camp || '',
+        isVerified: userData.isVerified || false,
+        canPost: userData.canPost || false,
+      };
+      return { ...userData, ...mappedData };
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('getUserByEmailApi error:', error.message);
     throw error;
   }
 };
@@ -122,21 +169,26 @@ export const registerUser = async (userData) => {
   try {
     console.log('Registering user with data:', userData);
     
-    // **NOUVEAU : Créer FormData pour inclure l'image**
     const formData = new FormData();
     
-    // Ajouter les données utilisateur
+    // **MODIFICATION : Mapper correctement les champs**
+    const fieldMapping = {
+      firstName: 'first_name',
+      lastName: 'last_name',
+      phoneNumber: 'phone',
+      // Autres champs restent identiques
+    };
+    
     Object.keys(userData).forEach(key => {
       if (key !== 'profileImage' && userData[key] !== undefined && userData[key] !== null) {
-        formData.append(`user[${key}]`, userData[key].toString());
+        const fieldName = fieldMapping[key] || key;
+        formData.append(fieldName, userData[key].toString());
       }
     });
     
-    // **NOUVEAU : Ajouter l'image de profil si elle existe**
     if (userData.profileImage && userData.profileImage.startsWith('file://')) {
-  // It's a local file URI, we need to append it as a file
-  const uriParts = userData.profileImage.split('/');
-  const fileName = uriParts[uriParts.length - 1];
+      const uriParts = userData.profileImage.split('/');
+      const fileName = uriParts[uriParts.length - 1];
       const fileType = userData.profileImage.includes('.jpeg') ? 'image/jpeg' : 
                      userData.profileImage.includes('.jpg') ? 'image/jpeg' : 
                      userData.profileImage.includes('.png') ? 'image/png' : 
@@ -158,10 +210,6 @@ export const registerUser = async (userData) => {
     return response;
   } catch (error) {
     console.error('registerUser error:', error);
-    if (error.response) {
-      console.error('Error response:', error.response.data);
-      console.error('Error status:', error.response.status);
-    }
     throw error;
   }
 };

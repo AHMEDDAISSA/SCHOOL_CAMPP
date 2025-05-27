@@ -142,13 +142,19 @@ export const getUser = async (req: Request<{},{},{userId:string}>, res: Response
             return;
         }
 
-        // Transformer l'URL de l'image de profil
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const userObj = user.toObject();
         
+        // **CORRECTION : Construire l'URL complète de l'image**
         if (userObj.profileImage) {
-            userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+            if (!userObj.profileImage.startsWith('http')) {
+                userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+            } else {
+                userObj.profileImageUrl = userObj.profileImage;
+            }
         }
+        
+        userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
 
         res.status(200).json(userObj);
     } catch (error) {
@@ -158,29 +164,26 @@ export const getUser = async (req: Request<{},{},{userId:string}>, res: Response
 
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Débogage - vérifier l'authentification
-    console.log('Auth header:', req.headers.authorization);
-    
-    // Récupérer tous les utilisateurs
     const users = await User.find().sort({ createdAt: -1 }).populate('camp');
-    
-    console.log(`Nombre d'utilisateurs trouvés: ${users.length}`);
-    
-    // Transformer les données pour inclure les URL complètes des images de profil
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     
     const transformedUsers = users.map(user => {
         const userObj = user.toObject();
         
-        // Transformer l'image de profil en URL complète
+        // **CORRECTION : Construire l'URL complète de l'image**
         if (userObj.profileImage) {
-            userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+            if (!userObj.profileImage.startsWith('http')) {
+                userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+            } else {
+                userObj.profileImageUrl = userObj.profileImage;
+            }
         }
+        
+        userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
         
         return userObj;
     });
     
-    // Renvoyer les données
     res.status(200).json(transformedUsers);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -277,17 +280,14 @@ export const deleteUser = async (req: Request<{id: string}>, res: Response): Pro
 
 // Existing functions
 export const getUserByEmail = async (req: Request, res: Response): Promise<void> => {
-    // For GET requests, the email is in req.query
     const { email } = req.query;
-    console.log('Getting user by email:', email);
     
     try {
       if (!email) {
         res.status(400).json({ message: 'Email is required' });
         return;
       }
-      console.log(email)
-      // Make email comparison case-insensitive
+      
       const user = await User.findOne({ 
           email: { $regex: new RegExp(`^${email}$`, 'i') } 
         }).populate('camp');
@@ -297,13 +297,20 @@ export const getUserByEmail = async (req: Request, res: Response): Promise<void>
         return;
       }
 
-      // Transformer l'URL de l'image de profil
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const userObj = user.toObject();
       
+      // **CORRECTION : Construire l'URL complète de l'image**
       if (userObj.profileImage) {
-          userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+          // Si l'image ne contient pas déjà l'URL complète
+          if (!userObj.profileImage.startsWith('http')) {
+              userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+          } else {
+              userObj.profileImageUrl = userObj.profileImage;
+          }
       }
+      
+      userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
       
       res.status(200).json(userObj);
     } catch (error: any) {

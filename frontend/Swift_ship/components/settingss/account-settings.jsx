@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -24,15 +24,24 @@ import NotificationIcon from '../../assets/images/notification.svg';
 import LanguageIcon from '../../assets/images/language.svg';
 
 const AccountSettings = () => {
-  const { theme, darkMode } = useContext(ThemeContext);
+  const { theme, darkMode, profileData  } = useContext(ThemeContext);
   
   // États pour les informations utilisateur
-  const [userInfo, setUserInfo] = useState({
-    firstName: 'ahmed',
-    lastName: 'aissa',
-    email: 'aisssaahmed9@gmail.com',
-    phone: '+44 963392877',
+   const [userInfo, setUserInfo] = useState({
+    firstName: profileData.firstName || profileData.first_name || '',
+    lastName: profileData.lastName || profileData.last_name || '',
+    email: profileData.email || '',
+    phone: profileData.phoneNumber || profileData.phone || '',
   });
+
+   useEffect(() => {
+    setUserInfo({
+      firstName: profileData.firstName || profileData.first_name || '',
+      lastName: profileData.lastName || profileData.last_name || '',
+      email: profileData.email || '',
+      phone: profileData.phoneNumber || profileData.phone || '',
+    });
+  }, [profileData]);
   
   const [isEditing, setIsEditing] = useState(false);
   const [notifications, setNotifications] = useState(true);

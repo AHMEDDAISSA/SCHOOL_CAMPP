@@ -31,7 +31,8 @@ app.use('/user',userRouter);
 
 // app.use('/api/contacts', contactRoutes);
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 //db connection
 mongoose.connect(process.env.MONGO_URI as string)

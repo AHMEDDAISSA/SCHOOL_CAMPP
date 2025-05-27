@@ -36,7 +36,13 @@ const Profile_section2 = () => {
             {profileData.profileImage ? (
               <Image 
                 source={{ uri: profileData.profileImage }} 
-                style={styles.image} 
+                style={styles.image}
+                onError={(error) => {
+                  console.error('Error loading profile image:', error.nativeEvent.error);
+                }}
+                onLoad={() => {
+                  console.log('Profile image loaded successfully');
+                }}
               />
             ) : (
               <View style={[styles.placeholder_image, { backgroundColor: darkMode ? '#2a2a2a' : '#f0f0f0' }]}>
@@ -51,7 +57,7 @@ const Profile_section2 = () => {
         
         <View style={[styles.content, { backgroundColor: theme.cardbg, shadowColor: darkMode ? '#000' : '#ccc' }]}>
           <Text style={[styles.name, { color: theme.color2 }]}>
-            {profileData.fullName || 'Utilisateur'}
+            {profileData.fullName || `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() || 'Utilisateur'}
           </Text>
           
           <View style={styles.infoContainer}>
@@ -62,12 +68,15 @@ const Profile_section2 = () => {
               </Text>
             </View>
             
-            <View style={styles.infoItem}>
-              {/* <PhoneIcon width={16} height={16} color={darkMode ? "#ccc" : "#666"} />
-              <Text style={[styles.infoText, { color: theme.color4 }]}>
-                {profileData.phoneNumber || 'Numéro non défini'}
-              </Text> */}
-            </View>
+            {/* **AJOUT : Affichage du téléphone** */}
+            {profileData.phoneNumber && (
+              <View style={styles.infoItem}>
+                <PhoneIcon width={16} height={16} color={darkMode ? "#ccc" : "#666"} />
+                <Text style={[styles.infoText, { color: theme.color4 }]}>
+                  {profileData.phoneNumber}
+                </Text>
+              </View>
+            )}
           </View>
           
           <View style={styles.editRow}>
@@ -83,12 +92,10 @@ const Profile_section2 = () => {
                     backgroundColor: darkMode ? 'rgba(131, 110, 254, 0.2)' : '#f0f0ff',
                   }
                 ]}>
-                  {profileData.role ? getRoleLabel(profileData.role) : 'Non défini'}
+                  {getRoleLabel(profileData.role)}
                 </Text>
               </View>
             )}
-            
-           
           </View>
           
           {profileData.lastUpdated && (

@@ -67,32 +67,62 @@ export const ThemeProvider = ({ children }) => {
       }
     };
 
-    const loadProfileData = async () => {
+  const loadProfileData = async () => {
+  try {
+    const [storedEmail, storedUserInfo, storedProfileData] = await Promise.all([
+      AsyncStorage.getItem('userEmail'),
+      AsyncStorage.getItem('userInfo'),
+      AsyncStorage.getItem('profileData'),
+    ]);
+
+    let newProfileData = { ...profileData };
+    
+    if (storedEmail) {
+      newProfileData.email = storedEmail;
+      
+      // **AJOUT : Récupérer les données utilisateur depuis l'API si on a l'email**
       try {
-        const [storedEmail, storedUserInfo, storedProfileData] = await Promise.all([
-          AsyncStorage.getItem('userEmail'),
-          AsyncStorage.getItem('userInfo'),
-          AsyncStorage.getItem('profileData'),
-        ]);
-
-        let newProfileData = { ...profileData };
-        if (storedEmail) {
-          newProfileData.email = storedEmail;
+        const userData = await getUserByEmailApi(storedEmail);
+        if (userData) {
+          newProfileData = {
+            ...newProfileData,
+            ...userData,
+            fullName: userData.fullName || `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+            firstName: userData.firstName || userData.first_name || '',
+            lastName: userData.lastName || userData.last_name || '',
+            phoneNumber: userData.phoneNumber || userData.phone || '',
+            profileImage: userData.profileImageUrl || userData.profileImage || null,
+          };
         }
-        if (storedUserInfo) {
-          const userInfo = JSON.parse(storedUserInfo);
-          newProfileData = { ...newProfileData, ...userInfo };
-        }
-        if (storedProfileData) {
-          const parsedProfileData = JSON.parse(storedProfileData);
-          newProfileData = { ...newProfileData, ...parsedProfileData };
-        }
-
-        setProfileData(newProfileData);
       } catch (error) {
-        console.error('Error loading profile data:', error);
+        console.error('Error fetching user data by email:', error);
       }
-    };
+    }
+    
+    if (storedUserInfo) {
+      const userInfo = JSON.parse(storedUserInfo);
+      newProfileData = { 
+        ...newProfileData, 
+        ...userInfo,
+        fullName: userInfo.fullName || `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim(),
+        firstName: userInfo.firstName || userInfo.first_name || '',
+        lastName: userInfo.lastName || userInfo.last_name || '',
+        phoneNumber: userInfo.phoneNumber || userInfo.phone || '',
+        profileImage: userInfo.profileImageUrl || userInfo.profileImage || newProfileData.profileImage,
+      };
+    }
+    
+    if (storedProfileData) {
+      const parsedProfileData = JSON.parse(storedProfileData);
+      newProfileData = { ...newProfileData, ...parsedProfileData };
+    }
+
+    console.log('Final profile data loaded:', newProfileData); // Debug
+    setProfileData(newProfileData);
+  } catch (error) {
+    console.error('Error loading profile data:', error);
+  }
+};
 
     loadDarkModeState();
     loadProfileData();
@@ -110,14 +140,23 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const updateProfileData = async (data) => {
-    try {
-      const newProfileData = { ...profileData, ...data };
-      setProfileData(newProfileData);
-      await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
-    } catch (error) {
-      console.error('Error saving profile data:', error);
-    }
-  };
+  try {
+    // **AJOUT : Mapper automatiquement les champs si nécessaire**
+    const mappedData = {
+      ...data,
+      fullName: data.fullName || `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+      firstName: data.firstName || data.first_name || '',
+      lastName: data.lastName || data.last_name || '',
+      phoneNumber: data.phoneNumber || data.phone || '',
+    };
+    
+    const newProfileData = { ...profileData, ...mappedData };
+    setProfileData(newProfileData);
+    await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+  } catch (error) {
+    console.error('Error saving profile data:', error);
+  }
+};
 
   const updateProfileImage = async (imageUri) => {
     try {
