@@ -33,6 +33,19 @@ const Login_section2 = () => {
 
     // Handle email input change
     const handleEmailChange = (text) => {
+        // Vérifier si le texte contient des majuscules
+        if (text !== text.toLowerCase()) {
+            Toast.show({
+                type: 'info',
+                text1: 'Format d\'email',
+                text2: 'Veuillez utiliser uniquement des lettres minuscules',
+                visibilityTime: 3000,
+                topOffset: 50
+            });
+            // Convertir automatiquement en minuscules
+            text = text.toLowerCase();
+        }
+        
         setEmail(text);
         if (text.length > 0) {
             setIsEmailValid(validateEmail(text));
@@ -204,7 +217,7 @@ const Login_section2 = () => {
             <View style={[styles.input_container]}>
                 <Input
                     label="Email"
-                    placeholder="Entrez-votre-email"
+                    placeholder="Entrez votre email "
                     keyboardType="email-address"
                     value={email}
                     onChangeText={handleEmailChange}
