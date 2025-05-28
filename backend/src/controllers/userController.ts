@@ -1,7 +1,10 @@
 import { Response, Request } from "express";
 import UserModel from "../models/User";
 import { IUser } from "../types/userTypes";
-import User from '../models/user1';
+import User from '../models/user1'; 
+import path from "path";
+import fs from "fs";
+
 //get all users
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 
@@ -38,7 +41,6 @@ import User from '../models/user1';
   
 export const addUser = async (req: Request<{}, {}, any>, res: Response): Promise<void> => {
     try {
-        // Extract all fields from the request body
         const { 
             email, 
             first_name, 
@@ -51,38 +53,40 @@ export const addUser = async (req: Request<{}, {}, any>, res: Response): Promise
             isVerified 
         } = req.body;
 
-        // Check if email is provided
         if (!email) {
             res.status(400).json({ message: "Please provide an email" });
             return;
         }
 
-        // Check if the email already exists in the database
-        const existingUser = await UserModel.findOne({ email: email.toLowerCase() });
+        // Vérifier si l'utilisateur existe déjà
+        const existingUser = await UserModel.findOne({ 
+            email: email.toLowerCase(),
+            camp: camp 
+        });
+        
         if (existingUser) {
-            res.status(400).json({ message: "Email is already in use" });
+            res.status(400).json({ message: "User already exists for this camp" });
             return;
         }
 
-        // Handle profile image upload
-        const uploadedFiles = req.files as Express.Multer.File[] || [];
-        const uploadedFile = req.file as Express.Multer.File; // For single file upload
+        // CORRECTION : Gérer correctement l'upload de fichier
+        const uploadedFile = req.file as Express.Multer.File;
         
         let profileImageData = {};
         
-        // Check if there's an uploaded profile image
         if (uploadedFile) {
+            console.log('File uploaded:', {
+                filename: uploadedFile.filename,
+                originalname: uploadedFile.originalname,
+                path: uploadedFile.path,
+                size: uploadedFile.size
+            });
+            
             profileImageData = {
                 profileImage: uploadedFile.filename
             };
-        } else if (uploadedFiles.length > 0) {
-            // If using array upload, take the first image as profile image
-            profileImageData = {
-                profileImage: uploadedFiles[0].filename
-            };
         }
 
-        // Create a new user with all provided data
         const newUserData = {
             email: email.toLowerCase(),
             first_name: first_name || '',
@@ -93,23 +97,23 @@ export const addUser = async (req: Request<{}, {}, any>, res: Response): Promise
             canPost: canPost || false,
             verificationCode: verificationCode || null,
             isVerified: isVerified !== undefined ? isVerified : true,
-            ...profileImageData // Add profile image data if available
+            ...profileImageData
         };
 
-        const newUser = new UserModel(newUserData);
+        console.log('Creating user with data:', newUserData);
 
-        // Save the user to the database
+        const newUser = new UserModel(newUserData);
         await newUser.save();
 
-        // Transform the response to include full image URL
+        // CORRECTION : Construire l'URL complète de l'image
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const userObj = newUser.toObject();
         
         if (userObj.profileImage) {
             userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+            console.log('Profile image URL created:', userObj.profileImageUrl);
         }
 
-        // Respond with a success message
         res.status(201).json({ 
             message: "User added successfully", 
             user: userObj 
@@ -142,18 +146,10 @@ export const getUser = async (req: Request<{},{},{userId:string}>, res: Response
             return;
         }
 
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
         const userObj = user.toObject();
         
-        // **CORRECTION : Construire l'URL complète de l'image**
-        if (userObj.profileImage) {
-            if (!userObj.profileImage.startsWith('http')) {
-                userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
-            } else {
-                userObj.profileImageUrl = userObj.profileImage;
-            }
-        }
-        
+        // CORRECTION : Utiliser la fonction utilitaire
+        userObj.profileImageUrl = getProfileImageUrl(req, userObj.profileImage);
         userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
 
         res.status(200).json(userObj);
@@ -165,20 +161,12 @@ export const getUser = async (req: Request<{},{},{userId:string}>, res: Response
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
     const users = await User.find().sort({ createdAt: -1 }).populate('camp');
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
     
     const transformedUsers = users.map(user => {
         const userObj = user.toObject();
         
-        // **CORRECTION : Construire l'URL complète de l'image**
-        if (userObj.profileImage) {
-            if (!userObj.profileImage.startsWith('http')) {
-                userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
-            } else {
-                userObj.profileImageUrl = userObj.profileImage;
-            }
-        }
-        
+        // CORRECTION : Utiliser la fonction utilitaire
+        userObj.profileImageUrl = getProfileImageUrl(req, userObj.profileImage);
         userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
         
         return userObj;
@@ -278,7 +266,33 @@ export const deleteUser = async (req: Request<{id: string}>, res: Response): Pro
   }
 };
 
-// Existing functions
+const getProfileImageUrl = (req: Request, profileImage: string | undefined): string | null => {
+    if (!profileImage) return null;
+    
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    
+    // Si c'est déjà une URL complète, la retourner
+    if (profileImage.startsWith('http')) {
+        return profileImage;
+    }
+    
+    // CORRECTION : Vérifier le chemin correct des uploads
+    const uploadsPath = path.join(__dirname, '..', 'uploads');
+    const filePath = path.join(uploadsPath, profileImage);
+    
+    console.log('Checking file path:', filePath);
+    console.log('File exists:', fs.existsSync(filePath));
+    
+    if (fs.existsSync(filePath)) {
+        const imageUrl = `${baseUrl}/uploads/${profileImage}`;
+        console.log('Generated image URL:', imageUrl);
+        return imageUrl;
+    }
+    
+    console.log(`Profile image not found: ${filePath}`);
+    return null;
+};
+
 export const getUserByEmail = async (req: Request, res: Response): Promise<void> => {
     const { email } = req.query;
     
@@ -297,20 +311,17 @@ export const getUserByEmail = async (req: Request, res: Response): Promise<void>
         return;
       }
 
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const userObj = user.toObject();
       
-      // **CORRECTION : Construire l'URL complète de l'image**
+      // CORRECTION : Construire l'URL de l'image de profil
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
       if (userObj.profileImage) {
-          // Si l'image ne contient pas déjà l'URL complète
-          if (!userObj.profileImage.startsWith('http')) {
-              userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
-          } else {
-              userObj.profileImageUrl = userObj.profileImage;
-          }
+        userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
       }
       
       userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
+      
+      console.log('Sending user data with image URL:', userObj.profileImageUrl);
       
       res.status(200).json(userObj);
     } catch (error: any) {

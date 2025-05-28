@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView } from 'react-native';
-import React, { useContext } from 'react';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView} from 'react-native';
+import React, { useContext, useState } from 'react';
 import ThemeContext from '../../theme/ThemeContext';
 import Profile_section3 from './Profile_section3';
 import Profile_section4 from './Profile_section4';
@@ -14,6 +14,45 @@ import PhoneIcon from '../../assets/images/phonee.svg'; // À créer ou importer
 
 const Profile_section2 = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext);
+  const [imageError, setImageError] = useState(false);
+  const [imageUrl, setImageUrl] = useState(null);
+
+
+
+ 
+
+    const handleImageError = (error) => {
+    console.error('Error loading profile image:', error.nativeEvent.error);
+    console.log('Failed image URL:', profileData.profileImage);
+    setImageError(true);
+  }
+
+
+   const handleImageLoad = () => {
+    console.log('Profile image loaded successfully:', profileData.profileImage);
+    setImageError(false);
+  };
+
+  // Fonction pour vérifier si l'image est valide
+  const isValidImageUrl = (url) => {
+    if (!url || imageError) return false;
+    
+    // Vérifier si c'est une URL valide
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return true;
+    }
+    
+    // Vérifier si c'est un URI de données
+    if (url.startsWith('data:image/')) {
+      return true;
+    }
+    
+    return false;
+  };
+  console.log('Profile data in component:', profileData);
+  console.log('Profile image URL:', profileData.profileImage);
+  console.log('Is valid image URL:', isValidImageUrl(profileData.profileImage));
+
 
   const getRoleLabel = (roleId) => {
     switch(roleId) {
@@ -28,25 +67,22 @@ const Profile_section2 = () => {
     }
   };
 
-  return (
+   return (
     <View>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.image_box}>
           <View style={styles.image_container}>
-            {profileData.profileImage ? (
+            {isValidImageUrl(profileData.profileImage) ? (
               <Image 
                 source={{ uri: profileData.profileImage }} 
                 style={styles.image}
-                onError={(error) => {
-                  console.error('Error loading profile image:', error.nativeEvent.error);
-                }}
-                onLoad={() => {
-                  console.log('Profile image loaded successfully');
-                }}
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                onLoadStart={() => console.log('Started loading image:', profileData.profileImage)}
               />
             ) : (
               <View style={[styles.placeholder_image, { backgroundColor: darkMode ? '#2a2a2a' : '#f0f0f0' }]}>
-                <ProfileIcon width={40} height={40} color={darkMode ? "#999" : "#666"} />
+                <Text style={{ fontSize: 40, color: darkMode ? "#999" : "#666" }}>👤</Text>
               </View>
             )}
             <TouchableOpacity style={styles.circle}>

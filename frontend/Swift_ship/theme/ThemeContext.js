@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserByEmailApi } from '../services/api'; // AJOUT : Import de la fonction API
 
 const lightTheme = {
   background: '#FFFFFF',
@@ -47,6 +48,8 @@ export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(lightTheme);
   const [profileData, setProfileData] = useState({
     fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phoneNumber: '',
     profileImage: null,
@@ -77,28 +80,7 @@ export const ThemeProvider = ({ children }) => {
 
     let newProfileData = { ...profileData };
     
-    if (storedEmail) {
-      newProfileData.email = storedEmail;
-      
-      // **AJOUT : Récupérer les données utilisateur depuis l'API si on a l'email**
-      try {
-        const userData = await getUserByEmailApi(storedEmail);
-        if (userData) {
-          newProfileData = {
-            ...newProfileData,
-            ...userData,
-            fullName: userData.fullName || `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
-            firstName: userData.firstName || userData.first_name || '',
-            lastName: userData.lastName || userData.last_name || '',
-            phoneNumber: userData.phoneNumber || userData.phone || '',
-            profileImage: userData.profileImageUrl || userData.profileImage || null,
-          };
-        }
-      } catch (error) {
-        console.error('Error fetching user data by email:', error);
-      }
-    }
-    
+    // Charger d'abord les données stockées localement
     if (storedUserInfo) {
       const userInfo = JSON.parse(storedUserInfo);
       newProfileData = { 
@@ -108,7 +90,8 @@ export const ThemeProvider = ({ children }) => {
         firstName: userInfo.firstName || userInfo.first_name || '',
         lastName: userInfo.lastName || userInfo.last_name || '',
         phoneNumber: userInfo.phoneNumber || userInfo.phone || '',
-        profileImage: userInfo.profileImageUrl || userInfo.profileImage || newProfileData.profileImage,
+        // CORRECTION : Prioriser profileImageUrl
+        profileImage: userInfo.profileImageUrl || userInfo.profileImage || null,
       };
     }
     
@@ -117,7 +100,39 @@ export const ThemeProvider = ({ children }) => {
       newProfileData = { ...newProfileData, ...parsedProfileData };
     }
 
-    console.log('Final profile data loaded:', newProfileData); // Debug
+    // Récupérer les données les plus récentes depuis l'API
+    if (storedEmail) {
+      newProfileData.email = storedEmail;
+      
+      try {
+        const userData = await getUserByEmailApi(storedEmail);
+        if (userData) {
+          console.log('Fresh user data from API:', userData); // Debug
+          
+          newProfileData = {
+            ...newProfileData,
+            ...userData,
+            fullName: userData.fullName || `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+            firstName: userData.firstName || userData.first_name || '',
+            lastName: userData.lastName || userData.last_name || '',
+            phoneNumber: userData.phoneNumber || userData.phone || '',
+            // CORRECTION : Utiliser profileImageUrl du serveur
+            profileImage: userData.profileImageUrl || userData.profileImage || newProfileData.profileImage,
+          };
+          
+          console.log('Final profile data after API update:', newProfileData); // Debug
+          
+          // Sauvegarder les données mises à jour
+          await AsyncStorage.setItem('userInfo', JSON.stringify(userData));
+          await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+        }
+      } catch (error) {
+        console.error('Error fetching fresh user data:', error);
+        // Continuer avec les données stockées localement en cas d'erreur réseau
+      }
+    }
+
+    console.log('Final profile data loaded:', newProfileData);
     setProfileData(newProfileData);
   } catch (error) {
     console.error('Error loading profile data:', error);
@@ -140,23 +155,44 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const updateProfileData = async (data) => {
-  try {
-    // **AJOUT : Mapper automatiquement les champs si nécessaire**
+     try {
+    // IMPROVED: Better URL handling
+    const imageUrl = data.profileImageUrl || data.profileImage;
+    
+    // Debug the image URL
+    if (imageUrl) {
+      console.log('Updating profile with image URL:', imageUrl);
+      
+      // Verify the URL is valid
+      if (imageUrl.startsWith('http')) {
+        // Test if the image is accessible
+        try {
+          const response = await fetch(imageUrl, { method: 'HEAD' });
+          console.log(`Image URL status: ${response.status}`);
+        } catch (err) {
+          console.warn('Could not verify image URL:', err.message);
+        }
+      }
+    }
+    
+    // Update the data with properly handled image URL
     const mappedData = {
       ...data,
       fullName: data.fullName || `${data.first_name || ''} ${data.last_name || ''}`.trim(),
       firstName: data.firstName || data.first_name || '',
       lastName: data.lastName || data.last_name || '',
       phoneNumber: data.phoneNumber || data.phone || '',
+      profileImage: imageUrl || profileData.profileImage,
     };
     
     const newProfileData = { ...profileData, ...mappedData };
-    setProfileData(newProfileData);
-    await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
-  } catch (error) {
-    console.error('Error saving profile data:', error);
-  }
-};
+    setProfileData(newProfileData)
+      await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+      await AsyncStorage.setItem('userInfo', JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving profile data:', error);
+    }
+  };
 
   const updateProfileImage = async (imageUri) => {
     try {
@@ -172,6 +208,8 @@ export const ThemeProvider = ({ children }) => {
     try {
       const emptyProfile = {
         fullName: '',
+        firstName: '',
+        lastName: '',
         email: '',
         phoneNumber: '',
         profileImage: null,
@@ -196,6 +234,23 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
+  // AJOUT : Fonction pour rafraîchir les données utilisateur
+  const refreshUserData = async () => {
+    try {
+      const storedEmail = await AsyncStorage.getItem('userEmail');
+      if (storedEmail) {
+        const userData = await getUserByEmailApi(storedEmail);
+        if (userData) {
+          await updateProfileData(userData);
+          return userData;
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+    return null;
+  };
+
   return (
     <ThemeContext.Provider
       value={{
@@ -208,6 +263,7 @@ export const ThemeProvider = ({ children }) => {
         updateProfileImage,
         clearProfileData,
         resetProfileImage,
+        refreshUserData, // AJOUT
       }}
     >
       {children}

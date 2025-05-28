@@ -84,18 +84,23 @@ export const getUserByEmailApi = async (email) => {
     
     if (response.data) {
       const userData = response.data;
+      console.log('Raw user data from API:', userData); // Pour déboguer
+      
       const mappedData = {
         fullName: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
         firstName: userData.first_name || '',
         lastName: userData.last_name || '',
         email: userData.email || '',
         phoneNumber: userData.phone || '',
+        // CORRECTION : Prioriser profileImageUrl s'il existe
         profileImage: userData.profileImageUrl || userData.profileImage || null,
         role: userData.role || '',
         camp: userData.camp || '',
         isVerified: userData.isVerified || false,
         canPost: userData.canPost || false,
       };
+      
+      console.log('Mapped user data:', mappedData); // Pour déboguer
       return { ...userData, ...mappedData };
     }
     

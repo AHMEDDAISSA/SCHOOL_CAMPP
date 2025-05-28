@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DynamicContactButton from'../../components/DynamicContactButton/DynamicContactButton'
 
 const Home = () => {
-    const { theme, darkMode, profileData } = useContext(ThemeContext);
+    const { theme, darkMode, profileData, refreshUserData  } = useContext(ThemeContext);
     const { annonces, loading, refreshAnnonces, updateNewStatus } = useContext(AnnonceContext);
     
     const [selectedCategory, setSelectedCategory] = useState('Tous');
@@ -60,25 +60,20 @@ const Home = () => {
     const [subscribed, setSubscribed] = useState(false);
 
     useEffect(() => {
-      refreshAnnonces();
-      updateNewStatus();
-      
-      const getLatestUserData = async () => {
-        try {
-          const storedUserInfo = await AsyncStorage.getItem('userInfo');
-          if (storedUserInfo) {
-            const userInfo = JSON.parse(storedUserInfo);
-            // Mettre à jour le contexte avec les dernières informations
-            updateProfileData(userInfo);
-          }
-        } catch (error) {
-          console.error('Erreur lors de la récupération des données utilisateur:', error);
-        }
-      };
-      
-      getLatestUserData();
-    }, []);
-
+  refreshAnnonces();
+  updateNewStatus();
+  
+  // AJOUT : Rafraîchir les données utilisateur
+  const refreshData = async () => {
+    try {
+      await refreshUserData(); // Utiliser la nouvelle fonction du contexte
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
+    }
+  };
+  
+  refreshData();
+}, []);
     // Helper function to navigate to announcement details
     const navigateToAnnonceDetail = (id) => {
       AsyncStorage.setItem('currentAnnonceId', id.toString())
