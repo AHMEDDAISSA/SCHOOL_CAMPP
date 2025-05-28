@@ -119,6 +119,7 @@ const phoneHasError = useMemo(() => {
   const handleContactMethodChange = (methodId) => {
   // Only update state if the selected method is different
   if (preferredContact !== methodId) {
+    console.log("Changement de méthode de contact:", methodId);
     setPreferredContact(methodId);
     
     if (methodId === 'phone' && !phoneNumber) {
@@ -372,7 +373,8 @@ useEffect(() => {
     setCamp(''); // Réinitialiser le camp
     setImages([]);
     setIsActive(true);
-    setPreferredContact('email');
+    // Ne pas réinitialiser preferredContact
+    // setPreferredContact('email');
     // Garder les coordonnées personnelles pour faciliter les futures publications
   };
   

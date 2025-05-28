@@ -17,7 +17,7 @@ const PostSchema = new mongoose.Schema({
     duration: { type: String },
     preferredContact: { 
         type: String, 
-        enum: ['email', 'phone', 'app'], 
+        enum: ['email', 'phone', 'app'],
         default: 'email' 
     },
     contactEmail: { type: String },

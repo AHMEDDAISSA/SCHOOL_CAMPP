@@ -306,10 +306,10 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction): void =>
 // Connexion à la base de données
 mongoose.connect(process.env.MONGO_URI as string)
 .then(() => {
-    console.log('✅ Connected to MongoDB');
+    console.log('Connected to MongoDB');
 })
 .catch((error) => {
-    console.error('❌ Error connecting to MongoDB:', error);
+    console.error(' Error connecting to MongoDB:', error);
 });
 
 // Gestion des erreurs MongoDB

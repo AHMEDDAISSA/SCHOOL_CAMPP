@@ -153,6 +153,7 @@ export const AnnonceProvider = ({ children }) => {
   const deleteAnnonceMeth = async (id, userEmail) => {
     console.log("AnnonceContext - Deleting ID:", id, "User:", userEmail);
     try {
+      const normalizedUserEmail = userEmail ? userEmail.toLowerCase() : '';
       const success = await deleteAnnounce(id, userEmail);
       
       if (success && success.success) {
