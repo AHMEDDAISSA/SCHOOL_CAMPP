@@ -11,6 +11,7 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import upload from "./middleware/upload";
+import messageRoutes from './routes/messageRoutes';
 
 dotenv.config();
 
@@ -251,6 +252,7 @@ app.use('/post', postRouter);
 app.use('/cat', categoryRouter);
 app.use('/admin', adminRouter);
 app.use('/user', userRouter);
+app.use('/api/messages', messageRoutes);
 
 // CORRECTION : Route racine avec types corrects
 app.get('/', (req: Request, res: Response): void => {

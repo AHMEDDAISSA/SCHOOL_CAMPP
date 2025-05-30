@@ -13,9 +13,18 @@
 //       return res.status(404).json({ message: "Annonce non trouvée" });
 //     }
     
+//     // Si le mode de contact est email, ne pas créer de contact dans la base de données
+//     if (contactMethod === 'email') {
+//       return res.status(200).json({ 
+//         message: "Contact par email initié", 
+//         redirectToEmail: true,
+//         contactEmail: post.contactEmail || post.email
+//       });
+//     }
+    
 //     const existingContact = await Contact.findOne({ 
 //       postId, 
-//       buyerId: buyerEmail, 
+//       buyerEmail, 
 //       status: { $in: ['active', 'initiated'] } 
 //     });
     
@@ -29,10 +38,12 @@
 //     // Créer un nouveau contact
 //     const newContact = new Contact({
 //       postId,
-//       buyerId: buyerEmail,
-//       sellerId: post.email,
+//       buyerEmail,
+//       sellerEmail: post.email,
 //       contactMethod,
-//       status: 'active'
+//       status: 'active',
+//       postTitle: post.title,
+//       postImage: post.imageUrl || (post.images && post.images.length > 0 ? post.images[0] : null)
 //     });
     
 //     await newContact.save();
@@ -43,13 +54,12 @@
 //       contactStatus: 'in_contact' 
 //     });
     
-//     res.status(201).json({ 
-//       message: "Contact initié avec succès", 
-//       contact: newContact, 
-//       contactInfo: getContactInfo(post, contactMethod)
+//     return res.status(201).json({
+//       message: "Contact initié avec succès",
+//       contact: newContact
 //     });
 //   } catch (error) {
 //     console.error("Erreur lors de l'initiation du contact:", error);
-//     res.status(500).json({ message: "Erreur serveur" });
+//     return res.status(500).json({ message: "Erreur serveur" });
 //   }
 // };

@@ -1,35 +1,56 @@
-// middleware/authMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { IUser } from '../types/userTypes';
+import { Types } from 'mongoose';
 
-// Extend the Request type to include a `user` property
 export interface AuthRequest extends Request {
-    user?: IUser;
+    user?: {
+        _id: string | Types.ObjectId;
+        email: string;
+        id?: string; // Parfois JWT utilise 'id' au lieu de '_id'
+        [key: string]: any;
+    };
 }
 
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Expecting 'Bearer <token>'
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
+        res.status(401).json({ 
+            success: false, 
+            error: 'Token d\'accès requis'
+        });
         return;
     }
     
-    // Verify the token
     try {
         const secret = process.env.JWT_SECRET;
         if (!secret) {
             throw new Error('JWT_SECRET is not defined in environment variables');
         }
         
-        const decoded = jwt.verify(token, secret);
-        req.user = decoded as IUser; // Attach decoded user data to the request
-        next(); // Proceed to the route handler
+        const decoded = jwt.verify(token, secret) as any;
+        
+        // Normaliser l'ID utilisateur
+        req.user = {
+            ...decoded,
+            _id: decoded._id || decoded.id || decoded.userId
+        };
+        
+        // Debug log pour voir la structure du token
+        console.log('Token décodé:', {
+            decoded,
+            userId: req.user?._id,
+            hasId: !!req.user?._id, // Utiliser '?' pour éviter les erreurs si req.user est undefined
+        });
+        
+        next();
     } catch (error) {
-        console.error('Token verification error:', error);
-        res.status(403).json({ success: false, message: 'Invalid or expired token.' });
+        console.error('Erreur de vérification du token:', error);
+        res.status(403).json({ 
+            success: false, 
+            error: 'Token invalide ou expiré'
+        });
         return;
     }
 };

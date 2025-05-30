@@ -952,4 +952,15 @@ const styles = StyleSheet.create({
     color: '#727272',
     lineHeight: 20,
   },
+  contactMethodBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

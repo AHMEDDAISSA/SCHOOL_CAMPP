@@ -166,8 +166,8 @@ const isUnavailable = item.contactStatus && ['reserved', 'sold'].includes(item.c
     
     const contactMethod = item.preferredContact || 'email';
     const contactInfo = contactMethod === 'email' 
-        ? item.contactEmail || item.email 
-        : item.contactPhone;
+        ? (item.contactEmail || item.email || '')
+        : (item.contactPhone || '');
     
     if (!contactInfo) {
         Alert.alert('Erreur', 'Information de contact manquante');
@@ -175,9 +175,6 @@ const isUnavailable = item.contactStatus && ['reserved', 'sold'].includes(item.c
     }
     
     try {
-        // Initier le contact en base de données
-        await onInitiateContact(item._id, userEmail, contactMethod);
-        
         // Exécuter l'action de contact selon la méthode
         switch(contactMethod) {
             case 'email':
@@ -188,6 +185,8 @@ const isUnavailable = item.contactStatus && ['reserved', 'sold'].includes(item.c
                 const supported = await Linking.canOpenURL(emailUrl);
                 if (supported) {
                     await Linking.openURL(emailUrl);
+                    // Initier le contact en base de données après l'ouverture réussie
+                    await onInitiateContact(item._id, userEmail, contactMethod);
                 } else {
                     Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
                 }
@@ -850,7 +849,7 @@ const Annonces = () => {
   
   // Navigation
   const back = () => {
-    router.push('/');  // Navigation vers la page d'accueil
+    router.push('/home');  // Navigation vers la page d'accueil
   };
   
   // Show loading indicator when fonts are loading
