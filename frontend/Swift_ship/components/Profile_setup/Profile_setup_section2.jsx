@@ -295,8 +295,8 @@ const Profile_setup_section2 = (data) => {
       try {
         await AsyncStorage.setItem('userInfo', JSON.stringify(storageData));
         console.log('Données utilisateur sauvegardées dans AsyncStorage');
-      } catch (storageError) {
-        console.error('Erreur lors de la sauvegarde des données utilisateur:', storageError);
+      } catch (storageError){
+        
       }
       
       // 4. Vérifier la réponse du serveur et rediriger
