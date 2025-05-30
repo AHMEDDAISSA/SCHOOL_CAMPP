@@ -35,9 +35,11 @@ const PublierAnnonce = () => {
 
 
   const CustomPhoneInput = ({ defaultValue, defaultCode, onChangeText, onChangeFormattedText, containerStyle, textContainerStyle, textInputStyle, codeTextStyle, textInputProps, flagButtonStyle, hasError, theme }) => {
+  const phoneInputRef = useRef(null);
+  
   return (
     <PhoneInput
-      ref={phoneInput}
+      ref={phoneInputRef}
       defaultValue={defaultValue}
       defaultCode={defaultCode}
       layout="first"
@@ -928,7 +930,7 @@ useEffect(() => {
           
           {/* Téléphone (facultatif) */}
           
-          <View style={styles.contactField}>
+         <View style={styles.contactField}>
   <View style={styles.contactFieldRow}>
     <Text style={[styles.label, {color: theme.color}]}>
       Téléphone {isPhoneRequired ? '' : '(facultatif)'}
@@ -940,14 +942,20 @@ useEffect(() => {
       trackColor={{ false: "#767577", true: "#39335E" }}
     />
   </View>
-        
-        {/* Remplacer le TextInput par CustomPhoneInput */}
-        <CustomPhoneInput
+  
+  <PhoneInput
     ref={phoneInput}
     defaultValue={phoneNumber}
     defaultCode="CH"
+    layout="first"
     onChangeText={handlePhoneChange}
-    onChangeFormattedText={handleFormattedPhoneChange}
+    onChangeFormattedText={(text) => {
+      const countryCode = phoneInput.current?.getCountryCode();
+      if (countryCode) {
+        setCountryCode(`+${countryCode}`);
+      }
+      handlePhoneChange(text);
+    }}
     containerStyle={[
       styles.phoneInputContainer, 
       {
@@ -961,10 +969,13 @@ useEffect(() => {
     codeTextStyle={{ color: theme.color }}
     textInputProps={{
       placeholderTextColor: theme.color3 || "#A8A8A8",
+      placeholder: "Votre numéro de téléphone",
+      style: { fontSize: 14 } 
     }}
     flagButtonStyle={{ backgroundColor: theme.background }}
-    hasError={phoneHasError}
-    theme={theme}
+    withDarkTheme={false}
+    withShadow={false}
+    autoFocus={false}
   />
   
   {hasPhoneError && (
@@ -1506,33 +1517,34 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 10,
   },
-  phoneInputContainer: {
-  width: '100%',
-  height: 50,
-  borderWidth: 1,
-  borderRadius: 8,
-  marginTop: 8,
-},
-phoneInputTextContainer: {
-  borderTopRightRadius: 8,
-  borderBottomRightRadius: 8,
-  paddingVertical: 0,
-},
-phoneInputText: {
-  fontSize: 16,
-  paddingVertical: 0,
-  height: 40,
-},
-phoneInputError: {
-  borderWidth: 2,
-  borderColor: '#EB001B',
-  backgroundColor: 'rgba(235, 0, 27, 0.05)',
-},
-phoneErrorMessage: {
-  color: '#EB001B',
-  fontFamily: 'Montserrat_500Medium',
-  fontSize: 12,
-  marginTop: 5,
-  marginBottom: 10,
-},
+   phoneInputContainer: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginTop: 8,
+    overflow: 'hidden',  // This helps with border radius rendering
+  },
+  phoneInputTextContainer: {
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    paddingVertical: 0,
+    backgroundColor: 'transparent',  // Let the container background show through
+  },
+  phoneInputText: {
+    fontSize: 16,
+    paddingVertical: 0,
+    height: 40,
+    color: '#000000',  // Ensure text is visible
+  },
+  phoneInputError: {
+    borderWidth: 2,
+    borderColor: '#EB001B',
+  },
+  phoneErrorMessage: {
+    color: '#EB001B',
+    fontFamily: 'Montserrat_500Medium',
+    fontSize: 12,
+    marginTop: 5,
+  }
 });
