@@ -148,7 +148,7 @@ const formatDate = (dateString) => {
 };
 
 const AdminDashboard = () => {
-  const { theme, darkMode, profileData } = useContext(ThemeContext);
+  const { theme, darkMode, profileData, refreshUserData } = useContext(ThemeContext);
   const { logout, refreshToken  } = useContext(AuthContext);
   
   // Utiliser le contexte AnnonceContext pour accéder aux annonces et fonctions
@@ -488,47 +488,17 @@ const [totalAnnounces, setTotalAnnounces] = useState(0);
   });
     
   useEffect(() => {
-    const refreshData = async () => {
-    await refreshAnnonces();
-    // Mettre à jour les annonces à modérer après chaque rafraîchissement
-    const moderatedAnnounces = getAnnoncesToModerate();
-    setAnnoncesToModerate(moderatedAnnounces);
+  // Rafraîchir les données utilisateur
+  const refreshData = async () => {
+    try {
+      await refreshUserData(); // Utiliser la fonction du contexte ThemeContext
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
+    }
   };
+  
   refreshData();
-  
-  // Configurer un rafraîchissement périodique si nécessaire
-   const refreshInterval = setInterval(() => {
-    refreshData();
-  }, 300000); // Rafraîchir toutes les 5 minutes
-  
-  return () => clearInterval(refreshInterval);
-
-    const backAction = () => {
-      Alert.alert(
-        "Confirmation", 
-        "Voulez-vous vraiment quitter et retourner à la page précédente ?",
-        [
-          {
-            text: "Annuler",
-            onPress: () => null,
-            style: "cancel"
-          },
-          { 
-            text: "Oui", 
-            onPress: () => router.back() 
-          }
-        ]
-      );
-      return true; 
-    };
-
-    const backHandler = BackHandler.addEventListener( /**linaa sarr un petit changement  */
-      "hardwareBackPress",
-      backAction
-    );
-
-    return () => backHandler.remove();
-  }, []);
+}, [refreshUserData]);
 
   const [categoryStats, setCategoryStats] = useState([
     { name: 'Donner', count: 15, color: '#4CAF50' },
@@ -1846,9 +1816,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profile: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 80,
+    height: 80,
+    borderRadius: 50,
     marginRight: 12,
     borderWidth: 2,
     borderColor: '#5D5FEF',
