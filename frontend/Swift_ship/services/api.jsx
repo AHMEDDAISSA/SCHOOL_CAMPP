@@ -482,26 +482,40 @@ export const createAnnounce = async (payload) => {
   };
   
   const categoryName = categoryMapping[payload.category] || payload.category;
-  
-  // Créer un objet FormData pour envoyer des fichiers
   const formData = new FormData();
   
-  // Ajouter les données textuelles
+  // Données de base
   formData.append("email", payload.contactEmail);
   formData.append("title", payload.title);
   formData.append("description", payload.description);
   formData.append("category", categoryName);
   formData.append("camp", payload.camp);
   formData.append("is_published", payload.isActive.toString());
-  formData.append("contact_info", payload.contact_info || "");
   formData.append("type", payload.type);
-  formData.append("preferredContact", payload.preferredContact || "app");
-  
-  // Ajouter TOUJOURS le prix et la durée, quel que soit la catégorie
   formData.append("price", payload.price || "");
   formData.append("duration", payload.duration || "");
   
-  // Ajouter les images
+  // NOUVEAUX CHAMPS DE CONTACT
+  formData.append("preferredContact", payload.preferredContact || "email");
+  formData.append("contactEmail", payload.contactEmail || payload.email);
+  formData.append("contactPhone", payload.contactPhone || "");
+  formData.append("contactName", payload.contactName || "");
+  formData.append("showName", payload.showName.toString());
+  formData.append("showPhone", payload.showPhone.toString());
+  formData.append("showEmail", payload.showEmail.toString());
+  
+  // Contact info basé sur la préférence
+  let contactInfo = '';
+  if (payload.preferredContact === 'email') {
+    contactInfo = payload.contactEmail || payload.email;
+  } else if (payload.preferredContact === 'phone') {
+    contactInfo = payload.contactPhone;
+  } else {
+    contactInfo = 'app'; // Contact via l'application
+  }
+  formData.append("contact_info", contactInfo);
+  
+  // Images
   if (payload.images && payload.images.length > 0) {
     payload.images.forEach((imageUri, index) => {
       const uriParts = imageUri.split('/');
@@ -517,17 +531,11 @@ export const createAnnounce = async (payload) => {
   }
   
   try {
-    // Afficher le contenu du formData pour déboguer
-    for (let [key, value] of formData._parts) {
-      console.log(`${key}: ${value}`);
-    }
-    
     const response = await api.post('/post/add', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       }
     });
-    console.log('Response data:', response);
     return response.data;
   } catch (error) {
     console.error('createAnnounce error:', error.message);

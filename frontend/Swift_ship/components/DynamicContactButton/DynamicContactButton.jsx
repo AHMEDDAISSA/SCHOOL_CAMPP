@@ -1,46 +1,36 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 
 const DynamicContactButton = ({ 
-  contactMethod, 
-  contactInfo, 
-  title, 
-  disabled = false, 
+  item,
+  userEmail,
+  onInAppMessage,
   style = {},
   textStyle = {}
 }) => {
-  // Configuration de l'apparence du bouton selon la méthode
+  // Ne pas afficher le bouton si c'est le propriétaire
+  if (userEmail === item.email || userEmail === item.contactEmail) {
+    return null;
+  }
+
+  // Configuration du bouton selon la méthode préférée
   const getButtonConfig = () => {
-    switch (contactMethod) {
+    switch (item.preferredContact) {
       case 'email':
         return {
           icon: 'mail-outline',
           text: 'Email',
           color: '#4285F4',
-          action: () => handleEmailContact(contactInfo, title)
+          action: () => handleEmailContact()
         };
       case 'phone':
         return {
           icon: 'call-outline',
           text: 'Appeler',
           color: '#34A853',
-          action: () => handlePhoneContact(contactInfo)
-        };
-      case 'whatsapp':
-        return {
-          icon: 'logo-whatsapp',
-          text: 'WhatsApp',
-          color: '#25D366',
-          action: () => handleWhatsAppContact(contactInfo, title)
-        };
-      case 'sms':
-        return {
-          icon: 'chatbox-outline',
-          text: 'SMS',
-          color: '#FF9800',
-          action: () => handleSmsContact(contactInfo, title)
+          action: () => handlePhoneContact()
         };
       case 'app':
       default:
@@ -48,78 +38,65 @@ const DynamicContactButton = ({
           icon: 'chatbubble-outline',
           text: 'Message',
           color: '#836EFE',
-          action: () => console.log('Action via app')
+          action: () => onInAppMessage && onInAppMessage()
         };
     }
   };
 
-  // Gérer contact par email
-  const handleEmailContact = async (email, subject) => {
-    const emailSubject = `À propos de: ${subject || 'votre annonce'}`;
-    const emailBody = `Bonjour,\n\nJe suis intéressé(e) par votre annonce "${subject || ''}".`;
-    const emailUrl = `mailto:${email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+  const handleEmailContact = async () => {
+    const email = item.contactEmail || item.email;
+    const subject = `À propos de votre annonce: ${item.title}`;
+    const body = `Bonjour${item.showName && item.contactName ? ` ${item.contactName}` : ''},\n\nJe suis intéressé(e) par votre annonce "${item.title}".\n\nCordialement.`;
+    const emailUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
     try {
       const supported = await Linking.canOpenURL(emailUrl);
       if (supported) {
         await Linking.openURL(emailUrl);
       } else {
-        console.error("L'application email n'est pas disponible");
+        Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
       }
     } catch (error) {
-      console.error('Erreur lors de l\'ouverture de l\'email:', error);
+      console.error('Erreur email:', error);
+      Alert.alert('Erreur', "Impossible d'ouvrir l'application email");
     }
   };
 
-  // Gérer contact par téléphone
-  const handlePhoneContact = async (phoneNumber) => {
-    try {
-      const url = `tel:${phoneNumber}`;
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.error("Les appels téléphoniques ne sont pas supportés");
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'appel:', error);
+  const handlePhoneContact = () => {
+    if (!item.contactPhone) {
+      Alert.alert('Erreur', 'Numéro de téléphone non disponible');
+      return;
     }
-  };
 
-  // Gérer contact par WhatsApp
-  const handleWhatsAppContact = async (phoneNumber, subject) => {
-    try {
-      const message = `Bonjour, je suis intéressé(e) par votre annonce "${subject || ''}".`;
-      // Formater le numéro pour WhatsApp (retirer le + initial)
-      const formattedNumber = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
-      const url = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
-      
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.error("WhatsApp n'est pas installé");
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'ouverture de WhatsApp:', error);
-    }
-  };
-
-  // Gérer contact par SMS
-  const handleSmsContact = async (phoneNumber, subject) => {
-    try {
-      const message = `Bonjour, je suis intéressé(e) par votre annonce "${subject || ''}".`;
-      const url = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-      
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.error("Les SMS ne sont pas supportés");
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi du SMS:', error);
-    }
+    Alert.alert(
+      'Contacter par téléphone',
+      `Comment souhaitez-vous contacter${item.showName && item.contactName ? ` ${item.contactName}` : ' cette personne'} ?`,
+      [
+        {
+          text: 'Appeler',
+          onPress: () => Linking.openURL(`tel:${item.contactPhone}`)
+        },
+        {
+          text: 'SMS',
+          onPress: () => {
+            const message = `Bonjour${item.showName && item.contactName ? ` ${item.contactName}` : ''}, je suis intéressé(e) par votre annonce "${item.title}".`;
+            Linking.openURL(`sms:${item.contactPhone}?body=${encodeURIComponent(message)}`);
+          }
+        },
+        {
+          text: 'WhatsApp',
+          onPress: () => {
+            const message = `Bonjour${item.showName && item.contactName ? ` ${item.contactName}` : ''}, je suis intéressé(e) par votre annonce "${item.title}".`;
+            let whatsappNumber = item.contactPhone.replace(/\s+/g, '');
+            if (whatsappNumber.startsWith('0')) {
+              whatsappNumber = `41${whatsappNumber.substring(1)}`;
+            }
+            Linking.openURL(`whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`);
+          }
+        },
+        { text: 'Annuler', style: 'cancel' }
+      ]
+    );
   };
 
   const config = getButtonConfig();
@@ -129,15 +106,13 @@ const DynamicContactButton = ({
       style={[
         styles.dynamicContactButton,
         { backgroundColor: config.color },
-        disabled && styles.disabledContactButton,
         style
       ]}
       onPress={config.action}
-      disabled={disabled}
     >
       <Ionicons 
         name={config.icon} 
-        size={18} 
+        size={16} 
         color="#FFFFFF" 
         style={styles.contactButtonIcon} 
       />
@@ -153,29 +128,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.22,
     shadowRadius: 2.22,
   },
-  
   contactButtonIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
-  
   contactButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-  },
-  
-  disabledContactButton: {
-    opacity: 0.6,
-    backgroundColor: '#CCCCCC',
   },
 });
 

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { debounce } from 'lodash'; 
 import * as Linking from 'expo-linking';
+import DynamicContactButton from '../../components/DynamicContactButton/DynamicContactButton';
 
 
 // Screen dimensions for responsive layouts
@@ -315,29 +316,23 @@ const showPhoneOptions = (item) => {
                     
                     {/* Bouton de contact pour les non-propriétaires */}
                     {!isOwner && (
-    <TouchableOpacity 
-        style={[
-            styles.contactButton, 
-            { backgroundColor: getContactButtonStyle(item.preferredContact).backgroundColor },
-            (isInContact || isUnavailable) && styles.contactButtonDisabled
-        ]}
-        onPress={(e) => {
-            e.stopPropagation();
-            handleContact();
-        }}
-        disabled={isUnavailable}
-    >
-        <Ionicons 
-            name={getContactButtonStyle(item.preferredContact).icon} 
-            size={14} 
-            color="white" 
-        />
-        <Text style={styles.contactButtonText}>
-            {isInContact ? 'En contact' : 
-             isUnavailable ? 'Non disponible' : 
-             getContactButtonStyle(item.preferredContact).text}
-        </Text>
-    </TouchableOpacity>
+     <DynamicContactButton
+    item={item}
+    userEmail={userEmail}
+    onInAppMessage={() => {
+      // Navigation vers la messagerie interne
+      router.push({
+        pathname: '(screens)/chat_screen',
+        params: { 
+          id: Date.now(),
+          advertId: item.id,
+          name: item.contactName || 'Propriétaire',
+          receiverId: item.email // Ou un ID utilisateur
+        }
+      });
+    }}
+    style={styles.contactButton}
+  />
 )}
                 </View>
             </View>
@@ -1508,6 +1503,36 @@ statusBadge: {
   },
   contactButtonDisabled: {
     opacity: 0.7,
-  }
-
+  },
+  contactSection: {
+    backgroundColor: '#F8F9FA',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 10,
+  },
+  
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  
+  contactInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingVertical: 5,
+  },
+  
+  contactText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  
+  mainContactButton: {
+    marginTop: 15,
+    paddingVertical: 12,
+  },
 });

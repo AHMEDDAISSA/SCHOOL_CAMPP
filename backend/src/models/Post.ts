@@ -22,6 +22,10 @@ const PostSchema = new mongoose.Schema({
     },
     contactEmail: { type: String },
     contactPhone: { type: String },
+    contactName: { type: String }, 
+    showName: { type: Boolean, default: false },
+    showPhone: { type: Boolean, default: false },
+    showEmail: { type: Boolean, default: true },
     
     
     

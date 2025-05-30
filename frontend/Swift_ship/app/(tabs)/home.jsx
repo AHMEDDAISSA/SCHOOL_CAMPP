@@ -9,7 +9,7 @@ import Toast from 'react-native-toast-message';
 import AnnonceContext from '../../contexts/AnnonceContext';
 import * as Linking from 'expo-linking'; // Ajout de l'import Linking pour ouvrir les applications externes
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
-import DynamicContactButton from'../../components/DynamicContactButton/DynamicContactButton'
+import DynamicContactButton from '../../components/DynamicContactButton/DynamicContactButton';
 
 const Home = () => {
     const { theme, darkMode, profileData, refreshUserData  } = useContext(ThemeContext);

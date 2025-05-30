@@ -14,6 +14,14 @@ import ThemeContext from '../../theme/ThemeContext';
 const TabBarButton = ({ children, onPress, accessibilityState, title }) => {
   const { theme } = useContext(ThemeContext);
   const isSelected = accessibilityState.selected;
+  
+  // Personnaliser les titres des onglets ici
+  let displayTitle = title;
+  if (title === 'home' || title === 'Accueil') {
+    displayTitle = 'Accueil';
+  } else if (title === 'inbox' || title === 'Messagerie') {
+    displayTitle = 'Messagerie';
+  }
 
   return (
     <TouchableOpacity
@@ -26,7 +34,7 @@ const TabBarButton = ({ children, onPress, accessibilityState, title }) => {
       <View style={[styles.iconContainer, isSelected ? styles.activeIconContainer : null]}>
         {children}
         <Text style={[styles.title, { color: theme.color5 }, isSelected ? styles.activeTitle : null]}>
-          {title}
+          {displayTitle}
         </Text>
       </View>
     </TouchableOpacity>
@@ -73,7 +81,7 @@ const TabsLayout = () => {
       >
         <Tabs.Screen name="home" options={{ title: 'Accueil' }} />
         <Tabs.Screen name="Annonces" options={{ title: 'Annonces' }} />
-        <Tabs.Screen name="inbox" options={{ title: 'Messages' }} />
+        <Tabs.Screen name="inbox" options={{ title: 'Messagerie' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
     </View>

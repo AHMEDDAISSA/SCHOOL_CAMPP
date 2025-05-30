@@ -14,4 +14,9 @@ export interface PostType {
     imageUrl?: string;
     contactEmail?: string; 
     contactPhone?: string;
+    preferredContact?: string,
+    contactName: string,
+    showName : boolean,
+    showPhone   : boolean,
+    showEmail : boolean
 }

@@ -40,7 +40,6 @@ const checkPostOwnership = async (req: Request, res: Response, postId: string, u
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export const createPost = async (req: Request<{}, {}, PostType>, res: Response) => {
     try {
-        // Extraire tous les champs, y compris price et duration
         const { 
             email, 
             title, 
@@ -51,14 +50,21 @@ export const createPost = async (req: Request<{}, {}, PostType>, res: Response) 
             is_published = true, 
             contact_info, 
             type, 
-            price, // Récupérer le prix
-            duration // Récupérer la durée
+            price,
+            duration,
+            // Nouveaux champs de contact
+            preferredContact = 'email',
+            contactEmail,
+            contactPhone,
+            contactName,
+            showName = false,
+            showPhone = false,
+            showEmail = true
         } = req.body;
         
         const uploadedFiles = req.files as Express.Multer.File[] || [];
         const imageFilenames = uploadedFiles.map((file) => file.filename);
         
-        // Ajouter les champs dans l'objet à enregistrer
         const newPost = new Post({ 
             email, 
             title, 
@@ -70,11 +76,18 @@ export const createPost = async (req: Request<{}, {}, PostType>, res: Response) 
             contact_info, 
             type, 
             images: imageFilenames,
-            price, // Inclure le prix
-            duration // Inclure la durée
+            price,
+            duration,
+            // Champs de contact
+            preferredContact,
+            contactEmail: contactEmail || email, // Utiliser l'email principal si pas d'email de contact
+            contactPhone,
+            contactName,
+            showName,
+            showPhone,
+            showEmail
         });
 
-        // Enregistrer et retourner le nouveau post
         const savedPost = await newPost.save();
         res.status(201).json(savedPost);
     } catch (error) {
