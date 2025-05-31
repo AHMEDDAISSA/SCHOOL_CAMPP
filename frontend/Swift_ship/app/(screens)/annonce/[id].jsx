@@ -12,7 +12,9 @@ import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
-import { updateAnnonce } from '../../../services/api'; 
+import { updateAnnonce, getUserByEmailApi } from '../../../services/api'; 
+
+
 
 
 
@@ -26,6 +28,8 @@ export default function AnnonceDetail() {
   // Utiliser useLocalSearchParams pour récupérer l'ID depuis l'URL
   const params = useLocalSearchParams();
   const paramId = params.id;
+
+  const [authorData, setAuthorData] = useState(null);
   
   const [annonce, setAnnonce] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +65,20 @@ export default function AnnonceDetail() {
     { id: '4', name: 'Louer', icon: 'cash-outline' },
     { id: '5', name: 'Acheter', icon: 'cart-outline' },
   ];
+
+  const fetchAuthorData = async (email) => {
+  if (!email) return;
+  
+  try {
+    const userData = await getUserByEmailApi(email);
+    console.log("Données de l'auteur récupérées:", userData);
+    console.log("URL d'image récupérée:", userData?.profileImageUrl || userData?.profileImage);
+    setAuthorData(userData);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des données de l'auteur:", error);
+  }
+};
+
 
    const getContactButtonStyle = (contactMethod) => {
     switch(contactMethod) {
@@ -192,55 +210,57 @@ useEffect(() => {
 
   // Charger les données de l'annonce une fois que nous avons l'ID
   useEffect(() => {
-    if (!id || !annonces || !Array.isArray(annonces)) {
-      return;
-    }
+  if (!id || !annonces || !Array.isArray(annonces)) {
+    return;
+  }
+  
+  console.log("Looking for annonce with ID:", id);
+  
+  // Rechercher l'annonce par ID
+  const foundAnnonce = annonces.find(item => 
+    (item._id && (item._id === id || item._id.toString() === id)) || 
+    (item.id && (item.id === id || item.id.toString() === id))
+  );
+  
+  if (foundAnnonce) {
+    console.log("Annonce trouvée:", foundAnnonce.title);
+    setAnnonce(foundAnnonce);
     
-    console.log("Looking for annonce with ID:", id);
+    // Initialiser les champs du formulaire
+    setTitle(foundAnnonce.title || '');
+    setDescription(foundAnnonce.description || '');
+    setCategory(foundAnnonce.category || '');
+    setType(foundAnnonce.type || '');
+    setDuration(foundAnnonce.duration || '');
+    setPrice(foundAnnonce.price || '');
+    setCondition(foundAnnonce.condition || '');
+    setCamp(foundAnnonce.camp || '');
     
-    // Rechercher l'annonce par ID
-    // Essayer différentes propriétés d'ID puisque le format peut varier
-    const foundAnnonce = annonces.find(item => 
-      (item._id && (item._id === id || item._id.toString() === id)) || 
-      (item.id && (item.id === id || item.id.toString() === id))
-    );
-    
-    if (foundAnnonce) {
-      console.log("Annonce trouvée:", foundAnnonce.title);
-      setAnnonce(foundAnnonce);
-      
-      // Initialiser les champs du formulaire
-      setTitle(foundAnnonce.title || '');
-      setDescription(foundAnnonce.description || '');
-      setCategory(foundAnnonce.category || '');
-      setType(foundAnnonce.type || '');
-      setDuration(foundAnnonce.duration || '');
-      setPrice(foundAnnonce.price || '');
-      setCondition(foundAnnonce.condition || '');
-      setCamp(foundAnnonce.camp || '');
-      
-      // Récupérer l'email de contact
-      const emailToUse = foundAnnonce.email || 
-                      (foundAnnonce.contact && foundAnnonce.contact.email) || 
-                      (profileData && profileData.email) || '';
-      setEmail(emailToUse);
+    // Récupérer l'email de contact
+    const emailToUse = foundAnnonce.email || 
+                    (foundAnnonce.contact && foundAnnonce.contact.email) || 
+                    (profileData && profileData.email) || '';
+    setEmail(emailToUse);
 
-      // Gérer les images
-      const annonceImages = [];
-      if (foundAnnonce.images && foundAnnonce.images.length > 0) {
-        annonceImages.push(...foundAnnonce.images);
-      } else if (foundAnnonce.imageUrl) {
-        annonceImages.push(foundAnnonce.imageUrl);
-      }
-      setImages(annonceImages);
-          
-      setLoading(false);
-    } else {
-      console.log("Annonce not found");
-      setError('Annonce non trouvée');
-      setLoading(false);
+    // Gérer les images
+    const annonceImages = [];
+    if (foundAnnonce.images && foundAnnonce.images.length > 0) {
+      annonceImages.push(...foundAnnonce.images);
+    } else if (foundAnnonce.imageUrl) {
+      annonceImages.push(foundAnnonce.imageUrl);
     }
-  }, [annonces, id, profileData]);
+    setImages(annonceImages);
+    
+    // Récupérer les informations de l'auteur
+    fetchAuthorData(foundAnnonce.email);
+    
+    setLoading(false);
+  } else {
+    console.log("Annonce not found");
+    setError('Annonce non trouvée');
+    setLoading(false);
+  }
+}, [annonces, id, profileData]);
 
   const goBack = () => {
     if (isEditMode) {
@@ -1209,20 +1229,24 @@ useEffect(() => {
                 {annonce.title}
               </Text>
               
-              <View style={[styles.userContainer, { backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                <Image 
-                  source={profileData?.profileImage ? { uri: profileData.profileImage } : require('../../../assets/images/placeholder.png')}
-                  style={styles.userAvatar}
-                />
-                <View>
-                  <Text style={[styles.userName, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>
-                    {profileData?.fullName || 'Utilisateur inconnu'}
-                  </Text>
-                  <Text style={[styles.userRole, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
-                    Membre depuis {new Date().getFullYear()}
-                  </Text>
-                </View>
-              </View>
+            <View style={[styles.userContainer, { backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+  <Image 
+    source={authorData?.profileImageUrl ? { uri: authorData.profileImageUrl } :
+           authorData?.profileImage ? { uri: authorData.profileImage } :
+           require('../../../assets/images/placeholder.png')}
+    style={styles.userAvatar}
+  />
+  <View>
+    <Text style={[styles.userName, { color: darkMode ? '#FFFFFF' : '#39335E' }]}>
+      {authorData?.fullName || 
+      `${authorData?.first_name || ''} ${authorData?.last_name || ''}`.trim() || 
+      'Utilisateur inconnu'}
+    </Text>
+    <Text style={[styles.userRole, { color: darkMode ? '#AAAAAA' : '#666666' }]}>
+      Membre depuis {new Date().getFullYear()}
+    </Text>
+  </View>
+</View>
 
               <View style={styles.infoContainer}>
   {annonce.condition && (
@@ -1769,5 +1793,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat_500Medium',
     fontSize: 14,
     color: '#856404',
-  },
+  }
 });
