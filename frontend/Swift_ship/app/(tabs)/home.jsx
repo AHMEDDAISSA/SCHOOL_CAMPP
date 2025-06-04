@@ -263,19 +263,19 @@ const getContactIcon = (contactMethod) => {
         <StatusBar translucent backgroundColor="transparent" barStyle={darkMode ? "light-content" : 'dark-content'} />
 
         <View style={styles.header}>
-          <View style={styles.header_left}>
+            <View style={styles.header_left}>
             <Image source={profileImage} style={styles.profile} />
             <View style={styles.content}>
               <Text style={styles.heading_text}>Bienvenue à l'école de La Brillaz! 👋🏻</Text>
               <Text style={[styles.heading, {color: theme.color}]}>{fullName}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.notification_box} onPress={() => {router.push('(screens)/notification')}}>
+          {/* <TouchableOpacity style={styles.notification_box} onPress={() => {router.push('(screens)/notification')}}>
             {darkMode ? <Dark_Notification style={styles.notification} /> : <Notification style={styles.notification} />}
             <View style={styles.circle}>
               <Text style={styles.notification_count}>3</Text>
             </View>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -565,9 +565,9 @@ const styles = StyleSheet.create({
       gap: 16,
   },
   profile: {
-      width: 65,
-      height: 65,
-      borderRadius: 32.5,
+      width: 80,
+      height: 80,
+      borderRadius: 45,
   },
   heading_text: {
       fontSize: 12,

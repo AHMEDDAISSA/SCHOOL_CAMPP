@@ -150,46 +150,43 @@ export const AnnonceProvider = ({ children }) => {
   };
 
   // Supprimer une annonce avec gestion garantie des IDs
-  const deleteAnnonceMeth = async (id, userEmail) => {
-    console.log("AnnonceContext - Deleting ID:", id, "User:", userEmail);
-    try {
-      const normalizedUserEmail = userEmail ? userEmail.toLowerCase() : '';
-      const success = await deleteAnnounce(id, userEmail);
-      
-      if (success && success.success) {
-        // Mise à jour immédiate du state local 
-        setAnnonces(prevAnnonces => 
-          prevAnnonces.filter(annonce => 
-            annonce._id !== id && annonce.id !== id
-          )
-        );
-        
-        // Mise à jour du stockage local
-        const updatedAnnonces = annonces.filter(annonce => 
+ const deleteAnnonceMeth = async (id, userEmail, isAdmin = false) => {
+  console.log("AnnonceContext - Deleting ID:", id, "User:", userEmail, "Admin:", isAdmin);
+  try {
+    const normalizedUserEmail = userEmail ? userEmail.toLowerCase() : '';
+    const success = await deleteAnnounce(id, userEmail, isAdmin);
+    
+    if (success && success.success) {
+      setAnnonces(prevAnnonces => 
+        prevAnnonces.filter(annonce => 
           annonce._id !== id && annonce.id !== id
-        );
-        
-        if (isMounted.current) {
-          await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
-        }
-        return { success: true, message: success.message || "Annonce supprimée avec succès" };
+        )
+      );
+      
+      const updatedAnnonces = annonces.filter(annonce => 
+        annonce._id !== id && annonce.id !== id
+      );
+      
+      if (isMounted.current) {
+        await AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
       }
-      return { success: false, message: success.message || "Erreur lors de la suppression" };
-    } catch (error) {
-      console.error('Erreur lors de la suppression de l\'annonce:', error);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Erreur lors de la suppression de l\'annonce' 
-      };
+      return { success: true, message: success.message || "Annonce supprimée avec succès" };
     }
-  };
+    return { success: false, message: success.message || "Erreur lors de la suppression" };
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'annonce:', error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Erreur lors de la suppression de l\'annonce' 
+    };
+  }
+};
 
 
-  const updateAnnonceMeth = async (id, updateData, userEmail) => {
-  console.log("AnnonceContext - Updating ID:", id, "User:", userEmail, "Data:", updateData);
+  const updateAnnonceMeth = async (id, updateData, userEmail, isAdmin = false) => {
+  console.log("AnnonceContext - Updating ID:", id, "User:", userEmail, "Admin:", isAdmin, "Data:", updateData);
   
   try {
-    // Trouver l'annonce pour vérifier l'email
     const currentAnnonce = annonces.find(annonce => 
       (annonce._id === id || annonce.id === id)
     );
@@ -201,20 +198,17 @@ export const AnnonceProvider = ({ children }) => {
       };
     }
     
-    // Utiliser l'email de l'annonce ou l'email de l'utilisateur
     const emailToUse = currentAnnonce.email || userEmail;
     console.log("Email utilisé pour la mise à jour:", emailToUse);
     
-    const response = await updateAnnonce(id, updateData, emailToUse); 
+    const response = await updateAnnonce(id, updateData, emailToUse, isAdmin); 
     
     if (response && response.success) {
-      // Mettre à jour le state local avec les nouvelles données
       setAnnonces(prevAnnonces => {
         const updatedAnnonces = prevAnnonces.map(annonce => 
           (annonce._id === id || annonce.id === id) ? { ...annonce, ...updateData } : annonce
         );
         
-        // Mettre à jour le stockage local avec les nouvelles données
         if (isMounted.current) {
           AsyncStorage.setItem('annonces', JSON.stringify(updatedAnnonces));
         }

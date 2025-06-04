@@ -6,7 +6,7 @@ export interface AuthRequest extends Request {
     user?: {
         _id: string | Types.ObjectId;
         email: string;
-        id?: string; // Parfois JWT utilise 'id' au lieu de '_id'
+        id?: string; 
         [key: string]: any;
     };
 }

@@ -6,10 +6,9 @@ import { PostType } from "../types/postTypes";
 
 
 
-
-const checkPostOwnership = async (req: Request, res: Response, postId: string, userEmail: string) => {
+const checkPostOwnership = async (req: Request, res: Response, postId: string, userEmail: string, isAdmin?: boolean) => {
     try {
-        console.log("Checking ownership for post:", postId, "user:", userEmail);
+        console.log("Checking ownership for post:", postId, "user:", userEmail, "isAdmin:", isAdmin);
         
         const post = await Post.findById(postId);
         if (!post) {
@@ -19,6 +18,12 @@ const checkPostOwnership = async (req: Request, res: Response, postId: string, u
         
         console.log("Post email:", post.email);
         console.log("User email:", userEmail);
+        
+        // Si l'utilisateur est admin, autoriser l'action
+        if (isAdmin === true) {
+            console.log("Admin access granted");
+            return { authorized: true, post, isAdmin: true };
+        }
         
         // Normaliser les emails pour la comparaison (supprimer espaces, mettre en minuscules)
         const postEmail = post.email?.trim().toLowerCase();
@@ -30,7 +35,7 @@ const checkPostOwnership = async (req: Request, res: Response, postId: string, u
         }
         
         console.log("Ownership verified successfully");
-        return { authorized: true, post };
+        return { authorized: true, post, isOwner: true };
     } catch (error) {
         console.error("Error in checkPostOwnership:", error);
         return { authorized: false, message: "Erreur lors de la vérification" };
@@ -198,10 +203,11 @@ export const getPostById = async (req: Request<{id: string}, {}, {}>, res: Respo
 export const updatePost = async (req: Request<{id: string}, {}, any>, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
-        const { userEmail, ...updateFields } = req.body; // Changé ici
+        const { userEmail, isAdmin, ...updateFields } = req.body;
         
         console.log("Backend - ID:", id);
         console.log("Backend - UserEmail:", userEmail);
+        console.log("Backend - IsAdmin:", isAdmin);
         console.log("Backend - UpdateFields:", updateFields);
         
         // Vérifier si l'ID est valide
@@ -213,10 +219,10 @@ export const updatePost = async (req: Request<{id: string}, {}, any>, res: Respo
             return;
         }
 
-        // Vérifier si l'utilisateur est autorisé
-        const ownershipCheck = await checkPostOwnership(req, res, id, userEmail);
+        // Vérifier si l'utilisateur est autorisé (propriétaire ou admin)
+        const ownershipCheck = await checkPostOwnership(req, res, id, userEmail, isAdmin);
         if (!ownershipCheck.authorized) {
-            console.log("Ownership check failed:", ownershipCheck.message);
+            console.log("Authorization failed:", ownershipCheck.message);
             res.status(403).json({ 
                 success: false,
                 message: ownershipCheck.message 
@@ -226,7 +232,7 @@ export const updatePost = async (req: Request<{id: string}, {}, any>, res: Respo
         
         // Vérifier si des fichiers ont été uploadés
         const uploadedFiles = req.files as Express.Multer.File[] || [];
-        let updateData = { ...updateFields }; // Utiliser updateFields au lieu de req.body
+        let updateData = { ...updateFields };
         
         // Gérer les images existantes et nouvelles
         if (req.body.existingImages || uploadedFiles.length > 0) {
@@ -282,7 +288,9 @@ export const updatePost = async (req: Request<{id: string}, {}, any>, res: Respo
 export const deletePost = async (req: Request<{ id: string }, {}, {}>, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
-        const { email: userEmail } = req.query; // Email passé en query parameter
+        const { email: userEmail, isAdmin } = req.query;
+        
+        console.log("Delete request - ID:", id, "Email:", userEmail, "IsAdmin:", isAdmin);
         
         // Vérifier si l'ID est valide
         if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -293,8 +301,11 @@ export const deletePost = async (req: Request<{ id: string }, {}, {}>, res: Resp
             return;
         }
 
-        // Vérifier si l'utilisateur est autorisé
-        const ownershipCheck = await checkPostOwnership(req, res, id, userEmail as string);
+        // Convertir isAdmin en booléen
+        const adminStatus = isAdmin === 'true';
+
+        // Vérifier si l'utilisateur est autorisé (propriétaire ou admin)
+        const ownershipCheck = await checkPostOwnership(req, res, id, userEmail as string, adminStatus);
         if (!ownershipCheck.authorized) {
             res.status(403).json({ 
                 success: false,

@@ -486,19 +486,19 @@ const [totalAnnounces, setTotalAnnounces] = useState(0);
     Montserrat_600SemiBold,
     Montserrat_500Medium,
   });
-    
-  useEffect(() => {
-  // Rafraîchir les données utilisateur
-  const refreshData = async () => {
-    try {
-      await refreshUserData(); // Utiliser la fonction du contexte ThemeContext
-    } catch (error) {
-      console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
-    }
-  };
+    ////// ahmedaissa
+//   useEffect(() => {
+//   // Rafraîchir les données utilisateur
+//   const refreshData = async () => {
+//     try {
+//       await refreshUserData(); // Utiliser la fonction du contexte ThemeContext
+//     } catch (error) {
+//       console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
+//     }
+//   };
   
-  refreshData();
-}, [refreshUserData]);
+//   refreshData();
+// }, [refreshUserData]);
 
   const [categoryStats, setCategoryStats] = useState([
     { name: 'Donner', count: 15, color: '#4CAF50' },
@@ -1256,14 +1256,14 @@ const getCategoryNameById = (categoryId) => {
     <View style={styles.tabContent}>
       {/* Section validation utilisateurs */}
       <View style={styles.usersSection}>
-        <View style={styles.sectionHeader}>
+        {/* <View style={styles.sectionHeader}>
           <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
             Validation utilisateurs
           </Text>
           <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
             {pendingUsers} utilisateur(s) en attente
           </Text>
-        </View>
+        </View> */}
         
         {userLoading ? (
   <View style={styles.loadingContainer}>

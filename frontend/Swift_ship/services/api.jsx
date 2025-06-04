@@ -574,18 +574,18 @@ export const getPosts = async (params = {}) => {
   }
 };
 
-export const updateAnnonce = async (postId, updateData, userEmail) => {
-  console.log("Updating post with ID:", postId, "Data:", updateData);
+export const updateAnnonce = async (postId, updateData, userEmail, isAdmin = false) => {
+  console.log("Updating post with ID:", postId, "Data:", updateData, "Admin:", isAdmin);
   try {
     const formData = new FormData();
     
-    // Ajouter l'email de l'utilisateur pour vérification
-    formData.append('userEmail', userEmail); // Changé de 'email' à 'userEmail' pour éviter la confusion
+    // Ajouter l'email de l'utilisateur et le statut admin pour vérification
+    formData.append('userEmail', userEmail);
+    formData.append('isAdmin', isAdmin.toString());
     
     // Ajouter les données textuelles en excluant l'email et les images
     Object.keys(updateData).forEach(key => {
       if (key === 'images' || key === 'email') {
-        // Exclure les images et l'email de cette boucle
         return;
       } else if (updateData[key] !== undefined && updateData[key] !== null) {
         formData.append(key, updateData[key].toString());
@@ -595,13 +595,10 @@ export const updateAnnonce = async (postId, updateData, userEmail) => {
     // Traiter les images séparément
     if (updateData.images && updateData.images.length > 0) {
       updateData.images.forEach((imageUri, index) => {
-        // Si c'est une URL existante sur le serveur
         if (imageUri.startsWith('http')) {
-          // Extraire le nom de fichier de l'URL
           const fileName = imageUri.split('/').pop();
           formData.append('existingImages', fileName);
         } else {
-          // C'est une nouvelle image locale
           const uriParts = imageUri.split('/');
           const fileName = uriParts[uriParts.length - 1];
           const fileType = imageUri.includes('.jpeg') ? 'image/jpeg' : 
@@ -618,12 +615,6 @@ export const updateAnnonce = async (postId, updateData, userEmail) => {
       });
     }
 
-    // Afficher le contenu du FormData pour debug
-    console.log("FormData content:");
-    for (let pair of formData._parts) {
-      console.log(pair[0], pair[1]);
-    }
-
     const response = await api.put(`/post/update/${postId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -633,7 +624,7 @@ export const updateAnnonce = async (postId, updateData, userEmail) => {
     console.log('updateAnnonce response:', response);
     return response;
   } catch (error) {
-    console.error('updateAnnounce error:', error);
+    console.error('updateAnnonce error:', error);
     if (error.response) {
       console.error('Response error data:', error.response.data);
     }
@@ -642,10 +633,10 @@ export const updateAnnonce = async (postId, updateData, userEmail) => {
 };
 
 // CORRECTION pour deleteAnnounce - déjà correct
-export const deleteAnnounce = async (postId, userEmail) => {
-  console.log("Deleting post with ID:", postId);
+export const deleteAnnounce = async (postId, userEmail, isAdmin = false) => {
+  console.log("Deleting post with ID:", postId, "Admin:", isAdmin);
   try {
-    const response = await api.delete(`/post/delete/${postId}?email=${encodeURIComponent(userEmail)}`);
+    const response = await api.delete(`/post/delete/${postId}?email=${encodeURIComponent(userEmail)}&isAdmin=${isAdmin}`);
     console.log('deleteAnnounce response:', response);
     return response;
   } catch (error) {

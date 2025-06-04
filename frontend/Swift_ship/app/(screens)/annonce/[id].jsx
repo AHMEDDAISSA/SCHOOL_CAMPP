@@ -30,6 +30,8 @@ export default function AnnonceDetail() {
   const paramId = params.id;
 
   const [authorData, setAuthorData] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
   
   const [annonce, setAnnonce] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,12 +150,21 @@ export default function AnnonceDetail() {
   }
 };
 useEffect(() => {
-    if (annonce && userEmail) {
-      const ownershipStatus = userEmail === annonce.email;
-      setIsOwner(ownershipStatus);
-      console.log("Ownership check:", { userEmail, annonceEmail: annonce.email, isOwner: ownershipStatus });
-    }
-  }, [annonce, userEmail]);
+  if (annonce && userEmail) {
+    const ownershipStatus = userEmail === annonce.email;
+    const canEdit = ownershipStatus || isAdmin; // Admin peut toujours éditer
+    
+    setIsOwner(ownershipStatus);
+    
+    console.log("Access control check:", { 
+      userEmail, 
+      annonceEmail: annonce.email, 
+      isOwner: ownershipStatus,
+      isAdmin,
+      canEdit 
+    });
+  }
+}, [annonce, userEmail, isAdmin]);
 
   useEffect(() => {
   const getUserEmail = async () => {
@@ -169,6 +180,38 @@ useEffect(() => {
   
   getUserEmail();
 }, []);
+
+useEffect(() => {
+  const getUserData = async () => {
+    try {
+      const storedEmail = await AsyncStorage.getItem('userEmail');
+      const adminStatus = await AsyncStorage.getItem('isAdmin');
+      const userRole = await AsyncStorage.getItem('userRole'); // Si vous stockez le rôle
+      
+      if (storedEmail) {
+        setUserEmail(storedEmail);
+      }
+      
+      // Vérifier si l'utilisateur est admin de plusieurs façons
+      const isUserAdmin = adminStatus === 'true' || 
+                         userRole === 'admin' || 
+                         (profileData && profileData.role === 'admin');
+      
+      setIsAdmin(isUserAdmin);
+      
+      console.log("User data loaded:", {
+        email: storedEmail,
+        isAdmin: isUserAdmin,
+        adminStatus,
+        userRole
+      });
+    } catch (error) {
+      console.error('Erreur lors de la récupération des données utilisateur:', error);
+    }
+  };
+  
+  getUserData();
+}, [profileData]);
   
   // Récupérer l'ID de l'annonce depuis les différentes sources possibles
   useEffect(() => {
@@ -473,51 +516,52 @@ useEffect(() => {
 };
 
   const handleDeleteAnnonce = useCallback(() => {
-    Alert.alert(
-      "Confirmation de suppression",
-      "Êtes-vous sûr de vouloir supprimer cette annonce ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              const annonceId = annonce._id || annonce.id;
-              const result = await deleteAnnonceMeth(annonceId, userEmail);
-              
-              if (result.success) {
-                Toast.show({
-                  type: 'success',
-                  text1: result.message || 'Annonce supprimée avec succès',
-                  visibilityTime: 3000,
-                });
-                router.back();
-              } else {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Erreur',
-                  text2: result.message || 'Impossible de supprimer cette annonce',
-                  visibilityTime: 3000,
-                });
-              }
-            } catch (error) {
-              console.error("Erreur lors de la suppression:", error);
+  Alert.alert(
+    "Confirmation de suppression",
+    "Êtes-vous sûr de vouloir supprimer cette annonce ?",
+    [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: async () => {
+          setIsDeleting(true);
+          try {
+            const annonceId = annonce._id || annonce.id;
+            // Passer également le statut d'administrateur à la fonction de suppression
+            const result = await deleteAnnonceMeth(annonceId, userEmail, isAdmin);
+            
+            if (result.success) {
+              Toast.show({
+                type: 'success',
+                text1: result.message || 'Annonce supprimée avec succès',
+                visibilityTime: 3000,
+              });
+              router.back();
+            } else {
               Toast.show({
                 type: 'error',
                 text1: 'Erreur',
-                text2: 'Une erreur inattendue s\'est produite',
+                text2: result.message || 'Impossible de supprimer cette annonce',
                 visibilityTime: 3000,
               });
-            } finally {
-              setIsDeleting(false);
             }
+          } catch (error) {
+            console.error("Erreur lors de la suppression:", error);
+            Toast.show({
+              type: 'error',
+              text1: 'Erreur',
+              text2: 'Une erreur inattendue s\'est produite',
+              visibilityTime: 3000,
+            });
+          } finally {
+            setIsDeleting(false);
           }
         }
-      ]
-    );
-  }, [annonce, deleteAnnonceMeth, userEmail]);
+      }
+    ]
+  );
+}, [annonce, deleteAnnonceMeth, userEmail, isAdmin]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -569,7 +613,7 @@ useEffect(() => {
 };
 
   // Update annonce submission
- const handleSubmit = async () => {
+  const handleSubmit = async () => {
   if (!validateForm()) {
     Toast.show({
       type: 'error',
@@ -599,7 +643,7 @@ useEffect(() => {
       email,
     };
     
-    const result = await updateAnnonce(annonceId, updatedData, userEmail);
+    const result = await updateAnnonce(annonceId, updatedData, userEmail, isAdmin);
     
     if (result.success) {
       setIsEditMode(false);
@@ -613,7 +657,6 @@ useEffect(() => {
       // Recharger l'annonce après mise à jour
       setTimeout(() => {
         refreshAnnonces().then(() => {
-          // Réinitialiser l'index d'image actif pour éviter des problèmes d'affichage
           setActiveImageIndex(0);
         });
       }, 500);
@@ -1319,50 +1362,50 @@ useEffect(() => {
 
             <View style={styles.actionButtons}>
         {/* Bouton de contact - visible seulement si ce n'est pas le propriétaire */}
-        {!isOwner && (
-          <TouchableOpacity
-            style={[styles.contactButton, { backgroundColor }]}
-            onPress={() => handleContact(annonce)}
-          >
-            <Ionicons name={icon} size={20} color="white" />
-            <Text style={styles.contactButtonText}>{text}</Text>
-          </TouchableOpacity>
-        )}
+        {!isOwner && !isAdmin && (
+    <TouchableOpacity
+      style={[styles.contactButton, { backgroundColor }]}
+      onPress={() => handleContact(annonce)}
+    >
+      <Ionicons name={icon} size={20} color="white" />
+      <Text style={styles.contactButtonText}>{text}</Text>
+    </TouchableOpacity>
+  )}
         
         {/* Boutons Modifier/Supprimer - visibles seulement pour le propriétaire */}
-        {isOwner && (
-          <>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={toggleEditMode}
-              disabled={isDeleting}
-              accessible={true}
-              accessibilityLabel="Modifier l'annonce"
-              accessibilityRole="button"
-            >
-              <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.editButtonText}>Modifier</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.deleteButton, { opacity: isDeleting ? 0.5 : 1 }]}
-              onPress={handleDeleteAnnonce}
-              disabled={isDeleting}
-              accessible={true}
-              accessibilityLabel="Supprimer l'annonce"
-              accessibilityRole="button"
-            >
-              {isDeleting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.deleteButtonText}>Supprimer</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </>
-        )}
+       {(isOwner || isAdmin) && (
+  <>
+    <TouchableOpacity 
+      style={styles.editButton}
+      onPress={toggleEditMode}
+      disabled={isDeleting}
+      accessible={true}
+      accessibilityLabel="Modifier l'annonce"
+      accessibilityRole="button"
+    >
+      <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
+      <Text style={styles.editButtonText}>Modifier</Text>
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      style={[styles.deleteButton, { opacity: isDeleting ? 0.5 : 1 }]}
+      onPress={handleDeleteAnnonce}
+      disabled={isDeleting}
+      accessible={true}
+      accessibilityLabel="Supprimer l'annonce"
+      accessibilityRole="button"
+    >
+      {isDeleting ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <>
+          <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.deleteButtonText}>Supprimer</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  </>
+)}
       </View>
       
       {/* Message informatif si l'utilisateur n'est pas propriétaire */}
