@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserByEmailApi } from '../services/api'; // AJOUT : Import de la fonction API
 
@@ -154,28 +154,16 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  const updateProfileData = async (data) => {
-     try {
-    // IMPROVED: Better URL handling
-    const imageUrl = data.profileImageUrl || data.profileImage;
+ const updateProfileData = async (data) => {
+  try {
+    console.log('Updating profile data:', data);
     
-    // Debug the image URL
-    if (imageUrl) {
-      console.log('Updating profile with image URL:', imageUrl);
-      
-      // Verify the URL is valid
-      if (imageUrl.startsWith('http')) {
-        // Test if the image is accessible
-        try {
-          const response = await fetch(imageUrl, { method: 'HEAD' });
-          console.log(`Image URL status: ${response.status}`);
-        } catch (err) {
-          console.warn('Could not verify image URL:', err.message);
-        }
-      }
-    }
+    // CORRECTION : Meilleure gestion de l'URL de l'image
+    const imageUrl = data.profileImageUrl || 
+                    (data.profileImage && !data.profileImage.startsWith('http') 
+                     ? `http://192.168.1.21:3001/uploads/${data.profileImage}` 
+                     : data.profileImage);
     
-    // Update the data with properly handled image URL
     const mappedData = {
       ...data,
       fullName: data.fullName || `${data.first_name || ''} ${data.last_name || ''}`.trim(),
@@ -186,13 +174,15 @@ export const ThemeProvider = ({ children }) => {
     };
     
     const newProfileData = { ...profileData, ...mappedData };
-    setProfileData(newProfileData)
-      await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
-      await AsyncStorage.setItem('userInfo', JSON.stringify(data));
-    } catch (error) {
-      console.error('Error saving profile data:', error);
-    }
-  };
+    setProfileData(newProfileData);
+    await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+    await AsyncStorage.setItem('userInfo', JSON.stringify(data));
+    
+    console.log('Profile updated with image URL:', imageUrl);
+  } catch (error) {
+    console.error('Error saving profile data:', error);
+  }
+};
 
   const updateProfileImage = async (imageUri) => {
     try {
@@ -235,21 +225,29 @@ export const ThemeProvider = ({ children }) => {
   };
 
   // AJOUT : Fonction pour rafraîchir les données utilisateur
-  const refreshUserData = async () => {
-    try {
-      const storedEmail = await AsyncStorage.getItem('userEmail');
-      if (storedEmail) {
-        const userData = await getUserByEmailApi(storedEmail);
-        if (userData) {
-          await updateProfileData(userData);
-          return userData;
-        }
+  const refreshUserData = useCallback(async () => {
+  try {
+    if (profileData && profileData.email) {
+      const updatedUserData = await getUserByEmailApi(profileData.email);
+      if (updatedUserData) {
+        setProfileData(updatedUserData);
+        await AsyncStorage.setItem('profileData', JSON.stringify(updatedUserData));
       }
-    } catch (error) {
-      console.error('Error refreshing user data:', error);
     }
-    return null;
-  };
+  } catch (error) {
+    console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
+  }
+}, [profileData]);
+
+// Ajoutez refreshUserData à la valeur du contexte
+const value = {
+  theme,
+  darkMode,
+  toggleTheme,
+  profileData,
+  setProfileData,
+  refreshUserData, // AJOUT
+};
 
   return (
     <ThemeContext.Provider

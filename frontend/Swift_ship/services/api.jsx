@@ -84,7 +84,7 @@ export const getUserByEmailApi = async (email) => {
     
     if (response.data) {
       const userData = response.data;
-      console.log('Raw user data from API:', userData); // Pour déboguer
+      console.log('Raw user data from API:', userData);
       
       const mappedData = {
         fullName: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
@@ -92,15 +92,16 @@ export const getUserByEmailApi = async (email) => {
         lastName: userData.last_name || '',
         email: userData.email || '',
         phoneNumber: userData.phone || '',
-        // CORRECTION : Prioriser profileImageUrl s'il existe
-        profileImage: userData.profileImageUrl || userData.profileImage || null,
+        // CORRECTION : Construire l'URL complète si nécessaire
+        profileImage: userData.profileImageUrl || 
+                     (userData.profileImage ? `http://192.168.1.21:3001/uploads/${userData.profileImage}` : null),
         role: userData.role || '',
         camp: userData.camp || '',
         isVerified: userData.isVerified || false,
         canPost: userData.canPost || false,
       };
       
-      console.log('Mapped user data:', mappedData); // Pour déboguer
+      console.log('Mapped user data with corrected image:', mappedData);
       return { ...userData, ...mappedData };
     }
     
@@ -641,6 +642,35 @@ export const deleteAnnounce = async (postId, userEmail, isAdmin = false) => {
     return response;
   } catch (error) {
     console.error('deleteAnnounce error:', error.message);
+    throw error;
+  }
+};
+export const approveUser = async (userId) => {
+  try {
+    const response = await axios.put(`http://192.168.1.21:3001/user/approve/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('approveUser error:', error);
+    throw error;
+  }
+};
+
+export const rejectUser = async (userId) => {
+  try {
+    const response = await axios.put(`http://192.168.1.21:3001/user/reject/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('rejectUser error:', error);
+    throw error;
+  }
+};
+
+export const checkUserPermissions = async (userEmail) => {
+  try {
+    const response = await axios.get(`http://192.168.1.21:3001/user/permissions/${encodeURIComponent(userEmail)}`);
+    return response.data;
+  } catch (error) {
+    console.error('checkUserPermissions error:', error);
     throw error;
   }
 };

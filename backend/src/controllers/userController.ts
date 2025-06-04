@@ -165,9 +165,18 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
     const transformedUsers = users.map(user => {
         const userObj = user.toObject();
         
-        // CORRECTION : Utiliser la fonction utilitaire
+        // Construire l'URL de l'image de profil
         userObj.profileImageUrl = getProfileImageUrl(req, userObj.profileImage);
         userObj.fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim();
+        
+        // Déterminer le statut basé sur canPost et isVerified
+        if (!userObj.isVerified) {
+          userObj.status = 'pending';
+        } else if (userObj.canPost) {
+          userObj.status = 'approved';
+        } else {
+          userObj.status = 'rejected';
+        }
         
         return userObj;
     });
@@ -261,6 +270,112 @@ export const deleteUser = async (req: Request<{id: string}>, res: Response): Pro
     res.status(500).json({
       success: false,
       message: "Error deleting user",
+      error: (error as Error).message
+    });
+  }
+};
+
+export const approveUser = async (req: Request<{id: string}>, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id);
+    
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: "Utilisateur non trouvé"
+      });
+      return;
+    }
+    
+    // Vérifier que c'est un parent
+    if (user.role !== 'parent') {
+      res.status(400).json({
+        success: false,
+        message: "Seuls les utilisateurs parents peuvent être approuvés/rejetés"
+      });
+      return;
+    }
+    
+    // Approuver l'utilisateur : canPost = true, isVerified = true
+    user.canPost = true;
+    user.isVerified = true;
+    
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: "Utilisateur parent approuvé avec succès",
+      user: {
+        _id: user._id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        canPost: user.canPost,
+        isVerified: user.isVerified,
+        role: user.role,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error("Error approving user:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de l'approbation de l'utilisateur",
+      error: (error as Error).message
+    });
+  }
+};
+
+export const rejectUser = async (req: Request<{id: string}>, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id);
+    
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: "Utilisateur non trouvé"
+      });
+      return;
+    }
+    
+    // Vérifier que c'est un parent
+    if (user.role !== 'parent') {
+      res.status(400).json({
+        success: false,
+        message: "Seuls les utilisateurs parents peuvent être approuvés/rejetés"
+      });
+      return;
+    }
+    
+    // Rejeter l'utilisateur : canPost = false (empêche publications et contact)
+    user.canPost = false;
+    user.isVerified = true; // Toujours vérifié mais sans droits de publication
+    
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: "Utilisateur parent rejeté avec succès",
+      user: {
+        _id: user._id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        canPost: user.canPost,
+        isVerified: user.isVerified,
+        role: user.role,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error("Error rejecting user:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors du rejet de l'utilisateur",
       error: (error as Error).message
     });
   }

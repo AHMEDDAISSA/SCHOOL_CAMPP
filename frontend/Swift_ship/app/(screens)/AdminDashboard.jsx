@@ -18,6 +18,7 @@ import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { getAllUsers, deleteUser, updateUserStatus } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { approveUser, rejectUser } from '../../services/api';
 
 
 const AnnonceCard = React.memo(({ item, darkMode, onPress, onDelete }) => (
@@ -165,6 +166,8 @@ const [pendingUsers, setPendingUsers] = useState(0);
 const [totalUsers, setTotalUsers] = useState(0);
 const [userLoading, setUserLoading] = useState(false);
 const [totalAnnounces, setTotalAnnounces] = useState(0);
+const [isInitializing, setIsInitializing] = useState(true);
+
 
   
   // Navigation hook inside the component
@@ -487,18 +490,57 @@ const [totalAnnounces, setTotalAnnounces] = useState(0);
     Montserrat_500Medium,
   });
     ////// ahmedaissa
-//   useEffect(() => {
-//   // Rafraîchir les données utilisateur
-//   const refreshData = async () => {
-//     try {
-//       await refreshUserData(); // Utiliser la fonction du contexte ThemeContext
-//     } catch (error) {
-//       console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
-//     }
-//   };
+  useEffect(() => {
+  // Rafraîchir les données utilisateur
+  const refreshData = async () => {
+    try {
+      await refreshUserData(); // Utiliser la fonction du contexte ThemeContext
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des données utilisateur:', error);
+    }
+  };
   
-//   refreshData();
-// }, [refreshUserData]);
+  refreshData();
+}, [refreshUserData]);
+
+useEffect(() => {
+  if (annonces && annonces.length > 0) {
+    const moderatedAnnounces = getAnnoncesToModerate();
+    setAnnoncesToModerate(moderatedAnnounces);
+  }
+}, [annonces, moderationMode, getAnnoncesToModerate]);
+
+useEffect(() => {
+  const initializeAdminData = async () => {
+    try {
+      setIsInitializing(true);
+      
+      // Rafraîchir les annonces
+      await refreshAnnonces();
+      await updateNewStatus();
+      
+      // Petit délai pour s'assurer que les données sont chargées
+      setTimeout(() => {
+        const moderatedAnnounces = getAnnoncesToModerate();
+        setAnnoncesToModerate(moderatedAnnounces);
+        setIsInitializing(false);
+      }, 300);
+      
+    } catch (error) {
+      console.error('Erreur lors de l\'initialisation des données admin:', error);
+      setIsInitializing(false);
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur d\'initialisation',
+        text2: 'Impossible de charger les données',
+        visibilityTime: 3000,
+      });
+    }
+  };
+  
+  initializeAdminData();
+}, []);
 
   const [categoryStats, setCategoryStats] = useState([
     { name: 'Donner', count: 15, color: '#4CAF50' },
@@ -618,97 +660,135 @@ const [totalAnnounces, setTotalAnnounces] = useState(0);
   // État pour les annonces à modérer
   const [annoncesToModerate, setAnnoncesToModerate] = useState([]);
 
-  useEffect(() => {
+ useEffect(() => {
   const fetchUsers = async () => {
-  try {
-    setUserLoading(true);
-    
-    const response = await getAllUsers();
-    
-    if (response && Array.isArray(response)) {
-      console.log("Données utilisateurs reçues:", response);
+    try {
+      setUserLoading(true);
       
-      // Prétraiter les utilisateurs pour garantir une structure cohérente
-      const processedUsers = response.map(user => ({
-        ...user,
-        // S'assurer que tous les utilisateurs ont un attribut status
-        status: user.status || (user.verified ? 'active' : 'pending')
-      }));
+      const response = await getAllUsers();
       
-      setAllUsers(processedUsers);
-      
-      // Compter les utilisateurs en attente et actifs
-      const pending = processedUsers.filter(user => 
-        user.status === 'pending' || 
-        user.verified === false || 
-        (user.verificationCode && !user.verified)
-      ).length;
-      
-      const active = processedUsers.filter(user => 
-        user.status === 'active' || 
-        user.verified === true ||
-        (!user.verificationCode && user.verified !== false)
-      ).length;
-      
-      setPendingUsers(pending);
-      setTotalUsers(active);
-      
-      await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
+      if (response && Array.isArray(response)) {
+        console.log("Données utilisateurs reçues:", response);
+        
+        // Prétraiter les utilisateurs avec la nouvelle logique de statut
+        const processedUsers = response.map(user => ({
+          ...user,
+          // Déterminer le statut basé sur isVerified et canPost
+          status: !user.isVerified ? 'pending' : 
+                  user.canPost ? 'approved' : 
+                  'rejected'
+        }));
+        
+        setAllUsers(processedUsers);
+        
+        // Compter les utilisateurs selon le nouveau système
+        const pending = processedUsers.filter(user => user.status === 'pending').length;
+        const approved = processedUsers.filter(user => user.status === 'approved').length;
+        const rejected = processedUsers.filter(user => user.status === 'rejected').length;
+        
+        setPendingUsers(pending);
+        setTotalUsers(approved);
+        
+        await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
+        
+        console.log(`Utilisateurs - En attente: ${pending}, Approuvés: ${approved}, Rejetés: ${rejected}`);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      // Charger depuis AsyncStorage en cas d'erreur
+      try {
+        const storedUsers = await AsyncStorage.getItem('allUsers');
+        if (storedUsers) {
+          const parsedUsers = JSON.parse(storedUsers);
+          setAllUsers(parsedUsers);
+          
+          const pending = parsedUsers.filter(user => user.status === 'pending').length;
+          const approved = parsedUsers.filter(user => user.status === 'approved').length;
+          
+          setPendingUsers(pending);
+          setTotalUsers(approved);
+        }
+      } catch (storageError) {
+        console.error('Error loading from storage:', storageError);
+      }
+    } finally {
+      setUserLoading(false);
     }
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    // ... reste du code de gestion d'erreur
-  } finally {
-    setUserLoading(false);
-  }
-};
+  };
   
   fetchUsers();
 }, [refreshing]);
 
     
 
- const onRefresh = useCallback(async () => {
+const onRefresh = useCallback(async () => {
   setRefreshing(true);
   try {
     // Refresh announcements
     await refreshAnnonces();
     await updateNewStatus();
     
-    // Refresh users data (sans vérification de token)
+    // Refresh users data
     const userResponse = await getAllUsers();
     if (userResponse) {
-      setAllUsers(userResponse);
+      const processedUsers = userResponse.map(user => ({
+        ...user,
+        status: !user.isVerified ? 'pending' : 
+                user.canPost ? 'approved' : 
+                'rejected'
+      }));
       
-      // Count pending and active users
-      const pending = userResponse.filter(user => user.status === 'pending').length;
-      const active = userResponse.filter(user => user.status === 'active').length;
+      setAllUsers(processedUsers);
+      
+      const pending = processedUsers.filter(user => user.status === 'pending').length;
+      const approved = processedUsers.filter(user => user.status === 'approved').length;
       
       setPendingUsers(pending);
-      setTotalUsers(active);
+      setTotalUsers(approved);
       
-      // Mettre à jour AsyncStorage
-      await AsyncStorage.setItem('allUsers', JSON.stringify(userResponse));
+      await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
     }
     
-    // Update moderation items
-    const moderatedAnnounces = getAnnoncesToModerate();
-    setAnnoncesToModerate(moderatedAnnounces);
+    // Update moderation items après le rafraîchissement des annonces
+    setTimeout(() => {
+      const moderatedAnnounces = getAnnoncesToModerate();
+      setAnnoncesToModerate(moderatedAnnounces);
+      
+      if (annonces) {
+        setTotalAnnounces(annonces.length);
+      }
+    }, 500); // Petit délai pour s'assurer que les annonces sont à jour
     
-    // Update total announces count
-    if (annonces) {
-      setTotalAnnounces(annonces.length);
-    }
   } catch (error) {
     console.error('Erreur lors du rafraîchissement:', error);
+    
+    // Afficher un message d'erreur
+    Toast.show({
+      type: 'error',
+      text1: 'Erreur de rafraîchissement',
+      text2: 'Impossible de mettre à jour les données',
+      visibilityTime: 3000,
+    });
   } finally {
     setRefreshing(false);
   }
-}, [refreshAnnonces, updateNewStatus, getAnnoncesToModerate]);
+}, [refreshAnnonces, updateNewStatus, getAnnoncesToModerate, annonces]);
+
     
-  const profileImage = profileData && profileData.profileImage 
-    ? { uri: profileData.profileImage } 
-    : require('../../assets/images/placeholder.png');
+  const profileImage = useMemo(() => {
+  if (profileData && profileData.profileImage) {
+    // Si l'URL est déjà complète
+    if (profileData.profileImage.startsWith('http')) {
+      return { uri: profileData.profileImage };
+    }
+    // Si c'est juste le nom du fichier, construire l'URL complète
+    if (profileData.profileImage.length > 0) {
+      return { uri: `http://192.168.1.21:3001/uploads/${profileData.profileImage}` };
+    }
+  }
+  // Image par défaut
+  return require('../../assets/images/placeholder.png');
+}, [profileData]);
 
   const adminName = profileData && profileData.fullName 
     ? profileData.fullName 
@@ -755,10 +835,10 @@ const getCategoryNameById = (categoryId) => {
   ];
 
   // Fonction pour approuver un utilisateur
- const approveUser = async (userId) => {
+const approveUserNew = async (userId) => {
   Alert.alert(
     "Confirmer l'approbation",
-    "Voulez-vous vraiment approuver cet utilisateur ?",
+    "Cet utilisateur pourra publier des annonces et accéder à toutes les fonctionnalités. Continuer ?",
     [
       {
         text: "Annuler",
@@ -768,18 +848,27 @@ const getCategoryNameById = (categoryId) => {
         text: "Approuver", 
         onPress: async () => {
           try {
-            // Fonction API à créer suivant le même modèle
-            const response = await updateUserStatus(userId, 'active');
+            const response = await approveUser(userId);
             
             if (response && response.success) {
               // Mettre à jour l'état local
               const updatedUsers = allUsers.map(user => 
-                user._id === userId ? { ...user, status: 'active' } : user
+                user._id === userId ? { 
+                  ...user, 
+                  canPost: true, 
+                  isVerified: true,
+                  status: 'approved'
+                } : user
               );
               
               setAllUsers(updatedUsers);
-              setPendingUsers(prev => prev - 1);
-              setTotalUsers(prev => prev + 1);
+              
+              // Recalculer les compteurs
+              const pending = updatedUsers.filter(user => user.status === 'pending').length;
+              const approved = updatedUsers.filter(user => user.status === 'approved').length;
+              
+              setPendingUsers(pending);
+              setTotalUsers(approved);
               
               // Mettre à jour AsyncStorage
               await AsyncStorage.setItem('allUsers', JSON.stringify(updatedUsers));
@@ -787,7 +876,8 @@ const getCategoryNameById = (categoryId) => {
               Toast.show({
                 type: 'success',
                 text1: 'Utilisateur approuvé',
-                visibilityTime: 2000,
+                text2: 'L\'utilisateur peut maintenant publier des annonces',
+                visibilityTime: 3000,
               });
             } else {
               throw new Error(response?.message || "Échec de l'approbation");
@@ -806,12 +896,12 @@ const getCategoryNameById = (categoryId) => {
     ]
   );
 };
-    
-  // Fonction pour rejeter un utilisateur
-  const rejectUser = async (userId) => {
+
+// Fonction pour rejeter un utilisateur
+const rejectUserNew = async (userId) => {
   Alert.alert(
     "Confirmer le rejet",
-    "Voulez-vous vraiment rejeter cet utilisateur ? Cette action supprimera l'utilisateur du système.",
+    "Cet utilisateur ne pourra plus publier d'annonces. Il restera dans le système mais avec des droits limités. Continuer ?",
     [
       {
         text: "Annuler",
@@ -821,20 +911,27 @@ const getCategoryNameById = (categoryId) => {
         text: "Rejeter", 
         onPress: async () => {
           try {
-            // Appel direct sans vérification de token
-            const response = await deleteUser(userId);
+            const response = await rejectUser(userId);
             
             if (response && response.success) {
-              // Mettre à jour l'état local en supprimant l'utilisateur
-              const updatedUsers = allUsers.filter(user => user._id !== userId);
+              // Mettre à jour l'état local
+              const updatedUsers = allUsers.map(user => 
+                user._id === userId ? { 
+                  ...user, 
+                  canPost: false, 
+                  isVerified: true,
+                  status: 'rejected'
+                } : user
+              );
               
               setAllUsers(updatedUsers);
-              setPendingUsers(prev => 
-                allUsers.find(user => user._id === userId)?.status === 'pending' ? prev - 1 : prev
-              );
-              setTotalUsers(prev => 
-                allUsers.find(user => user._id === userId)?.status === 'active' ? prev - 1 : prev
-              );
+              
+              // Recalculer les compteurs
+              const pending = updatedUsers.filter(user => user.status === 'pending').length;
+              const approved = updatedUsers.filter(user => user.status === 'approved').length;
+              
+              setPendingUsers(pending);
+              setTotalUsers(approved);
               
               // Mettre à jour AsyncStorage
               await AsyncStorage.setItem('allUsers', JSON.stringify(updatedUsers));
@@ -842,7 +939,8 @@ const getCategoryNameById = (categoryId) => {
               Toast.show({
                 type: 'success',
                 text1: 'Utilisateur rejeté',
-                visibilityTime: 2000,
+                text2: 'L\'utilisateur ne peut plus publier d\'annonces',
+                visibilityTime: 3000,
               });
             } else {
               throw new Error(response?.message || "Échec du rejet");
@@ -861,7 +959,6 @@ const getCategoryNameById = (categoryId) => {
     ]
   );
 };
-    
   // Fonction pour approuver une annonce
  const approveAnnounce = (announceId) => {
   Alert.alert(
@@ -1254,220 +1351,247 @@ const getCategoryNameById = (categoryId) => {
     case 'users':
   return (
     <View style={styles.tabContent}>
-      {/* Section validation utilisateurs */}
       <View style={styles.usersSection}>
-        {/* <View style={styles.sectionHeader}>
-          <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
-            Validation utilisateurs
-          </Text>
-          <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-            {pendingUsers} utilisateur(s) en attente
-          </Text>
-        </View> */}
-        
         {userLoading ? (
-  <View style={styles.loadingContainer}>
-    <ActivityIndicator size="large" color="#39335E" />
-  </View>
-) : (
-  <View>
-    {/* Debug information - You can remove this in production */}
-    {/* <View style={{padding: 8, marginBottom: 10, backgroundColor: darkMode ? '#363636' : '#f5f5f5', borderRadius: 8}}>
-      <Text style={{color: theme.color, fontSize: 12}}>
-        Total users: {allUsers.length} | 
-        Format check: {allUsers.length > 0 ? JSON.stringify(Object.keys(allUsers[0]).slice(0, 5)) : 'No users'}
-      </Text>
-    </View> */}
-
-    {/* Pending Users Section */}
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
-        Utilisateurs en attente
-      </Text>
-      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-        {pendingUsers} utilisateur(s) en attente
-      </Text>
-    </View>
-
-    {allUsers.filter(user => 
-      user.status === 'pending' || 
-      (user.verified === false) || 
-      (user.verificationCode && !user.verified)
-    ).length > 0 ? (
-      allUsers
-        .filter(user => 
-          user.status === 'pending' || 
-          (user.verified === false) || 
-          (user.verificationCode && !user.verified)
-        )
-        .map(user => (
-          <View 
-            key={user._id || user.id} 
-            style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
-          >
-            <View style={styles.userInfo}>
-              <Text style={[styles.userName, {color: theme.color}]}>
-                {(user.first_name || user.firstName) && (user.last_name || user.lastName) 
-                  ? `${user.first_name || user.firstName} ${user.last_name || user.lastName}` 
-                  : user.email?.split('@')[0] || 'Utilisateur'}
-              </Text>
-              <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                {user.email || 'Email non disponible'}
-              </Text>
-              <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                Demande le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
-              </Text>
-            </View>
-            
-            <View style={styles.userActions}>
-              <TouchableOpacity 
-                style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
-                onPress={() => approveUser(user._id || user.id)}
-              >
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                <Text style={styles.approveUserButtonText}>Approuver</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
-                onPress={() => rejectUser(user._id || user.id)}
-              >
-                <Ionicons name="close" size={16} color="#FFFFFF" />
-                <Text style={styles.rejectUserButtonText}>Rejeter</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#39335E" />
           </View>
-        ))
-    ) : (
-      <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
-        <Ionicons name="warning-outline" size={48} color="#FF9800" />
-        <Text style={[styles.emptyText, {color: theme.color}]}>
-          Aucun utilisateur en attente
-        </Text>
-      </View>
-    )}
-
-    {/* Approved Users Section */}
-    <View style={{marginTop: 32}}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
-          Utilisateurs approuvés
-        </Text>
-        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-          {totalUsers} utilisateur(s) actif(s)
-        </Text>
-      </View>
-
-      {allUsers.filter(user => 
-        user.status === 'active' || 
-        user.verified === true ||
-        (!user.verificationCode && user.verified !== false)
-      ).length > 0 ? (
-        allUsers
-          .filter(user => 
-            user.status === 'active' || 
-            user.verified === true ||
-            (!user.verificationCode && user.verified !== false)
-          )
-          .map(user => (
-            <View 
-              key={user._id || user.id} 
-              style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
-            >
-              <View style={styles.userInfo}>
-                <Text style={[styles.userName, {color: theme.color}]}>
-                  {(user.first_name || user.firstName) && (user.last_name || user.lastName) 
-                    ? `${user.first_name || user.firstName} ${user.last_name || user.lastName}` 
-                    : user.email?.split('@')[0] || 'Utilisateur'}
-                </Text>
-                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                  {user.email || 'Email non disponible'}
-                </Text>
-                {(user.role || user.userType) && (
-                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                    Rôle: {(user.role || user.userType).charAt(0).toUpperCase() + (user.role || user.userType).slice(1)}
-                  </Text>
-                )}
-                {user.camp && user.camp.name && (
-                  <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                    Camp: {user.camp.name}
-                  </Text>
-                )}
-              </View>
-              
-              <View style={styles.userActions}>
-                <TouchableOpacity 
-                  style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
-                  onPress={() => rejectUser(user._id || user.id)}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.rejectUserButtonText}>Supprimer</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-      ) : (
-        <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
-          <Ionicons name="warning-outline" size={48} color="#FF9800" />
-          <Text style={[styles.emptyText, {color: theme.color}]}>
-            Aucun utilisateur approuvé
-          </Text>
-        </View>
-      )}
-    </View>
-  </View>
-)}
-
-        {/* Section for all approved users */}
-        {allUsers.filter(user => user.status === 'active').length > 0 && (
-          <View style={{marginTop: 32}}>
+        ) : (
+          <View>
+            {/* Section Utilisateurs en attente */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
-                Utilisateurs approuvés
+                Utilisateurs en attente de validation
               </Text>
               <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                {totalUsers} utilisateur(s) actif(s)
+                {allUsers.filter(user => user.status === 'pending').length} utilisateur(s)
               </Text>
             </View>
 
-            {allUsers
-              .filter(user => user.status === 'active')
-              .map(user => (
+            {allUsers.filter(user => user.status === 'pending').length > 0 ? (
+              allUsers
+                .filter(user => user.status === 'pending')
+                .map(user => (
+                  <View 
+                    key={user._id || user.id} 
+                    style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
+                  >
+                    <View style={styles.userInfo}>
+                      <Text style={[styles.userName, {color: theme.color}]}>
+                        {user.first_name && user.last_name 
+                          ? `${user.first_name} ${user.last_name}` 
+                          : user.email?.split('@')[0] || 'Utilisateur'}
+                      </Text>
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                        {user.email || 'Email non disponible'}
+                      </Text>
+                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                        Inscription: {new Date(user.createdAt).toLocaleDateString('fr-FR')}
+                      </Text>
+                      {user.role && (
+                        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                          Rôle: {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                        </Text>
+                      )}
+                    </View>
+                    
+                    <View style={styles.userActions}>
+                      <TouchableOpacity 
+                        style={[styles.approveUserButton, {backgroundColor: '#4CAF50'}]}
+                        onPress={() => approveUserNew(user._id || user.id)}
+                      >
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        <Text style={styles.approveUserButtonText}>Approuver</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.rejectUserButton, {backgroundColor: '#FF5722'}]}
+                        onPress={() => rejectUserNew(user._id || user.id)}
+                      >
+                        <Ionicons name="close" size={16} color="#FFFFFF" />
+                        <Text style={styles.rejectUserButtonText}>Rejeter</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+            ) : (
+              <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+                <Ionicons name="checkmark-circle-outline" size={48} color="#4CAF50" />
+                <Text style={[styles.emptyText, {color: theme.color}]}>
+                  Aucun utilisateur en attente
+                </Text>
+              </View>
+            )}
+
+            {/* Section Utilisateurs approuvés */}
+            <View style={{marginTop: 32}}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
+                  Utilisateurs approuvés
+                </Text>
+                <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                  {allUsers.filter(user => user.status === 'approved').length} utilisateur(s)
+                </Text>
+              </View>
+
+              {allUsers.filter(user => user.status === 'approved').map(user => (
                 <View 
-                  key={user._id} 
+                  key={user._id || user.id} 
                   style={[styles.userCard, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}
                 >
                   <View style={styles.userInfo}>
-                    <Text style={[styles.userName, {color: theme.color}]}>
-                      {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 
-                       user.email.split('@')[0]}
-                    </Text>
+                    <View style={styles.userNameContainer}>
+                      <Text style={[styles.userName, {color: theme.color}]}>
+                        {user.first_name && user.last_name 
+                          ? `${user.first_name} ${user.last_name}` 
+                          : user.email?.split('@')[0] || 'Utilisateur'}
+                      </Text>
+                      <View style={[styles.statusBadge, {backgroundColor: '#4CAF50'}]}>
+                        <Text style={styles.statusText}>Approuvé</Text>
+                      </View>
+                    </View>
                     <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
                       {user.email}
                     </Text>
-                    {user.role && (
-                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                        Rôle: {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      </Text>
-                    )}
-                    {user.camp && user.camp.name && (
-                      <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-                        Camp: {user.camp.name}
-                      </Text>
-                    )}
+                    <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+                      Peut publier: {user.canPost ? 'Oui' : 'Non'}
+                    </Text>
                   </View>
                   
                   <View style={styles.userActions}>
                     <TouchableOpacity 
-                      style={[styles.rejectUserButton, {backgroundColor: '#F44336'}]}
-                      onPress={() => rejectUser(user._id)}
+                      style={[styles.rejectUserButton, {backgroundColor: '#FF5722'}]}
+                      onPress={() => rejectUserNew(user._id || user.id)}
                     >
-                      <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                      <Text style={styles.rejectUserButtonText}>Supprimer</Text>
+                      <Ionicons name="close" size={16} color="#FFFFFF" />
+                      <Text style={styles.rejectUserButtonText}>Rejeter</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              ))
-            }
+              ))}
+            </View>
+
+            {/* Section Utilisateurs rejetés */}
+            <View style={{marginTop: 32}}>
+  <View style={styles.sectionHeader}>
+    <Text style={[styles.heading_text, {color: darkMode ? '#FFFFFF' : theme.secondaryText}]}>
+      Utilisateurs rejetés
+    </Text>
+    <View style={styles.rejectedCountBadge}>
+      <Ionicons name="close-circle" size={16} color="#FFFFFF" />
+      <Text style={styles.rejectedCountText}>
+        {allUsers.filter(user => user.status === 'rejected').length}
+      </Text>
+    </View>
+  </View>
+
+  {allUsers.filter(user => user.status === 'rejected').map(user => (
+    <View 
+      key={user._id || user.id} 
+      style={[styles.rejectedUserCard, { backgroundColor: darkMode ? '#2A1F1F' : '#FFF8F8' }]}
+    >
+      {/* Bande latérale décorative */}
+      <View style={styles.rejectedSideBand} />
+      
+      {/* Contenu principal */}
+      <View style={styles.rejectedUserContent}>
+        {/* En-tête avec avatar et statut */}
+        <View style={styles.rejectedUserHeader}>
+          <View style={styles.rejectedAvatarContainer}>
+            <View style={[styles.rejectedAvatar, {backgroundColor: darkMode ? '#FF5722' : '#FFE5E5'}]}>
+              <Ionicons 
+                name="person-outline" 
+                size={20} 
+                color={darkMode ? '#FFFFFF' : '#FF5722'} 
+              />
+            </View>
+            <View style={styles.rejectedStatusIndicator}>
+              <Ionicons name="close" size={12} color="#FFFFFF" />
+            </View>
+          </View>
+          
+          <View style={styles.rejectedUserMainInfo}>
+            <Text style={[styles.rejectedUserName, {color: darkMode ? '#FFCCCB' : '#D32F2F'}]}>
+              {user.first_name && user.last_name 
+                ? `${user.first_name} ${user.last_name}` 
+                : user.email?.split('@')[0] || 'Utilisateur'}
+            </Text>
+            <View style={styles.rejectedBadgeContainer}>
+              <Ionicons name="ban" size={14} color="#FF5722" />
+              <Text style={styles.rejectedBadgeText}>Accès restreint</Text>
+            </View>
+          </View>
+
+          {/* Icône décorative */}
+          <View style={styles.rejectedDecoIcon}>
+            <Ionicons name="shield-outline" size={24} color={darkMode ? '#FF8A80' : '#FFCDD2'} />
+          </View>
+        </View>
+
+        {/* Informations détaillées */}
+        <View style={styles.rejectedUserDetails}>
+          <View style={styles.rejectedDetailRow}>
+            <Ionicons name="mail-outline" size={16} color={darkMode ? '#FFAB91' : '#FF7043'} />
+            <Text style={[styles.rejectedDetailText, {color: darkMode ? '#FFCCBC' : '#BF360C'}]}>
+              {user.email}
+            </Text>
+          </View>
+          
+          <View style={styles.rejectedDetailRow}>
+            <Ionicons name="time-outline" size={16} color={darkMode ? '#FFAB91' : '#FF7043'} />
+            <Text style={[styles.rejectedDetailText, {color: darkMode ? '#FFCCBC' : '#BF360C'}]}>
+              Rejeté le {new Date(user.updatedAt || user.createdAt).toLocaleDateString('fr-FR')}
+            </Text>
+          </View>
+
+          <View style={styles.rejectedDetailRow}>
+            <Ionicons name="ban-outline" size={16} color={darkMode ? '#FFAB91' : '#FF7043'} />
+            <Text style={[styles.rejectedDetailText, {color: darkMode ? '#FFCCBC' : '#BF360C'}]}>
+              Publication désactivée
+            </Text>
+          </View>
+        </View>
+
+        {/* Actions stylisées */}
+        <View style={styles.rejectedUserActions}>
+          <TouchableOpacity 
+            style={[styles.artisticReapproveButton, {
+              backgroundColor: darkMode ? '#2E7D32' : '#4CAF50',
+              shadowColor: '#4CAF50'
+            }]}
+            onPress={() => approveUserNew(user._id || user.id)}
+          >
+            <View style={styles.buttonIconContainer}>
+              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+            </View>
+            <Text style={styles.artisticButtonText}>Réhabiliter</Text>
+            <View style={styles.buttonGlow} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.artisticDeleteButton, {
+              backgroundColor: darkMode ? '#C62828' : '#F44336',
+              shadowColor: '#F44336'
+            }]}
+            onPress={() => deleteUser(user._id || user.id)}
+          >
+            <View style={styles.buttonIconContainer}>
+              <Ionicons name="trash" size={18} color="#FFFFFF" />
+            </View>
+            <Text style={styles.artisticButtonText}>Supprimer</Text>
+            <View style={styles.buttonGlow} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Effet de dégradé décoratif */}
+      <View style={[styles.rejectedGradientOverlay, {
+        backgroundColor: darkMode 
+          ? 'rgba(255, 87, 34, 0.05)' 
+          : 'rgba(255, 235, 238, 0.7)'
+      }]} />
+    </View>
+  ))}
+</View>
           </View>
         )}
       </View>
@@ -1554,14 +1678,20 @@ const getCategoryNameById = (categoryId) => {
     <View style={styles.tabContent}>
       {/* Section modération */}
       <View style={styles.moderationSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, {color: theme.color}]}>Modération</Text>
-          <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
-            {annoncesToModerate.length} annonce(s) à modérer
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, {color: theme.color}]}>Modération</Text>
+        <Text style={[styles.heading_text, {color: darkMode ? '#888888' : theme.secondaryText, fontSize: 12}]}>
+          {annoncesToModerate.length} annonce(s) à modérer
+        </Text>
+      </View>
+      {isInitializing ? (
+        <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+          <ActivityIndicator size="large" color="#5D5FEF" />
+          <Text style={[styles.emptyText, {color: theme.color, marginTop: 12}]}>
+            Chargement des annonces...
           </Text>
         </View>
-        
-        {annoncesToModerate.length > 0 ? (
+      ) :annoncesToModerate.length > 0 ? (
           annoncesToModerate.map(item => (
             <View 
               key={item._id || item.id} 
@@ -1630,16 +1760,16 @@ const getCategoryNameById = (categoryId) => {
                   </View>
                 ))
                 ) : (
-          <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
-            <Ionicons name="warning-outline" size={48} color="#FF9800" /> 
-            <Text style={[styles.emptyText, {color: theme.color}]}>
-              Aucune annonce à modérer
-            </Text>
-          </View>
-        )}
-      </View>
+         <View style={[styles.emptyContainer, { backgroundColor: darkMode ? '#2A2A2A' : '#FFFFFF', shadowColor: theme.shadow }]}>
+          <Ionicons name="checkmark-circle-outline" size={48} color="#4CAF50" />
+          <Text style={[styles.emptyText, {color: theme.color}]}>
+            Aucune annonce à modérer
+          </Text>
+        </View>
+      )}
     </View>
-  );
+  </View>
+);
         
     }
   };
@@ -2532,5 +2662,256 @@ activeModeButton: {
 modeButtonText: {
   fontSize: 14,
   fontFamily: 'Montserrat_500Medium',
+},
+userNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: 'Montserrat_600SemiBold',
+  },
+  rejectedUsersSection: {
+  marginTop: 32,
+},
+rejectedUserCard: {
+  backgroundColor: '#FFF5F5', // Background légèrement rouge
+  borderLeftWidth: 4,
+  borderLeftColor: '#FF5722',
+},
+rejectedUserInfo: {
+  opacity: 0.8,
+},
+rejectedUserName: {
+  textDecorationLine: 'line-through',
+  textDecorationStyle: 'solid',
+  textDecorationColor: '#FF5722',
+},
+rejectedBadge: {
+  backgroundColor: '#FF5722',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+},
+rejectedBadgeText: {
+  color: '#FFFFFF',
+  fontSize: 10,
+  fontWeight: '600',
+  fontFamily: 'Montserrat_600SemiBold',
+},
+reactivateButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 12,
+  borderRadius: 8,
+  backgroundColor: '#4CAF50',
+  marginRight: 8,
+},
+reactivateButtonText: {
+  color: '#FFFFFF',
+  fontSize: 14,
+  fontWeight: '600',
+  marginLeft: 8,
+  fontFamily: 'Montserrat_600SemiBold',
+},
+rejectedCountBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FF5722',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+  shadowColor: '#FF5722',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 3,
+},
+rejectedCountText: {
+  color: '#FFFFFF',
+  fontSize: 12,
+  fontWeight: '700',
+  marginLeft: 6,
+  fontFamily: 'Montserrat_700Bold',
+},
+rejectedUserCard: {
+  position: 'relative',
+  marginBottom: 20,
+  borderRadius: 16,
+  overflow: 'hidden',
+  elevation: 6,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 87, 34, 0.1)',
+},
+rejectedSideBand: {
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  bottom: 0,
+  width: 6,
+  backgroundColor: '#FF5722',
+  shadowColor: '#FF5722',
+  shadowOffset: { width: 2, height: 0 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+},
+rejectedUserContent: {
+  padding: 20,
+  paddingLeft: 26,
+},
+rejectedUserHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+rejectedAvatarContainer: {
+  position: 'relative',
+  marginRight: 16,
+},
+rejectedAvatar: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#FF5722',
+},
+rejectedStatusIndicator: {
+  position: 'absolute',
+  top: -4,
+  right: -4,
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  backgroundColor: '#FF5722',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#FFFFFF',
+},
+rejectedUserMainInfo: {
+  flex: 1,
+},
+rejectedUserName: {
+  fontSize: 18,
+  fontWeight: '700',
+  marginBottom: 6,
+  fontFamily: 'Montserrat_700Bold',
+  textShadowColor: 'rgba(211, 47, 47, 0.1)',
+  textShadowOffset: { width: 1, height: 1 },
+  textShadowRadius: 2,
+},
+rejectedBadgeContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(255, 87, 34, 0.1)',
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 12,
+  alignSelf: 'flex-start',
+},
+rejectedBadgeText: {
+  color: '#FF5722',
+  fontSize: 12,
+  fontWeight: '600',
+  marginLeft: 4,
+  fontFamily: 'Montserrat_600SemiBold',
+},
+rejectedDecoIcon: {
+  opacity: 0.3,
+},
+rejectedUserDetails: {
+  marginBottom: 20,
+  paddingLeft: 8,
+},
+rejectedDetailRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+  paddingVertical: 4,
+},
+rejectedDetailText: {
+  fontSize: 14,
+  marginLeft: 12,
+  fontFamily: 'Montserrat_500Medium',
+  flex: 1,
+},
+rejectedUserActions: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  gap: 12,
+},
+artisticReapproveButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  position: 'relative',
+  elevation: 4,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 6,
+},
+artisticDeleteButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  position: 'relative',
+  elevation: 4,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 6,
+},
+buttonIconContainer: {
+  marginRight: 8,
+  transform: [{ scale: 1.1 }],
+},
+artisticButtonText: {
+  color: '#FFFFFF',
+  fontSize: 14,
+  fontWeight: '700',
+  fontFamily: 'Montserrat_700Bold',
+  textShadowColor: 'rgba(0, 0, 0, 0.2)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+buttonGlow: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  borderRadius: 12,
+  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+},
+rejectedGradientOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  height: 4,
+  borderTopLeftRadius: 16,
+  borderTopRightRadius: 16,
 },
 });

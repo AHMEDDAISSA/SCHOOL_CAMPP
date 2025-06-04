@@ -14,6 +14,7 @@ import PhoneInput from 'react-native-phone-number-input';
 import { createAd, uploadMultipleImages, sendEmailOTP, verifyOTP } from '../../services/api'; // Ajouté les fonctions d'API
 import Toast from 'react-native-toast-message';
 import { createAnnounce } from '../../services/api'; 
+import {checkUserPermissions } from '../../services/api'; 
 
 const PublierAnnonce = () => {
   const { theme, darkMode, profileData } = useContext(ThemeContext); 
@@ -314,6 +315,14 @@ useEffect(() => {
       }
     }
   };
+
+  
+const handleCreateAnnonce = () => {
+  if (!checkUserPermissions()) {
+    return;
+  }
+  handleSubmit();
+};
   
   // Fonction pour prendre une photo avec l'appareil photo
   const takePhoto = async () => {
@@ -411,8 +420,13 @@ useEffect(() => {
   
   // Soumission du formulaire
   const handleSubmit = async () => {
-    
-     if (preferredContact === 'phone' && !phoneNumber) {
+  // AJOUT : Vérifier les permissions avant tout
+  const hasPermission = await checkUserPermissions();
+  if (!hasPermission) {
+    return; // Arrêter si l'utilisateur n'a pas les permissions
+  }
+
+  if (preferredContact === 'phone' && !phoneNumber) {
     updateMissingFields(prevFields => {
       const fields = Array.isArray(prevFields) ? [...prevFields] : [];
       if (!fields.includes('numéro de téléphone')) {
@@ -431,100 +445,107 @@ useEffect(() => {
     return;
   }
 
-    if (!isAuthenticated) {
-      Toast.show({
-        type: 'error',
-        text1: 'Authentification requise',
-        text2: 'Veuillez vous authentifier avant de publier une annonce.',
-        position: 'bottom'
-      });
-      return;
+  if (!isAuthenticated) {
+    Toast.show({
+      type: 'error',
+      text1: 'Authentification requise',
+      text2: 'Veuillez vous authentifier avant de publier une annonce.',
+      position: 'bottom'
+    });
+    return;
+  }
+  
+  if (!validateForm()) {
+    Toast.show({
+      type: 'error',
+      text1: 'Champs obligatoires manquants',
+      text2: `Veuillez remplir les champs suivants: ${missingFields.join(', ')}.`,
+      position: 'bottom',
+      visibilityTime: 4000
+    });
+    return;
+  }
+  
+  setLoading(true);
+  
+  try {
+    let contactInfo = '';
+    if (preferredContact === 'email') {
+        contactInfo = email;
+    } else if (preferredContact === 'phone') {
+        contactInfo = phoneNumber;
+    } else if (preferredContact === 'app') {
+        contactInfo = 'app';
     }
-    
-    
-    if (!validateForm()) {
-      Toast.show({
-        type: 'error',
-        text1: 'Champs obligatoires manquants',
-        text2: `Veuillez remplir les champs suivants: ${missingFields.join(', ')}.`,
-        position: 'bottom',
-        visibilityTime: 4000
-      });
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-
-       let contactInfo = '';
-        if (preferredContact === 'email') {
-            contactInfo = email;
-        } else if (preferredContact === 'phone') {
-            contactInfo = phoneNumber;
-        } else if (preferredContact === 'app') {
-            contactInfo = 'app';
-        }
 
     // Création de l'objet annonce
     const nouvelleAnnonce = {
-    id: Date.now().toString(), 
-    title,
-    description,
-    category,
-    type,
-    condition,
-    camp,
-    campType: camp,
-    
-    price: price, // Ne pas utiliser de condition ici
-    duration: duration, // Ne pas utiliser de condition ici
-    images: images,
-    imageUrl: images.length > 0 ? images[0] : null,
-    isActive,
-    date: new Date().toLocaleDateString('fr-FR'),
-    
-    contactEmail: email,
-    contactPhone: phoneNumber,
-    contactName: userName,
-    showEmail: showEmail,
-    showPhone: showPhone,
-    showName: showName,
-    preferredContact: preferredContact,
-    showInInbox: preferredContact === 'app',
-    contact_info: contactInfo, 
-    createdAt: new Date().toISOString()
-};
+      id: Date.now().toString(), 
+      title,
+      description,
+      category,
+      type,
+      condition,
+      camp,
+      campType: camp,
+      
+      price: price,
+      duration: duration,
+      images: images,
+      imageUrl: images.length > 0 ? images[0] : null,
+      isActive,
+      date: new Date().toLocaleDateString('fr-FR'),
+      
+      contactEmail: email,
+      contactPhone: phoneNumber,
+      contactName: userName,
+      showEmail: showEmail,
+      showPhone: showPhone,
+      showName: showName,
+      preferredContact: preferredContact,
+      showInInbox: preferredContact === 'app',
+      contact_info: contactInfo, 
+      createdAt: new Date().toISOString()
+    };
 
-      // Ajouter l'annonce via le contexte
-      const annonceAjoutee = createAnnounce(nouvelleAnnonce);      
-      
-      // Réinitialiser le formulaire
-      resetForm();
-      
-      setTimeout(() => {
-        setLoading(false);
-        Toast.show({
-          type: 'success',
-          text1: 'Annonce publiée !',
-          text2: 'Votre annonce a été publiée avec succès.',
-          position: 'bottom',
-          visibilityTime: 3000,
-          onHide: () => router.replace('(tabs)/Annonces') 
-        });
-      }, 1000);
-    } catch (error) {
-      console.error("Erreur lors de l'ajout de l'annonce:", error);
+    // Ajouter l'annonce via le contexte
+    const annonceAjoutee = await createAnnounce(nouvelleAnnonce);      
+    
+    // Réinitialiser le formulaire
+    resetForm();
+    
+    setTimeout(() => {
       setLoading(false);
       Toast.show({
-        type: 'error',
-        text1: 'Erreur',
-        text2: 'Une erreur est survenue lors de la publication.',
+        type: 'success',
+        text1: 'Annonce publiée !',
+        text2: 'Votre annonce a été publiée avec succès.',
         position: 'bottom',
-        visibilityTime: 3000
+        visibilityTime: 3000,
+        onHide: () => router.replace('(tabs)/Annonces') 
       });
-    }
+    }, 1000);
+  } catch (error) {
+    console.error("Erreur lors de l'ajout de l'annonce:", error);
+    setLoading(false);
+    Toast.show({
+      type: 'error',
+      text1: 'Erreur',
+      text2: 'Une erreur est survenue lors de la publication.',
+      position: 'bottom',
+      visibilityTime: 3000
+    });
+  }
+};
+
+// AJOUT : Vérifier les permissions au chargement de la page
+useEffect(() => {
+  const verifyPermissions = async () => {
+    await checkUserPermissions();
   };
+  
+  verifyPermissions();
+}, [profileData]);
   
   // Navigation
   const back = () => {
@@ -539,6 +560,53 @@ useEffect(() => {
       </View>
     );
   }
+
+  const checkUserPermissions = async () => {
+  try {
+    if (!profileData || !profileData.email) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: 'Informations utilisateur manquantes',
+        visibilityTime: 3000,
+      });
+      return false;
+    }
+
+    // Vérifier si l'utilisateur est un admin
+    if (profileData.role === 'admin') {
+      return true; // Les admins peuvent toujours publier
+    }
+
+    // Pour les parents, vérifier canPost
+    if (profileData.role === 'parent') {
+      if (!profileData.canPost) {
+        Alert.alert(
+          'Publication non autorisée',
+          'Votre compte n\'a pas été approuvé pour publier des annonces. Veuillez contacter un administrateur.',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back()
+            }
+          ]
+        );
+        return false;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la vérification des permissions:', error);
+    Toast.show({
+      type: 'error',
+      text1: 'Erreur',
+      text2: 'Impossible de vérifier vos permissions',
+      visibilityTime: 3000,
+    });
+    return false;
+  }
+};
   
   return (
     <KeyboardAvoidingView 
