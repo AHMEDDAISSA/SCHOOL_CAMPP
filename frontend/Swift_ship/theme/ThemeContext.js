@@ -54,6 +54,7 @@ export const ThemeProvider = ({ children }) => {
     phoneNumber: '',
     profileImage: null,
     role: '',
+    canPost: false,
   });
 
   useEffect(() => {

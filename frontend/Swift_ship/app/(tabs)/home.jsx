@@ -20,9 +20,20 @@ const Home = () => {
     const [selectedCamp, setSelectedCamp] = useState('Tous');
     const [selectedSize, setSelectedSize] = useState('Tous');
     
-    const profileImage = profileData && profileData.profileImage 
-      ? { uri: profileData.profileImage } 
-      : require('../../assets/images/placeholder.png');
+    const profileImage = useMemo(() => {
+  if (profileData && profileData.profileImage) {
+    let imageUrl = profileData.profileImage;
+    
+    // Vérifier si l'URL est complète
+    if (!imageUrl.startsWith('http')) {
+      imageUrl = `http://192.168.1.21:3001/uploads/${imageUrl}`;
+    }
+    
+    console.log('Profile image URL:', imageUrl); // Debug
+    return { uri: imageUrl };
+  }
+  return require('../../assets/images/placeholder.png');
+}, [profileData]);
 
     const fullName = profileData && profileData.fullName 
       ? profileData.fullName 

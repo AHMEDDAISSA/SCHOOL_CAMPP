@@ -1081,6 +1081,63 @@ const rejectUserNew = async (userId) => {
     ]
   );
 };
+
+const deleteUserPermanently = async (userId) => {
+  console.log('Starting delete process for user:', userId);
+  console.log('User data:', allUsers.find(u => u._id === userId || u.id === userId));
+  Alert.alert(
+    "Suppression définitive",
+    "Cette action est irréversible. L'utilisateur sera définitivement supprimé du système. Continuer ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      { 
+        text: "Supprimer définitivement", 
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await deleteUser(userId);
+            
+            if (response && response.success) {
+              // Mettre à jour l'état local en retirant l'utilisateur supprimé
+              const updatedUsers = allUsers.filter(user => user._id !== userId);
+              setAllUsers(updatedUsers);
+              
+              // Recalculer les compteurs
+              const pending = updatedUsers.filter(user => user.status === 'pending').length;
+              const approved = updatedUsers.filter(user => user.status === 'approved').length;
+              
+              setPendingUsers(pending);
+              setTotalUsers(approved);
+              
+              // Mettre à jour AsyncStorage
+              await AsyncStorage.setItem('allUsers', JSON.stringify(updatedUsers));
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Utilisateur supprimé',
+                text2: 'L\'utilisateur a été définitivement supprimé du système',
+                visibilityTime: 3000,
+              });
+            } else {
+              throw new Error(response?.message || "Échec de la suppression");
+            }
+          } catch (error) {
+            console.error("Erreur lors de la suppression de l'utilisateur:", error);
+            Toast.show({
+              type: 'error',
+              text1: 'Erreur',
+              text2: error.message || "Échec de la suppression",
+              visibilityTime: 3000
+            });
+          }
+        }
+      }
+    ]
+  );
+};
     
   // Fonction pour supprimer une annonce
   const handleDeleteAnnonce = useCallback((id) => {
@@ -1568,18 +1625,18 @@ const rejectUserNew = async (userId) => {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.artisticDeleteButton, {
-              backgroundColor: darkMode ? '#C62828' : '#F44336',
-              shadowColor: '#F44336'
-            }]}
-            onPress={() => deleteUser(user._id || user.id)}
-          >
-            <View style={styles.buttonIconContainer}>
-              <Ionicons name="trash" size={18} color="#FFFFFF" />
-            </View>
-            <Text style={styles.artisticButtonText}>Supprimer</Text>
-            <View style={styles.buttonGlow} />
-          </TouchableOpacity>
+  style={[styles.artisticDeleteButton, {
+    backgroundColor: darkMode ? '#C62828' : '#F44336',
+    shadowColor: '#F44336'
+  }]}
+  onPress={() => deleteUserPermanently(user._id || user.id)} // Utiliser la nouvelle fonction
+>
+  <View style={styles.buttonIconContainer}>
+    <Ionicons name="trash" size={18} color="#FFFFFF" />
+  </View>
+  <Text style={styles.artisticButtonText}>Supprimer</Text>
+  <View style={styles.buttonGlow} />
+</TouchableOpacity>
         </View>
       </View>
 

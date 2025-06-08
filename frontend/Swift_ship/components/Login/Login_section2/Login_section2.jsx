@@ -33,7 +33,6 @@ const Login_section2 = () => {
 
     // Handle email input change
     const handleEmailChange = (text) => {
-        // Vérifier si le texte contient des majuscules
         if (text !== text.toLowerCase()) {
             Toast.show({
                 type: 'info',
@@ -42,7 +41,6 @@ const Login_section2 = () => {
                 visibilityTime: 3000,
                 topOffset: 50
             });
-            // Convertir automatiquement en minuscules
             text = text.toLowerCase();
         }
         
@@ -75,142 +73,155 @@ const Login_section2 = () => {
     const closeModal3 = () => setModalVisible3(false);
     const closeModal4 = () => setModalVisible4(false);
 
-    // Login function
+    // *** LOGIQUE D'AUTHENTIFICATION MODIFIÉE ***
     const handleLogin = async () => {
-        if (!email) {
-            Toast.show({
-                type: 'error',
-                text1: 'Erreur!',
-                text2: 'Veuillez saisir votre adresse e-mail',
-                visibilityTime: 4000,
-                topOffset: 50
-            });
-            return;
-        }
-    
-        if (!validateEmail(email)) {
-            Toast.show({
-                type: 'error',
-                text1: 'Erreur!',
-                text2: 'Veuillez saisir une adresse e-mail valide',
-                visibilityTime: 4000,
-                topOffset: 50
-            });
-            return;
-        }
-    
-        setLoading(true);
-    
-        try {
-            const userData = await loginUser(email);
-    
-            if (userData.status === "success" || userData.token) {
-                console.log('User logged in:', userData);
-    
-                if (userData.token) {
-                    try {
-                        await AsyncStorage.setItem('userToken', userData.token);
-                        await AsyncStorage.setItem('userEmail', email);
-                        
-                        // Store user info in AsyncStorage and update context
-                        if (userData.user) {
-                            await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
-                            setProfileData({
-    fullName: userData.user.fullName || `${userData.user.first_name || ''} ${userData.user.last_name || ''}`.trim(),
-    email: userData.user.email,
-    phoneNumber: userData.user.phone,
-    role: userData.user.role,
-    first_name: userData.user.first_name,
-    last_name: userData.user.last_name,
-    
-  });
-                            
-                            // Get user role
-                            const userRole = userData.user.role;
-                            
-                            // Store user role for future use
-                            await AsyncStorage.setItem('userRole', userRole);
-                        } else {
-                            setProfileData(prev => ({ ...prev, email }));
-                        }
-                        console.log('Token, email, and user info stored successfully');
-                    } catch (storageError) {
-                        console.error('Failed to store data:', storageError);
-                        throw new Error('Failed to store authentication data');
-                    }
-                } else {
-                    throw new Error('No token received from server');
-                }
-    
+    if (!email) {
+        Toast.show({
+            type: 'error',
+            text1: 'Erreur!',
+            text2: 'Veuillez saisir votre adresse e-mail',
+            visibilityTime: 4000,
+            topOffset: 50
+        });
+        return;
+    }
+
+    if (!validateEmail(email)) {
+        Toast.show({
+            type: 'error',
+            text1: 'Erreur!',
+            text2: 'Veuillez saisir une adresse e-mail valide',
+            visibilityTime: 4000,
+            topOffset: 50
+        });
+        return;
+    }
+
+    setLoading(true);
+
+    try {
+        const userData = await loginUser(email);
+        console.log('Response from loginUser:', userData);
+
+        // Vérifier la structure de la réponse
+        if (userData && (userData.status === "success" || userData.token)) {
+            console.log('User logged in:', userData);
+
+            // Vérification canPost
+            if (userData.user && userData.user.canPost === false) {
                 Toast.show({
-                    type: 'success',
-                    text1: 'Connexion réussie',
-                    text2: 'Vous êtes maintenant connecté',
-                    visibilityTime: 3000,
+                    type: 'error',
+                    text1: 'Accès refusé',
+                    text2: 'Votre compte est en attente de validation par l\'administrateur. Veuillez patienter.',
+                    visibilityTime: 5000,
                     topOffset: 50
                 });
-    
-                setTimeout(() => {
-                    // Check if user has a role from userData
-                    if (userData.user && userData.user.role) {
+                setLoading(false);
+                return;
+            }
+
+            if (userData.token) {
+                try {
+                    await AsyncStorage.setItem('userToken', userData.token);
+                    await AsyncStorage.setItem('userEmail', email);
+                    
+                    if (userData.user) {
+                        await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
+                        setProfileData({
+                            fullName: userData.user.fullName || `${userData.user.first_name || ''} ${userData.user.last_name || ''}`.trim(),
+                            email: userData.user.email,
+                            phoneNumber: userData.user.phone,
+                            role: userData.user.role,
+                            first_name: userData.user.first_name,
+                            last_name: userData.user.last_name,
+                            canPost: userData.user.canPost,
+                        });
+                        
                         const userRole = userData.user.role;
-                        
-                        
-                        switch(userRole) {
-                            case 'exploitant':
-                                router.push('/exploitant');
-                                break;
-                            case 'admin':
-                                router.push('/admin');
-                                break;
-                            case 'parent':
-                                router.push('/home');
-                                break;
-                            default:
-                                router.push('/home');
-                        }
+                        await AsyncStorage.setItem('userRole', userRole);
                     } else {
-                        
-                        router.push('/home');
+                        setProfileData(prev => ({ ...prev, email }));
                     }
-                }, 1000);
-            } else {
-                throw new Error(userData.message || 'Response received but login failed');
-            }
-        } catch (err) {
-            console.error('Login error:', err);
-            let errorMessage = 'Une erreur est survenue lors de la connexion';
-            if (err.response) {
-                const status = err.response.status;
-                if (status === 404) {
-                    errorMessage = "Cet email n'est pas enregistré. Veuillez créer un compte.";
-                } else if (status === 401) {
-                    errorMessage = "Identifiants invalides. Veuillez réessayer.";
-                } else if (status === 400) {
-                    errorMessage = err.response.data?.message || "Données invalides. Vérifiez vos informations.";
-                } else {
-                    errorMessage = `Erreur de serveur: ${status}`;
-                    if (err.response.data && err.response.data.message) {
-                        errorMessage = err.response.data.message;
-                    }
+                    console.log('Token, email, and user info stored successfully');
+                } catch (storageError) {
+                    console.error('Failed to store data:', storageError);
+                    throw new Error('Failed to store authentication data');
                 }
-            } else if (err.request) {
-                errorMessage = 'Pas de réponse du serveur. Vérifiez votre connexion réseau.';
             } else {
-                errorMessage = `Erreur: ${err.message}`;
+                throw new Error('No token received from server');
             }
-    
+
             Toast.show({
-                type: 'error',
-                text1: 'Échec de la connexion',
-                text2: errorMessage,
-                visibilityTime: 4000,
+                type: 'success',
+                text1: 'Connexion réussie',
+                text2: 'Vous êtes maintenant connecté',
+                visibilityTime: 3000,
                 topOffset: 50
             });
-        } finally {
-            setLoading(false);
+
+            setTimeout(() => {
+                if (userData.user && userData.user.role) {
+                    const userRole = userData.user.role;
+                    
+                    switch(userRole) {
+                        case 'exploitant':
+                            router.push('/exploitant');
+                            break;
+                        case 'admin':
+                            router.push('/admin');
+                            break;
+                        case 'parent':
+                            router.push('/home');
+                            break;
+                        default:
+                            router.push('/home');
+                    }
+                } else {
+                    router.push('/home');
+                }
+            }, 1000);
+        } else {
+            throw new Error('Response received but login failed');
         }
-    };
+    } catch (err) {
+        console.error('Login error:', err);
+        let errorMessage = 'Une erreur est survenue lors de la connexion';
+        
+        if (err.response) {
+            const status = err.response.status;
+            const responseData = err.response.data;
+            
+            if (status === 403 && responseData?.errorType === "ACCOUNT_PENDING_VALIDATION") {
+                errorMessage = responseData.message || "Votre compte est en attente de validation par l'administrateur. Veuillez patienter.";
+            } else if (status === 404) {
+                errorMessage = "Cet email n'est pas enregistré. Veuillez créer un compte.";
+            } else if (status === 401) {
+                errorMessage = "Identifiants invalides. Veuillez réessayer.";
+            } else if (status === 400) {
+                errorMessage = responseData?.message || "Données invalides. Vérifiez vos informations.";
+            } else {
+                errorMessage = `Erreur de serveur: ${status}`;
+                if (responseData && responseData.message) {
+                    errorMessage = responseData.message;
+                }
+            }
+        } else if (err.request) {
+            errorMessage = 'Pas de réponse du serveur. Vérifiez votre connexion réseau.';
+        } else {
+            errorMessage = `Erreur: ${err.message}`;
+        }
+
+        Toast.show({
+            type: 'error',
+            text1: 'Échec de la connexion',
+            text2: errorMessage,
+            visibilityTime: 4000,
+            topOffset: 50
+        });
+    } finally {
+        setLoading(false);
+    }
+};
 
     return (
         <View>

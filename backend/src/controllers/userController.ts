@@ -251,6 +251,17 @@ export const deleteUser = async (req: Request<{id: string}>, res: Response): Pro
   try {
     const { id } = req.params;
     
+    console.log('Attempting to delete user with ID:', id);
+    
+    // Vérifier que l'ID est valide
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      res.status(400).json({
+        success: false,
+        message: "ID utilisateur invalide"
+      });
+      return;
+    }
+    
     const result = await User.findByIdAndDelete(id);
     
     if (!result) {
@@ -261,15 +272,23 @@ export const deleteUser = async (req: Request<{id: string}>, res: Response): Pro
       return;
     }
     
+    console.log('User deleted successfully:', result.email);
+    
     res.status(200).json({
       success: true,
-      message: "Utilisateur supprimé avec succès"
+      message: "Utilisateur supprimé avec succès",
+      deletedUser: {
+        _id: result._id,
+        email: result.email,
+        first_name: result.first_name,
+        last_name: result.last_name
+      }
     });
   } catch (error) {
     console.error("Error deleting user:", error);
     res.status(500).json({
       success: false,
-      message: "Error deleting user",
+      message: "Erreur lors de la suppression de l'utilisateur",
       error: (error as Error).message
     });
   }

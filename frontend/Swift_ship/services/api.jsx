@@ -61,17 +61,16 @@ export const loginUser = async (email) => {
         lastName: userData.last_name || '',
         email: userData.email || '',
         phoneNumber: userData.phone || '',
-        // **CORRECTION : Utiliser profileImageUrl ou construire l'URL**
         profileImage: userData.profileImageUrl || userData.profileImage || null,
         role: userData.role || '',
         camp: userData.camp || '',
         isVerified: userData.isVerified || false,
-        canPost: userData.canPost || false,
+        canPost: userData.canPost || false, // *** AJOUT CANPOST ***
       };
       response.data.user = { ...userData, ...mappedData };
     }
     
-    return response;
+    return response; // Retourner response.data au lieu de response
   } catch (error) {
     console.error('loginUser error:', error.message);
     throw error;
@@ -92,9 +91,9 @@ export const getUserByEmailApi = async (email) => {
         lastName: userData.last_name || '',
         email: userData.email || '',
         phoneNumber: userData.phone || '',
-        // CORRECTION : Construire l'URL complète si nécessaire
+        // CORRECTION : Utiliser la BASE_URL configurable
         profileImage: userData.profileImageUrl || 
-                     (userData.profileImage ? `http://192.168.1.21:3001/uploads/${userData.profileImage}` : null),
+                     (userData.profileImage ? `${BASE_URL}/uploads/${userData.profileImage}` : null),
         role: userData.role || '',
         camp: userData.camp || '',
         isVerified: userData.isVerified || false,
@@ -111,7 +110,6 @@ export const getUserByEmailApi = async (email) => {
     throw error;
   }
 };
-
 
 export const addUser = async (email) => {
   try {
@@ -160,10 +158,8 @@ export const getUser = async (token) => {
 
 export const getAllUsers = async () => {
   try {
-    const response = await axios.get('http://192.168.1.21:3001/user/all-users');
-    
-    // Retourner la réponse complète
-    return response.data;
+    const response = await api.get('/user/all-users');
+    return response;
   } catch (error) {
     console.error('getAllUsers error:', error);
     throw error;
@@ -222,22 +218,26 @@ export const registerUser = async (userData) => {
 
 export const deleteUser = async (userId) => {
   try {
-    // Appel direct sans vérification de token, comme pour deleteAnnonce
-    const response = await axios.delete(`http://192.168.1.21:3001/user/delete/${userId}`);
+    console.log('Deleting user with ID:', userId);
+    const response = await api.delete(`/user/delete/${userId}`);
     
-    return response.data;
+    console.log('Delete user response:', response);
+    return response;
   } catch (error) {
     console.error('deleteUser error:', error);
+    if (error.response) {
+      console.error('Response error:', error.response.data);
+    }
     throw error;
   }
 };
 export const updateUserStatus = async (userId, status) => {
   try {
-    const response = await axios.put(`http://192.168.1.21:3001/user/update-status/${userId}`, 
+    const response = await api.put(`/user/update-status/${userId}`, 
       { status } // status should be 'active' or 'pending'
     );
     
-    return response.data;
+    return response;
   } catch (error) {
     console.error('updateUserStatus error:', error);
     throw error;
@@ -647,8 +647,8 @@ export const deleteAnnounce = async (postId, userEmail, isAdmin = false) => {
 };
 export const approveUser = async (userId) => {
   try {
-    const response = await axios.put(`http://192.168.1.21:3001/user/approve/${userId}`);
-    return response.data;
+    const response = await api.put(`/user/approve/${userId}`);
+    return response; // Utilisez response au lieu de response.data pour la cohérence
   } catch (error) {
     console.error('approveUser error:', error);
     throw error;
@@ -657,8 +657,8 @@ export const approveUser = async (userId) => {
 
 export const rejectUser = async (userId) => {
   try {
-    const response = await axios.put(`http://192.168.1.21:3001/user/reject/${userId}`);
-    return response.data;
+    const response = await api.put(`/user/reject/${userId}`);
+    return response; // Utilisez response au lieu de response.data pour la cohérence
   } catch (error) {
     console.error('rejectUser error:', error);
     throw error;
@@ -667,8 +667,8 @@ export const rejectUser = async (userId) => {
 
 export const checkUserPermissions = async (userEmail) => {
   try {
-    const response = await axios.get(`http://192.168.1.21:3001/user/permissions/${encodeURIComponent(userEmail)}`);
-    return response.data;
+    const response = await api.get(`/user/permissions/${encodeURIComponent(userEmail)}`);
+    return response; // Utilisez response au lieu de response.data pour la cohérence
   } catch (error) {
     console.error('checkUserPermissions error:', error);
     throw error;

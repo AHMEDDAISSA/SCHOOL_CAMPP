@@ -63,6 +63,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
           email: user.email,
           camp: user.camp,
           role: user.role,
+          canPost: user.canPost,
         },
         process.env.JWT_SECRET as string,
         { expiresIn: "3d" }
@@ -212,6 +213,8 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
     camp: camp.trim(),
     role: role.trim(),
     lastUpdated: new Date().toISOString(),
+    // *** AJOUT : Définir canPost selon le rôle ***
+    canPost: role.trim() === 'parent' ? false : true, // Les parents doivent être approuvés, les autres rôles peuvent poster
     ...profileImageData // **NOUVEAU : Ajouter les données d'image**
   };
 
@@ -232,6 +235,8 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
         lastUpdated: sanitizedUserData.lastUpdated,
         isVerified: true,
         role: sanitizedUserData.role,
+        // *** AJOUT : Préserver canPost existant ou mettre à jour selon le rôle ***
+        canPost: sanitizedUserData.role === 'parent' ? existingUser.canPost : true,
         // **NOUVEAU : Mettre à jour l'image si fournie**
         ...(uploadedFile && { profileImage: uploadedFile.filename })
       };
@@ -262,6 +267,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
           camp: sanitizedUserData.camp,
           role: updatedUser?.role,
           isVerified: updatedUser?.isVerified,
+          canPost: updatedUser?.canPost, // *** AJOUT ***
           profileImage: updatedUser?.profileImage,
           profileImageUrl: userResponse?.profileImageUrl
         },
@@ -303,6 +309,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
           email: newUserData.email,
           camp: newUserData.camp,
           role: newUserData.role,
+          canPost: newUser.canPost, // *** AJOUT ***
           profileImage: newUser.profileImage,
           profileImageUrl: userObj.profileImageUrl
         },
@@ -318,6 +325,7 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
         email: newUserData.email,
         camp: newUserData.camp,
         role: newUserData.role,
+        canPost: newUser.canPost, // *** AJOUT ***
         profileImage: newUser.profileImage,
         profileImageUrl: userObj.profileImageUrl
       },
@@ -365,46 +373,10 @@ export const verifyOTPHandler = async (req: Request, res: Response): Promise<voi
     }
   };
 
-// Handler function for resending verification code
-// export const resendVerificationCodeHandler = async (req: Request, res: Response): Promise<void> => {
-//   const { email, camp } = req.body;
-
-//   // Required fields check
-//   if (!email || !camp) {
-//     res.status(400).json({ status: "error", message: "Email and camp are required." });
-//     return;
-//   }
-
-//   try {
-//     const user = await UserModel.findOne({ email: email.trim().toLowerCase(), camp: camp.trim() });
-//     if (!user) {
-//       res.status(404).json({ status: "error", message: "User not found." });
-//       return;
-//     }
-
-//     if (user.isVerified) {
-//       res.status(400).json({ status: "error", message: "Email already verified." });
-//       return;
-//     }
-
-//     // Generate and save new verification code
-//     const newCode = generateVerificationCode();
-//     user.verificationCode = newCode;
-//     await user.save();
-
-//     // Send new verification email
-//     await sendVerificationEmail(user.email, newCode);
-
-//     res.status(200).json({ status: "success", message: "New verification code sent." });
-//   } catch (error) {
-//     console.error("Resend code error:", error);
-//     res.status(500).json({ status: "error", message: "Internal server error." });
-//   }
-// };
-
-// Handler function for logging in a user
+// *** HANDLER DE CONNEXION MODIFIÉ AVEC VÉRIFICATION CANPOST ***
 export const loginHandler = async (req: Request, res: Response): Promise<void> => {
   const { email, camp } = req.body;
+  
   // Check if email exists
   if (!email) {
     res.status(400).json({ status: "error", message: "Email is required." });
@@ -418,7 +390,7 @@ export const loginHandler = async (req: Request, res: Response): Promise<void> =
       query.camp = camp.trim();
     }
 
-    const user = await UserModel.findOne(query);
+    const user = await UserModel.findOne(query).populate('camp');
     if (!user) {
       res.status(404).json({
         status: "error",
@@ -432,14 +404,27 @@ export const loginHandler = async (req: Request, res: Response): Promise<void> =
       res.status(403).json({
         status: "error",
         message: "Email not verified. Please verify your email to log in.",
+        errorType: "EMAIL_NOT_VERIFIED"
       });
       return;
     }
 
-    // Generate JWT
+    // *** VÉRIFICATION CANPOST - POINT CLÉ ***
+    if (user.canPost === false) {
+      res.status(403).json({
+        status: "error",
+        message: "Votre compte est en attente de validation par l'administrateur. Veuillez patienter.",
+        errorType: "ACCOUNT_PENDING_VALIDATION",
+        canPost: false
+      });
+      return;
+    }
+
+    // Generate JWT - Si canPost est true, continuer avec la connexion normale
     const token = jwt.sign(
       {
         userId: user._id,
+        _id: user._id, // Ajouter _id aussi pour compatibilité
         email: user.email,
         camp: user.camp,
         role: user.role,
@@ -449,23 +434,133 @@ export const loginHandler = async (req: Request, res: Response): Promise<void> =
       { expiresIn: "3d" }
     );
 
+    // Construire l'URL de l'image de profil
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const userObj = user.toObject();
+    
+    if (userObj.profileImage) {
+      userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+    }
+
     res.status(200).json({
       status: "success",
       message: "User logged in successfully",
       token,
       user: {
         id: user._id,
+        _id: user._id,
         email: user.email,
         camp: user.camp,
         role: user.role,
         canPost: user.canPost,
+        isVerified: user.isVerified,
         first_name: user.first_name,
         last_name: user.last_name,
+        phone: user.phone,
+        profileImage: user.profileImage,
+        profileImageUrl: userObj.profileImageUrl,
+        fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim()
       },
     });
   } catch (error) {
     console.error("Error logging in user:", error);
-    res.status(500).json({ status: "error", message: "Internal server error." });
+    res.status(500).json({ 
+      status: "error", 
+      message: "Internal server error." 
+    });
   }
 };
 
+// *** NOUVELLE FONCTION : LOGIN SIMPLE AVEC EMAIL SEULEMENT ***
+export const loginWithEmailOnly = async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+  
+  if (!email) {
+    res.status(400).json({ 
+      success: false,
+      message: "Email is required." 
+    });
+    return;
+  }
+
+  try {
+    // Rechercher l'utilisateur par email uniquement
+    const user = await UserModel.findOne({ 
+      email: { $regex: new RegExp(`^${email.trim()}$`, 'i') } 
+    }).populate('camp');
+
+    if (!user) {
+      res.status(404).json({ 
+        success: false,
+        message: "User not found. Please check your email or register." 
+      });
+      return;
+    }
+
+    // Vérifier si l'email est vérifié
+    if (!user.isVerified) {
+      res.status(403).json({
+        success: false,
+        message: "Email not verified. Please verify your email to log in.",
+        errorType: "EMAIL_NOT_VERIFIED"
+      });
+      return;
+    }
+
+    // *** VÉRIFICATION CANPOST PRINCIPALE ***
+    if (user.canPost === false) {
+      res.status(403).json({
+        success: false,
+        message: "Votre compte est en attente de validation par l'administrateur. Veuillez patienter.",
+        errorType: "ACCOUNT_PENDING_VALIDATION",
+        canPost: false
+      });
+      return;
+    }
+
+    // Générer le token JWT
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not defined');
+    }
+
+    const token = jwt.sign(
+      { 
+        _id: user._id,
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        canPost: user.canPost,
+        camp: user.camp
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    // Construire l'URL de l'image de profil
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const userObj = user.toObject();
+    
+    if (userObj.profileImage) {
+      userObj.profileImageUrl = `${baseUrl}/uploads/${userObj.profileImage}`;
+    }
+
+    res.status(200).json({
+      status: "success",
+      success: true,
+      message: "Connexion réussie",
+      token,
+      user: {
+        ...userObj,
+        id: user._id,
+        fullName: `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim()
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: "Erreur serveur lors de la connexion" 
+    });
+  }
+};
