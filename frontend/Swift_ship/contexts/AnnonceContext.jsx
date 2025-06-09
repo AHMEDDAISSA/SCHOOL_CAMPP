@@ -280,22 +280,37 @@ export const AnnonceProvider = ({ children }) => {
     );
     return annonce || null;
   };
+  const resetAllAnnonces = async () => {
+  try {
+    setAnnonces([]);
+    await AsyncStorage.removeItem('annonces');
+    await AsyncStorage.removeItem('viewedAnnonces');
+    console.log('All annonces cleared from context and storage');
+    return true;
+  } catch (error) {
+    console.error('Error clearing annonces:', error);
+    return false;
+  }
+};
 
   return (
   <AnnonceContext.Provider
     value={{
       annonces,
       loading,
-      deleteAnnonceMeth,
+      deleteAnnonce: deleteAnnonceMeth, // ✅ Correct
+      deleteAnnonceMeth, // ✅ Ajouter aussi ceci pour compatibilité
       updateNewStatus,
       refreshAnnonces,
       getAnnonceById,
-      updateAnnonce: updateAnnonceMeth  // Vous exportez updateAnnonceMeth sous le nom updateAnnonce
+      updateAnnonce: updateAnnonceMeth,
+      cleanOldAnnonces: () => {},
+      resetAllAnnonces,
     }}
   >
     {children}
   </AnnonceContext.Provider>
-); 
+);
 };
 
 export default AnnonceContext;

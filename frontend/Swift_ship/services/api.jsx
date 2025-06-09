@@ -674,5 +674,14 @@ export const checkUserPermissions = async (userEmail) => {
     throw error;
   }
 };
+export const resetSystemAnnual = async () => {
+  try {
+    const response = await api.post('/admin/reset-annual');
+    return response;
+  } catch (error) {
+    console.error('resetSystemAnnual error:', error);
+    throw error;
+  }
+};
 
 export default api;

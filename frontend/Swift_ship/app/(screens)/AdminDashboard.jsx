@@ -16,7 +16,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
-import { getAllUsers, deleteUser, updateUserStatus } from '../../services/api';
+import { getAllUsers, deleteUser, updateUserStatus, resetSystemAnnual  } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { approveUser, rejectUser } from '../../services/api';
 
@@ -153,7 +153,7 @@ const AdminDashboard = () => {
   const { logout, refreshToken  } = useContext(AuthContext);
   
   // Utiliser le contexte AnnonceContext pour accéder aux annonces et fonctions
-  const { annonces, loading, refreshAnnonces, deleteAnnonce, cleanOldAnnonces, updateNewStatus } = useContext(AnnonceContext);
+  const { annonces, loading, refreshAnnonces, deleteAnnonce, cleanOldAnnonces, updateNewStatus, deleteAnnonceMeth, resetAllAnnonces   } = useContext(AnnonceContext);
   
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'annonces', 'users', 'settings'
@@ -514,17 +514,50 @@ useEffect(() => {
   const initializeAdminData = async () => {
     try {
       setIsInitializing(true);
+      console.log("Initialisation des données admin...");
       
-      // Rafraîchir les annonces
+      // Vider les caches potentiellement corrompus
+      const lastReset = await AsyncStorage.getItem('lastSystemReset');
+      const now = Date.now();
+      
+      // Si la réinitialisation a eu lieu récemment (moins de 5 minutes), vider tous les caches
+      if (lastReset && (now - parseInt(lastReset)) < 300000) {
+        console.log("Réinitialisation récente détectée, vidage des caches...");
+        await AsyncStorage.multiRemove(['annonces', 'allUsers', 'viewedAnnonces']);
+      }
+      
+      // Forcer le rechargement depuis l'API
       await refreshAnnonces();
       await updateNewStatus();
+      
+      // Recharger les utilisateurs
+      const userResponse = await getAllUsers();
+      if (userResponse && Array.isArray(userResponse)) {
+        const processedUsers = userResponse.map(user => ({
+          ...user,
+          status: !user.isVerified ? 'pending' : 
+                  user.canPost ? 'approved' : 
+                  'rejected'
+        }));
+        
+        setAllUsers(processedUsers);
+        
+        const pending = processedUsers.filter(user => user.status === 'pending').length;
+        const approved = processedUsers.filter(user => user.status === 'approved').length;
+        
+        setPendingUsers(pending);
+        setTotalUsers(approved);
+        
+        await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
+      }
       
       // Petit délai pour s'assurer que les données sont chargées
       setTimeout(() => {
         const moderatedAnnounces = getAnnoncesToModerate();
         setAnnoncesToModerate(moderatedAnnounces);
         setIsInitializing(false);
-      }, 300);
+        console.log("Initialisation terminée");
+      }, 1000);
       
     } catch (error) {
       console.error('Erreur lors de l\'initialisation des données admin:', error);
@@ -724,13 +757,20 @@ useEffect(() => {
 const onRefresh = useCallback(async () => {
   setRefreshing(true);
   try {
-    // Refresh announcements
+    console.log("Début du rafraîchissement complet des données");
+    
+    // 1. Rafraîchir les annonces
+    console.log("Rafraîchissement des annonces...");
     await refreshAnnonces();
     await updateNewStatus();
     
-    // Refresh users data
+    // 2. Rafraîchir les utilisateurs avec une nouvelle requête API
+    console.log("Rafraîchissement des utilisateurs...");
     const userResponse = await getAllUsers();
-    if (userResponse) {
+    
+    if (userResponse && Array.isArray(userResponse)) {
+      console.log(`${userResponse.length} utilisateurs reçus de l'API`);
+      
       const processedUsers = userResponse.map(user => ({
         ...user,
         status: !user.isVerified ? 'pending' : 
@@ -746,23 +786,34 @@ const onRefresh = useCallback(async () => {
       setPendingUsers(pending);
       setTotalUsers(approved);
       
+      // Sauvegarder dans AsyncStorage
       await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
+      
+      console.log(`Utilisateurs mis à jour - En attente: ${pending}, Approuvés: ${approved}`);
+    } else {
+      console.warn("Aucune donnée utilisateur reçue ou format invalide");
+      // En cas de problème, essayer de vider le cache et réessayer
+      await AsyncStorage.removeItem('allUsers');
+      setAllUsers([]);
+      setPendingUsers(0);
+      setTotalUsers(0);
     }
     
-    // Update moderation items après le rafraîchissement des annonces
+    // 3. Mettre à jour les annonces à modérer après rafraîchissement
     setTimeout(() => {
-      const moderatedAnnounces = getAnnoncesToModerate();
-      setAnnoncesToModerate(moderatedAnnounces);
-      
-      if (annonces) {
+      if (annonces && annonces.length >= 0) {
+        const moderatedAnnounces = getAnnoncesToModerate();
+        setAnnoncesToModerate(moderatedAnnounces);
         setTotalAnnounces(annonces.length);
+        console.log(`${moderatedAnnounces.length} annonces à modérer, ${annonces.length} annonces totales`);
       }
-    }, 500); // Petit délai pour s'assurer que les annonces sont à jour
+    }, 500);
+    
+    console.log("Rafraîchissement complet terminé");
     
   } catch (error) {
     console.error('Erreur lors du rafraîchissement:', error);
     
-    // Afficher un message d'erreur
     Toast.show({
       type: 'error',
       text1: 'Erreur de rafraîchissement',
@@ -773,6 +824,7 @@ const onRefresh = useCallback(async () => {
     setRefreshing(false);
   }
 }, [refreshAnnonces, updateNewStatus, getAnnoncesToModerate, annonces]);
+
 
     
   const profileImage = useMemo(() => {
@@ -1025,7 +1077,7 @@ const rejectUserNew = async (userId) => {
 };
     
   // Fonction pour rejeter une annonce
- const rejectAnnounce = (announceId) => {
+const rejectAnnounce = (announceId) => {
   Alert.alert(
     "Rejeter l'annonce",
     "Cette annonce sera supprimée définitivement. Continuer ?",
@@ -1038,10 +1090,10 @@ const rejectUserNew = async (userId) => {
         text: "Supprimer", 
         onPress: async () => {
           try {
-            // Appeler la fonction de suppression du contexte
-            const success = await deleteAnnonce(announceId);
+            // ✅ CORRECTION : Utiliser deleteAnnonce directement
+            const result = await deleteAnnonce(announceId, profileData.email, true);
             
-            if (success) {
+            if (result && result.success) {
               // Mettre à jour l'état local des annonces à modérer
               const updatedModeration = annoncesToModerate.filter(
                 announce => announce._id !== announceId && announce.id !== announceId
@@ -1063,7 +1115,7 @@ const rejectUserNew = async (userId) => {
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
-                text2: 'Veuillez réessayer',
+                text2: result?.message || 'Veuillez réessayer',
                 visibilityTime: 2000,
               });
             }
@@ -1140,7 +1192,7 @@ const deleteUserPermanently = async (userId) => {
 };
     
   // Fonction pour supprimer une annonce
-  const handleDeleteAnnonce = useCallback((id) => {
+const handleDeleteAnnonce = useCallback(async (id) => {
   Alert.alert(
     "Confirmation de suppression",
     "Êtes-vous sûr de vouloir supprimer cette annonce ?",
@@ -1154,19 +1206,16 @@ const deleteUserPermanently = async (userId) => {
         style: "destructive",
         onPress: async () => {
           try {
-            const announceId = id;
-
-            // Appeler la fonction de suppression du contexte
-            const success = await deleteAnnonce(id);
+            // ✅ CORRECTION : Utiliser deleteAnnonce (pas deleteAnnonceMeth)
+            const result = await deleteAnnonce(id, profileData.email, true);
             
-            // Afficher un message de succès ou d'erreur
-            if (success) {
+            if (result && result.success) {
               // Mettre à jour le nombre total d'annonces
               setTotalAnnounces(prev => prev - 1);
               
               // Mettre à jour les annonces à modérer
               setAnnoncesToModerate(prev => 
-                prev.filter(item => item._id !== announceId && item.id !== announceId)
+                prev.filter(item => item._id !== id && item.id !== id)
               );
               
               Toast.show({
@@ -1176,12 +1225,12 @@ const deleteUserPermanently = async (userId) => {
               });
               
               // Rafraîchir les annonces
-              refreshAnnonces();
+              await refreshAnnonces();
             } else {
               Toast.show({
                 type: 'error',
                 text1: 'Erreur lors de la suppression',
-                text2: 'Veuillez réessayer',
+                text2: result?.message || 'Veuillez réessayer',
                 visibilityTime: 2000,
               });
             }
@@ -1198,39 +1247,60 @@ const deleteUserPermanently = async (userId) => {
       }
     ]
   );
-}, [deleteAnnonce, refreshAnnonces]);
+}, [deleteAnnonce, profileData.email, refreshAnnonces]); 
     
   // Fonction pour réinitialiser le système
   const resetSystem = () => {
-    Alert.alert(
-      "Réinitialisation du système",
-      "Cette action supprimera toutes les annonces et réinitialisera les statistiques. Cette action est irréversible et devrait être effectuée une fois par année scolaire. Voulez-vous continuer ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        { 
-          text: "Réinitialiser", 
-          onPress: () => {
-            Alert.alert(
-              "Confirmation finale",
-              "Dernière vérification : êtes-vous absolument sûr de vouloir réinitialiser le système ?",
-              [
-                {
-                  text: "Annuler",
-                  style: "cancel"
-                },
-                {
-                  text: "Réinitialiser",
-                  onPress: async () => {
-                    try {
-                      // Réinitialisation des données
-                      // Idéalement, cela appellerait une fonction du contexte pour nettoyer toutes les annonces
-                      // AnnonceContext.resetAllAnnonces()
+  Alert.alert(
+    "Réinitialisation du système",
+    "Cette action supprimera TOUTES les annonces ET tous les utilisateurs avec le rôle 'parent'. Cette action est irréversible et devrait être effectuée une fois par année scolaire. Voulez-vous continuer ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel"
+      },
+      { 
+        text: "Réinitialiser", 
+        onPress: () => {
+          Alert.alert(
+            "Confirmation finale",
+            "Dernière vérification : êtes-vous absolument sûr de vouloir réinitialiser le système ? Cela supprimera :\n\n• Toutes les annonces\n• Tous les utilisateurs parents\n\nSeuls les administrateurs seront conservés.",
+            [
+              {
+                text: "Annuler",
+                style: "cancel"
+              },
+              {
+                text: "RÉINITIALISER",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    Toast.show({
+                      type: 'info',
+                      text1: 'Réinitialisation en cours...',
+                      text2: 'Veuillez patienter',
+                      visibilityTime: 3000,
+                    });
+
+                    // 1. Appeler l'API de réinitialisation
+                    const response = await resetSystemAnnual();
+                    
+                    if (response && response.success) {
+                      // 2. Vider TOUS les caches AsyncStorage
+                      await AsyncStorage.multiRemove([
+                        'annonces',
+                        'allUsers', 
+                        'viewedAnnonces',
+                        'userPreferences',
+                        'lastRefresh'
+                      ]);
                       
+                      // 3. Réinitialiser TOUS les états locaux
                       setTotalAnnounces(0);
                       setAnnoncesToModerate([]);
+                      setTotalUsers(0);
+                      setPendingUsers(0);
+                      setAllUsers([]);
                       setVisitStats([0, 0, 0, 0, 0, 0, 0]);
                       setCategoryStats([
                         { name: 'Donner', count: 0, color: '#4CAF50' },
@@ -1241,29 +1311,74 @@ const deleteUserPermanently = async (userId) => {
                         { name: 'Échanger', count: 0, color: '#009688' }
                       ]);
                       
+                      // 4. Forcer la réinitialisation du contexte des annonces
+                      if (typeof resetAllAnnonces === 'function') {
+                        await resetAllAnnonces();
+                      }
+                      
+                      // 5. Attendre un moment puis recharger les données
+                      setTimeout(async () => {
+                        try {
+                          // Recharger les annonces depuis l'API
+                          await refreshAnnonces();
+                          
+                          // Recharger les utilisateurs depuis l'API
+                          const userResponse = await getAllUsers();
+                          if (userResponse && Array.isArray(userResponse)) {
+                            const processedUsers = userResponse.map(user => ({
+                              ...user,
+                              status: !user.isVerified ? 'pending' : 
+                                      user.canPost ? 'approved' : 
+                                      'rejected'
+                            }));
+                            
+                            setAllUsers(processedUsers);
+                            
+                            const pending = processedUsers.filter(user => user.status === 'pending').length;
+                            const approved = processedUsers.filter(user => user.status === 'approved').length;
+                            
+                            setPendingUsers(pending);
+                            setTotalUsers(approved);
+                            
+                            await AsyncStorage.setItem('allUsers', JSON.stringify(processedUsers));
+                          }
+                          
+                          // Mettre à jour les annonces à modérer
+                          const moderatedAnnounces = getAnnoncesToModerate();
+                          setAnnoncesToModerate(moderatedAnnounces);
+                          
+                        } catch (reloadError) {
+                          console.error('Erreur lors du rechargement des données:', reloadError);
+                        }
+                      }, 1000); // Attendre 1 seconde
+                      
                       Toast.show({
                         type: 'success',
-                        text1: 'Système réinitialisé pour la nouvelle année',
-                        visibilityTime: 3000,
+                        text1: 'Système réinitialisé avec succès',
+                        text2: `${response.deletedPosts || 0} annonces et ${response.deletedUsers || 0} utilisateurs supprimés`,
+                        visibilityTime: 4000,
                       });
-                    } catch (error) {
-                      console.error('Erreur lors de la réinitialisation:', error);
-                      Toast.show({
-                        type: 'error',
-                        text1: 'Erreur lors de la réinitialisation',
-                        text2: error.message || 'Une erreur est survenue',
-                        visibilityTime: 3000,
-                      });
+                    } else {
+                      throw new Error(response?.message || 'Échec de la réinitialisation');
                     }
+                  } catch (error) {
+                    console.error('Erreur lors de la réinitialisation:', error);
+                    Toast.show({
+                      type: 'error',
+                      text1: 'Erreur lors de la réinitialisation',
+                      text2: error.message || 'Une erreur est survenue',
+                      visibilityTime: 3000,
+                    });
                   }
                 }
-              ]
-            );
-          }
+              }
+            ]
+          );
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
     
   // Optimiser les fonctions de rendu pour la FlatList
   const keyExtractor = useCallback((item) => item._id?.toString() || Math.random().toString(), []);

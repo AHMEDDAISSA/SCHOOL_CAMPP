@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Post from "../models/Post";
+import User from "../models/User";
 import { IUser } from "../types/userTypes";
 import mongoose from "mongoose";
 
@@ -58,3 +59,33 @@ export const resetPosts = async (req: Request<{},{},{user: IUser}>, res: Respons
         res.status(500).json({ message: "Error resetting posts", error });
     }
 };
+export const resetSystemAnnual = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log("Début de la réinitialisation annuelle du système");
+    
+    // Supprimer toutes les annonces
+    const deletedPosts = await Post.deleteMany({});
+    console.log(`${deletedPosts.deletedCount} annonces supprimées`);
+    
+    // Supprimer tous les utilisateurs avec le rôle 'parent'
+    const deletedUsers = await User.deleteMany({ role: 'parent' });
+    console.log(`${deletedUsers.deletedCount} utilisateurs parents supprimés`);
+    
+    res.status(200).json({
+      success: true,
+      message: "Réinitialisation annuelle effectuée avec succès",
+      deletedPosts: deletedPosts.deletedCount,
+      deletedUsers: deletedUsers.deletedCount
+    });
+  } catch (error) {
+    console.error("Erreur lors de la réinitialisation annuelle:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la réinitialisation annuelle",
+      error: (error as Error).message
+    });
+  }
+};
+
+
+
