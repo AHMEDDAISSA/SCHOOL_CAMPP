@@ -15,6 +15,7 @@ import Toast from 'react-native-toast-message';
 import { debounce } from 'lodash'; 
 import * as Linking from 'expo-linking';
 import DynamicContactButton from '../../components/DynamicContactButton/DynamicContactButton';
+import { createOrGetConversation } from '../../services/createOrGetConversation';
 
 
 // Screen dimensions for responsive layouts
@@ -316,24 +317,43 @@ const showPhoneOptions = (item) => {
                     
                     {/* Bouton de contact pour les non-propriétaires */}
                     {!isOwner && (
-     <DynamicContactButton
+  <DynamicContactButton
     item={item}
     userEmail={userEmail}
-    onInAppMessage={() => {
-      // Navigation vers la messagerie interne
-      router.push({
-        pathname: '(screens)/chat_screen',
-        params: { 
-          id: Date.now(),
-          advertId: item.id,
-          name: item.contactName || 'Propriétaire',
-          receiverId: item.email // Ou un ID utilisateur
+    onInAppMessage={async () => {
+      try {
+        // Utiliser le service pour créer/récupérer la conversation
+        const response = await createOrGetConversation(item.email, item._id || item.id);
+        
+        if (response.success) {
+          // Rediriger directement vers la conversation dans Inbox
+          router.push({
+            pathname: '(tabs)/inbox',
+            params: {
+              openConversation: response.data._id,
+              advertId: item._id || item.id,
+              advertTitle: item.title
+            }
+          });
         }
-      });
+      } catch (error) {
+        console.error('Erreur:', error);
+        // Fallback vers l'ancienne méthode
+        router.push({
+          pathname: '(screens)/chat_screen',
+          params: {
+            id: Date.now(),
+            advertId: item.id,
+            name: item.contactName || 'Propriétaire',
+            receiverId: item.email
+          }
+        });
+      }
     }}
     style={styles.contactButton}
   />
 )}
+
                 </View>
             </View>
         </TouchableOpacity>

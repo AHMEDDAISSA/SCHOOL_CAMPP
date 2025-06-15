@@ -126,7 +126,7 @@ const Login_section2 = () => {
                     await AsyncStorage.setItem('userEmail', email);
                     
                     if (userData.user) {
-                        await AsyncStorage.setItem('userInfo', JSON.stringify(userData.user));
+                        await AsyncStorage.setItem('userData', JSON.stringify(userData.user));
                         setProfileData({
                             fullName: userData.user.fullName || `${userData.user.first_name || ''} ${userData.user.last_name || ''}`.trim(),
                             email: userData.user.email,

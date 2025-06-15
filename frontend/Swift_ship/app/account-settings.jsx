@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import Settings from '../components/settingss/account-settings'; 
+import { View, StyleSheet, Button } from 'react-native';
+import Settings from '../components/settingss/account-settings';
+import Toast from 'react-native-toast-message';
 
 export default function SettingScreen() {
   return (

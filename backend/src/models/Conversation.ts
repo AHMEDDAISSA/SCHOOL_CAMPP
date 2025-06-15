@@ -1,47 +1,54 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
+
+export enum ConversationType {
+  Private = 'private',
+  Group = 'group'
+}
 
 export interface IConversation extends Document {
   participants: mongoose.Types.ObjectId[];
-  lastMessage: {
+  advertId?: mongoose.Types.ObjectId;
+  lastMessage?: {
     content: string;
     timestamp: Date;
     senderId: mongoose.Types.ObjectId;
   };
-  unreadCount: Map<string, number>;
+  unreadCount: Record<string, number>;
+  conversationType: ConversationType;
   createdAt: Date;
+  updatedAt: Date;
 }
 
-const ConversationSchema: Schema = new Schema({
+const ConversationSchema: Schema = new Schema<IConversation>({
   participants: [{
-    type: mongoose.Schema.Types.ObjectId,
+    type: Schema.Types.ObjectId,
     ref: 'User',
     required: true
   }],
+  advertId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Post'
+  },
   lastMessage: {
-    content: {
-      type: String,
-      required: true
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now
-    },
-    senderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    }
+    content: { type: String, required: false },
+    timestamp: { type: Date, default: Date.now },
+    senderId: { type: Schema.Types.ObjectId, ref: 'User', required: false }
   },
   unreadCount: {
-    type: Map,
-    of: Number,
-    default: new Map()
+    type: Schema.Types.Mixed,
+    default: {}
+  },
+  conversationType: {
+    type: String,
+    enum: Object.values(ConversationType),
+    default: ConversationType.Private,
+    required: true
   }
 }, {
   timestamps: true
 });
 
-// Index pour optimiser les requêtes
 ConversationSchema.index({ participants: 1 });
+ConversationSchema.index({ advertId: 1 });
 
 export default mongoose.model<IConversation>('Conversation', ConversationSchema);

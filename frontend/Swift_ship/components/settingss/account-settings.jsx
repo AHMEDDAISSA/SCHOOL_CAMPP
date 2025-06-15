@@ -7,11 +7,13 @@ import {
   TouchableOpacity, 
   TextInput, 
   Alert,
-  Switch
+  Switch,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import ThemeContext from '../../theme/ThemeContext';
+import { updateUserProfile } from '../../services/api'; 
 import { Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 
 import BackIcon from '../../assets/images/back.svg';
@@ -22,30 +24,91 @@ import PhoneIcon from '../../assets/images/phone.svg';
 import SecurityIcon from '../../assets/images/security.svg';
 import NotificationIcon from '../../assets/images/notification.svg';
 import LanguageIcon from '../../assets/images/language.svg';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const AccountSettings = () => {
-  const { theme, darkMode, profileData  } = useContext(ThemeContext);
+  const { theme, darkMode, profileData, updateProfileData } = useContext(ThemeContext);
   
   // États pour les informations utilisateur
-   const [userInfo, setUserInfo] = useState({
+  const [userInfo, setUserInfo] = useState({
     firstName: profileData.firstName || profileData.first_name || '',
     lastName: profileData.lastName || profileData.last_name || '',
     email: profileData.email || '',
     phone: profileData.phoneNumber || profileData.phone || '',
   });
 
-   useEffect(() => {
-    setUserInfo({
+  const [originalUserInfo, setOriginalUserInfo] = useState({});
+  const [isEditing, setIsEditing] = useState(false);
+  const [notifications, setNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const initialData = {
       firstName: profileData.firstName || profileData.first_name || '',
       lastName: profileData.lastName || profileData.last_name || '',
       email: profileData.email || '',
       phone: profileData.phoneNumber || profileData.phone || '',
-    });
+    };
+    
+    setUserInfo(initialData);
+    setOriginalUserInfo(initialData);
   }, [profileData]);
-  
-  const [isEditing, setIsEditing] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+
+  // Fonction pour afficher une alerte personnalisée avec icône
+  const showCustomAlert = (type, title, message) => {
+    const alertIcon = type === 'success' 
+      ? <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+      : <Ionicons name="close-circle" size={24} color="#F44336" />;
+
+    Alert.alert(
+      title,
+      message,
+      [{ text: 'OK', style: 'default' }],
+      { 
+        cancelable: false,
+        // Note: React Native Alert ne supporte pas les icônes personnalisées nativement
+        // Cette fonction montre la structure, mais pour une vraie implémentation avec icônes,
+        // il faudrait utiliser une bibliothèque comme react-native-modal ou créer un modal personnalisé
+      }
+    );
+  };
+
+  // Composant Modal personnalisé pour les alertes avec icônes
+  const CustomAlert = ({ visible, type, title, message, onClose }) => {
+    if (!visible) return null;
+
+    return (
+      <View style={styles.alertOverlay}>
+        <View style={[styles.alertContainer, { backgroundColor: theme.cardbg }]}>
+          <View style={styles.alertIconContainer}>
+            {type === 'success' ? (
+              <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
+            ) : (
+              <Ionicons name="close-circle" size={48} color="#F44336" />
+            )}
+          </View>
+          <Text style={[styles.alertTitle, { color: theme.color3 }]}>{title}</Text>
+          <Text style={[styles.alertMessage, { color: theme.color3 }]}>{message}</Text>
+          <TouchableOpacity 
+            style={[styles.alertButton, { 
+              backgroundColor: type === 'success' ? '#4CAF50' : '#F44336' 
+            }]}
+            onPress={onClose}
+          >
+            <Text style={styles.alertButtonText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const [alertState, setAlertState] = useState({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: ''
+  });
 
   // Données des sections de paramètres
   const settingsData = [
@@ -66,13 +129,6 @@ const AccountSettings = () => {
       id: 2,
       title: 'Sécurité',
       items: [
-        // {
-        //   id: 'password',
-        //   name: 'Changer le mot de passe',
-        //   icon: <SecurityIcon width={20} height={20} />,
-        //   type: 'navigation',
-        //   onPress: () => Alert.alert('Info', 'Fonctionnalité à implémenter')
-        // },
         {
           id: 'twofa',
           name: 'Authentification à deux facteurs',
@@ -120,9 +176,103 @@ const AccountSettings = () => {
     }
   ];
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!profileData._id) {
+      setAlertState({
+        visible: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'ID utilisateur manquant'
+      });
+      return;
+    }
+
+    // Vérifier si des changements ont été effectués
+    const hasChanges = Object.keys(userInfo).some(key => 
+      userInfo[key] !== originalUserInfo[key]
+    );
+
+    if (!hasChanges) {
+      setAlertState({
+        visible: true,
+        type: 'success',
+        title: 'Info',
+        message: 'Aucun changement détecté'
+      });
+      setIsEditing(false);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Préparer les données à envoyer
+      const updateData = {
+        first_name: userInfo.firstName,
+        last_name: userInfo.lastName,
+        email: userInfo.email,
+        phone: userInfo.phone,
+      };
+
+      console.log('Sending update data:', updateData);
+      console.log('User ID:', profileData._id);
+
+      // Appeler l'API pour mettre à jour le profil
+      const response = await updateUserProfile(profileData._id, updateData);
+      
+      console.log('Update response:', response);
+
+      if (response && response.success) {
+        // Mettre à jour le contexte avec les nouvelles données
+        const updatedProfileData = {
+          ...profileData,
+          firstName: userInfo.firstName,
+          first_name: userInfo.firstName,
+          lastName: userInfo.lastName,
+          last_name: userInfo.lastName,
+          email: userInfo.email,
+          phone: userInfo.phone,
+          phoneNumber: userInfo.phone,
+        };
+
+        // Si votre contexte a une fonction updateProfileData
+        if (updateProfileData) {
+          updateProfileData(updatedProfileData);
+        }
+
+        // Mettre à jour les données originales
+        setOriginalUserInfo(userInfo);
+        setIsEditing(false);
+        
+        // Afficher le message de succès avec icône verte
+        setAlertState({
+          visible: true,
+          type: 'success',
+          title: 'Succès',
+          message: 'Informations mises à jour avec succès'
+        });
+      } else {
+        throw new Error('Réponse de mise à jour invalide');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error);
+      
+      // Afficher le message d'erreur avec icône rouge
+      setAlertState({
+        visible: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Impossible de mettre à jour les informations. Veuillez réessayer.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    // Rétablir les valeurs originales
+    setUserInfo(originalUserInfo);
     setIsEditing(false);
-    Alert.alert('Succès', 'Informations mises à jour avec succès');
   };
 
   const handleInputChange = (field, value) => {
@@ -130,6 +280,10 @@ const AccountSettings = () => {
       ...prev,
       [field]: value
     }));
+  };
+
+  const closeAlert = () => {
+    setAlertState(prev => ({ ...prev, visible: false }));
   };
 
   const renderProfileSection = () => (
@@ -152,10 +306,11 @@ const AccountSettings = () => {
               onChangeText={(value) => handleInputChange('firstName', value)}
               placeholder="Prénom"
               placeholderTextColor={darkMode ? '#888' : '#999'}
+              editable={!isLoading}
             />
           ) : (
             <Text style={[styles.value, { color: theme.color3 }]}>
-              {userInfo.firstName}
+              {userInfo.firstName || 'Non défini'}
             </Text>
           )}
         </View>
@@ -173,10 +328,11 @@ const AccountSettings = () => {
               onChangeText={(value) => handleInputChange('lastName', value)}
               placeholder="Nom"
               placeholderTextColor={darkMode ? '#888' : '#999'}
+              editable={!isLoading}
             />
           ) : (
             <Text style={[styles.value, { color: theme.color3 }]}>
-              {userInfo.lastName}
+              {userInfo.lastName || 'Non défini'}
             </Text>
           )}
         </View>
@@ -195,10 +351,11 @@ const AccountSettings = () => {
               placeholder="Email"
               keyboardType="email-address"
               placeholderTextColor={darkMode ? '#888' : '#999'}
+              editable={!isLoading}
             />
           ) : (
             <Text style={[styles.value, { color: theme.color3 }]}>
-              {userInfo.email}
+              {userInfo.email || 'Non défini'}
             </Text>
           )}
         </View>
@@ -217,10 +374,11 @@ const AccountSettings = () => {
               placeholder="Téléphone"
               keyboardType="phone-pad"
               placeholderTextColor={darkMode ? '#888' : '#999'}
+              editable={!isLoading}
             />
           ) : (
             <Text style={[styles.value, { color: theme.color3 }]}>
-              {userInfo.phone}
+              {userInfo.phone || 'Non défini'}
             </Text>
           )}
         </View>
@@ -228,16 +386,29 @@ const AccountSettings = () => {
         {isEditing && (
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.button, styles.cancelButton, { borderColor: darkMode ? '#555' : '#ddd' }]}
-              onPress={() => setIsEditing(false)}
+              style={[styles.button, styles.cancelButton, { 
+                borderColor: darkMode ? '#555' : '#ddd',
+                opacity: isLoading ? 0.6 : 1 
+              }]}
+              onPress={handleCancel}
+              disabled={isLoading}
             >
-              <Text style={[styles.buttonText, { color: theme.color3 }]}>Annuler</Text>
+              <Text style={[styles.buttonText, { color: theme.color3 }]}>
+                Annuler
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.button, styles.saveButton]}
+              style={[styles.button, styles.saveButton, { 
+                opacity: isLoading ? 0.6 : 1 
+              }]}
               onPress={handleSave}
+              disabled={isLoading}
             >
-              <Text style={styles.saveButtonText}>Enregistrer</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>Enregistrer</Text>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -256,7 +427,7 @@ const AccountSettings = () => {
           <TouchableOpacity
             style={styles.settingItem}
             onPress={item.type === 'navigation' ? item.onPress : undefined}
-            disabled={item.type === 'switch'}
+            disabled={item.type === 'switch' || isLoading}
           >
             <View style={styles.settingLeft}>
               <View style={[styles.iconContainer, { 
@@ -283,6 +454,7 @@ const AccountSettings = () => {
                 onValueChange={item.onToggle}
                 value={item.value}
                 style={styles.switch}
+                disabled={isLoading}
               />
             ) : (
               <Text style={[styles.arrow, { color: darkMode ? '#888' : '#666' }]}>›</Text>
@@ -304,6 +476,7 @@ const AccountSettings = () => {
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
+          disabled={isLoading}
         >
           <BackIcon width={24} height={24} color={theme.color3} />
         </TouchableOpacity>
@@ -311,8 +484,9 @@ const AccountSettings = () => {
           Paramètres du compte
         </Text>
         <TouchableOpacity 
-          style={styles.editButton}
+          style={[styles.editButton, { opacity: isLoading ? 0.6 : 1 }]}
           onPress={() => setIsEditing(!isEditing)}
+          disabled={isLoading}
         >
           <EditIcon width={24} height={24} color="#836EFE" />
         </TouchableOpacity>
@@ -330,12 +504,22 @@ const AccountSettings = () => {
         
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertState.visible}
+        type={alertState.type}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={closeAlert}
+      />
     </SafeAreaView>
   );
 };
 
 export default AccountSettings;
 
+// Styles mis à jour avec les nouveaux styles pour l'alerte personnalisée
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -472,5 +656,57 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 32,
+  },
+  // Nouveaux styles pour l'alerte personnalisée
+  alertOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  alertContainer: {
+    marginHorizontal: 32,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    minWidth: 280,
+    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowColor: '#000',
+  },
+  alertIconContainer: {
+    marginBottom: 16,
+  },
+  alertTitle: {
+    fontSize: 18,
+    fontFamily: 'Montserrat_600SemiBold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  alertMessage: {
+    fontSize: 14,
+    fontFamily: 'Montserrat_400Regular',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  alertButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 80,
+  },
+  alertButtonText: {
+    fontSize: 14,
+    fontFamily: 'Montserrat_500Medium',
+    color: '#fff',
+    textAlign: 'center',
   },
 });

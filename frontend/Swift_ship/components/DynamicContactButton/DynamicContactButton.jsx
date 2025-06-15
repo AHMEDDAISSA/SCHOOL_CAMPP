@@ -2,6 +2,8 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
+import { createOrGetConversation } from '../../services/createOrGetConversation';
 
 const DynamicContactButton = ({ 
   item,
@@ -38,8 +40,76 @@ const DynamicContactButton = ({
           icon: 'chatbubble-outline',
           text: 'Message',
           color: '#836EFE',
-          action: () => onInAppMessage && onInAppMessage()
+          action: () => handleInAppMessage() // ✅ Utiliser la nouvelle fonction
         };
+    }
+  };
+
+  // ✅ NOUVELLE FONCTION pour gérer les messages in-app
+  const handleInAppMessage = async () => {
+    try {
+      console.log('=== HANDLING IN-APP MESSAGE ===');
+      
+      const receiverEmail = item.email || item.contactEmail;
+      const advertId = item._id || item.id;
+      
+      console.log('Receiver email:', receiverEmail);
+      console.log('Advert ID:', advertId);
+      console.log('User email:', userEmail);
+      
+      if (!receiverEmail) {
+        Alert.alert('Erreur', 'Email du destinataire manquant');
+        return;
+      }
+
+      if (receiverEmail === userEmail) {
+        Alert.alert('Erreur', 'Vous ne pouvez pas vous envoyer un message à vous-même');
+        return;
+      }
+
+      // Créer ou récupérer la conversation
+      console.log('Création/récupération de la conversation...');
+      const response = await createOrGetConversation(receiverEmail, advertId);
+      
+      console.log('Réponse conversation:', response);
+      
+      if (response && response.success !== false) {
+        console.log('✅ Conversation créée/récupérée, redirection vers inbox...');
+        
+        // Rediriger vers la page Inbox avec l'ID de conversation
+        router.push({
+          pathname: '/(tabs)/inbox',
+          params: {
+            openConversation: response.data?._id || response._id,
+            advertId: advertId,
+            advertTitle: item.title || 'Conversation',
+            receiverName: item.contactName || item.publisherInfo?.fullName || 'Utilisateur'
+          }
+        });
+      } else {
+        throw new Error(response?.message || 'Échec de création/récupération de la conversation');
+      }
+    } catch (error) {
+      console.error('❌ Erreur création conversation:', error);
+      
+      // Fallback : utiliser l'ancienne méthode si elle existe
+      if (onInAppMessage) {
+        console.log('🔄 Utilisation du fallback onInAppMessage');
+        onInAppMessage();
+      } else {
+        // Fallback final : redirection directe vers chat_screen
+        console.log('🔄 Fallback final vers chat_screen');
+        router.push({
+          pathname: '/(screens)/chat_screen',
+          params: {
+            id: Date.now().toString(),
+            advertId: item._id || item.id,
+            name: item.contactName || item.publisherInfo?.fullName || 'Propriétaire',
+            receiverId: item.email || item.contactEmail,
+            advertTitle: item.title
+          }
+        });
+      }
     }
   };
 

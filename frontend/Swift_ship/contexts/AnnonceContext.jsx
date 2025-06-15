@@ -24,16 +24,15 @@ export const AnnonceProvider = ({ children }) => {
 
     let annoncesList = [];
     
-    // Traiter différentes structures d'API possibles
     if (Array.isArray(data)) {
-      annoncesList = data;
+        annoncesList = data;
     } else if (data.posts && Array.isArray(data.posts)) {
-      annoncesList = data.posts;
+        annoncesList = data.posts;
     } else if (data.data && Array.isArray(data.data)) {
-      annoncesList = data.data;
+        annoncesList = data.data;
     } else {
-      console.warn("Format de données inconnu:", data);
-      return [];
+        console.warn("Format de données inconnu:", data);
+        return [];
     }
 
     // Normaliser chaque annonce pour garantir une structure cohérente
@@ -51,15 +50,27 @@ export const AnnonceProvider = ({ children }) => {
                 (item.category === 3 || item.category === '3') ? 'Emprunter' :
                 (item.category === 5 || item.category === '5') ? 'Acheter' : "Autre",
       type: item.type || "Non spécifié",
-      email: item.email || "",
-      contactEmail: item.contactEmail || item.email || "",
-      camp: item.camp || "",
-      images: item.images || [],
-      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : 
-            item.date ? item.date : new Date().toLocaleDateString('fr-FR'),
-      isNew: true
+        email: item.email || "",
+        contactEmail: item.contactEmail || item.email || "",
+        contactName: item.contactName || "",
+        camp: item.camp || "",
+        images: item.images || [],
+        date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : 
+              item.date ? item.date : new Date().toLocaleDateString('fr-FR'),
+        isNew: true,
+        // AJOUT IMPORTANT: Conserver les informations utilisateur
+        publisherInfo: item.publisherInfo || {
+            fullName: item.contactName || 'Utilisateur Anonyme',
+            firstName: '',
+            lastName: '',
+            email: item.email || '',
+            profileImage: null,
+            profileImageUrl: null,
+            role: '',
+            camp: item.camp || ''
+        }
     }));
-  };
+};
 
   // Charger les annonces depuis AsyncStorage
   const loadAnnonces = async () => {

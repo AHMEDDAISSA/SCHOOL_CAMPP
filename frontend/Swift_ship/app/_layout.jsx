@@ -1,12 +1,17 @@
+if (!__DEV__) {
+  console.error = () => {};
+  console.warn  = () => {};
+}
+
 import { StyleSheet } from 'react-native';
 import React from 'react';
 import { Stack } from 'expo-router';
 import { ThemeProvider } from '../theme/ThemeContext';
-import { MessageProvider } from '../message_context';
 import { AnnonceProvider } from '../contexts/AnnonceContext';
 import Toast, { BaseToast } from 'react-native-toast-message';
 import { AuthProvider } from '../services/AuthContext';
 import LottieView from 'lottie-react-native';
+import { MessageProvider } from '../contexts/messageContext';
 
 const toastConfig = {
   success: ({ text1, text2, ...rest }) => (
@@ -49,9 +54,10 @@ const toastConfig = {
 
 const RootLayout = () => {
   return (
-    <MessageProvider>
+    
       <AuthProvider>
       <ThemeProvider>
+        <MessageProvider>
         <AnnonceProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
@@ -76,9 +82,10 @@ const RootLayout = () => {
           </Stack>
           <Toast config={toastConfig}/> 
         </AnnonceProvider>
+        </MessageProvider>
       </ThemeProvider>
       </AuthProvider>
-    </MessageProvider>
+    
   );
 };
 

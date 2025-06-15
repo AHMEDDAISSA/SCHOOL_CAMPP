@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const API_URL = 'http://192.168.1.21:3001';
 
 const api = axios.create({
   baseURL: 'http://192.168.1.21:3001',
@@ -14,7 +15,7 @@ const api = axios.create({
 api.interceptors.response.use(
   response => {
     console.log(`[Response] ${response.status}:`, response.data);
-    return response; // Retourner l'objet de réponse complet
+    return response.data; // Extraire directement les données
   },
   error => {
     if (error.code === 'ECONNABORTED') {
@@ -28,20 +29,20 @@ api.interceptors.response.use(
   }
 );
 
-// Response interceptor for error handling
-api.interceptors.response.use(
-  response => {
-    console.log(`[Response] ${response.status}:`, response.data);
-    return response.data;
-  },
-  error => {
-    if (error.code === 'ECONNABORTED') {
-      console.error('Request timeout. Server might be down.');
-    } else if (!error.response) {
-      console.error('Network error. Check server and connection.');
-    } else {
-      console.error(`[Error ${error.response.status}]`, error.response.data);
+// Interceptor de requête pour l'authentification
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération du token:', error);
     }
+    return config;
+  },
+  (error) => {
     return Promise.reject(error);
   }
 );
@@ -680,6 +681,417 @@ export const resetSystemAnnual = async () => {
     return response;
   } catch (error) {
     console.error('resetSystemAnnual error:', error);
+    throw error;
+  }
+};
+export const updateUserProfile = async (userId, userData) => {
+  try {
+    console.log('Updating user profile with data:', userData);
+    
+    const formData = new FormData();
+    
+    // Ajouter les champs texte
+    Object.keys(userData).forEach(key => {
+      if (key !== 'profileImage' && userData[key] !== undefined && userData[key] !== null) {
+        formData.append(key, userData[key].toString());
+      }
+    });
+    
+    // Ajouter l'image de profil si elle existe
+    if (userData.profileImage && userData.profileImage.startsWith('file://')) {
+      const uriParts = userData.profileImage.split('/');
+      const fileName = uriParts[uriParts.length - 1];
+      const fileType = userData.profileImage.includes('.jpeg') ? 'image/jpeg' : 
+                     userData.profileImage.includes('.jpg') ? 'image/jpeg' : 
+                     userData.profileImage.includes('.png') ? 'image/png' : 
+                     'image/jpeg';
+      
+      formData.append('profileImage', {
+        uri: userData.profileImage,
+        name: fileName,
+        type: fileType
+      });
+    }
+
+    const response = await api.put(`/user/update-profile/${userId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('updateUserProfile error:', error);
+    throw error;
+  }
+};
+export const sendMessage = async (receiverId, content, messageType = 'text') => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    const response = await api.post('/api/messages/send', {
+      receiverId,
+      content,
+      messageType
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('sendMessage error:', error);
+    throw error;
+  }
+};
+
+// Récupérer les messages d'une conversation
+export const getMessages = async (conversationId, page = 1, limit = 50) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.get(`/api/messages/conversation/${conversationId}?page=${page}&limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('getMessages error:', error);
+    throw error;
+  }
+};
+
+export const getConversationMessages = async (conversationId, page = 1, limit = 50) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    console.log('🔗 Appel API vers:', `/api/messages/conversation/${conversationId}?page=${page}&limit=${limit}`);
+
+    const response = await api.get(`/api/messages/conversation/${conversationId}?page=${page}&limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    console.log('📥 Réponse API messages:', response);
+    return response; // Déjà traité par l'interceptor
+  } catch (error) {
+    console.error('❌ getConversationMessages error:', error);
+    
+    // Gestion d'erreur plus détaillée
+    if (error.response?.status === 401) {
+      throw new Error('Non authentifié. Veuillez vous reconnecter.');
+    } else if (error.response?.status === 404) {
+      throw new Error('Conversation non trouvée.');
+    } else if (error.response?.status >= 500) {
+      throw new Error('Erreur serveur. Veuillez réessayer.');
+    }
+    
+    throw error;
+  }
+};
+
+export const addMessageToConversation = async (conversationId, messageData) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.post(
+      `/api/messages/conversation/${conversationId}/add`,
+      messageData,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+
+    return response.data; 
+
+  } catch (error) {
+    console.error('addMessageToConversation error:', error.response?.data || error);
+    throw error;
+  }
+};
+
+
+// Récupérer toutes les conversations
+export const getConversations = async () => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.get('/api/conversations', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return response; // Déjà traité par l'interceptor
+  } catch (error) {
+    console.error('getConversations error:', error);
+    throw error;
+  }
+};
+
+// Marquer les messages comme lus
+export const markMessagesAsRead = async (conversationId) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    const response = await api.put(`/api/messages/${conversationId}/read`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('markMessagesAsRead error:', error);
+    throw error;
+  }
+};
+
+export const createConversation = async (participantId, advertId, initialMessage) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.post('/api/conversations', {
+      participantId,
+      advertId,
+      initialMessage
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('createConversation error:', error);
+    throw error;
+  }
+};
+export const markConversationAsRead = async (conversationId) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.patch(`/api/messages/conversation/${conversationId}/read`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('markConversationAsRead error:', error);
+    throw error;
+  }
+};
+
+export const getConversationById = async (conversationId) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.get(`/api/conversations/${conversationId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    return response.data; // ✅ cette ligne est importante
+  } catch (error) {
+    console.error('getConversationById error:', error);
+    throw error;
+  }
+};
+
+// Créer une nouvelle conversation avec une annonce
+// export const createConversationFromAdApi = async (advertId, advertiserId, initialMessage) => {
+//   try {
+//     const token = await AsyncStorage.getItem('userToken');
+//     if (!token) {
+//       throw new Error('Token d\'authentification manquant');
+//     }
+
+//     const response = await api.post('/api/messages/conversations', {
+//       participantId: advertiserId,
+//       advertId,
+//       initialMessage
+//     }, {
+//       headers: { Authorization: `Bearer ${token}` }
+//     });
+    
+//     return response.data;
+//   } catch (error) {
+//     console.error('createConversationFromAdApi error:', error);
+//     throw error;
+//   }
+// };
+
+export const getConversationMessagesForTable = async (conversationId) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    console.log('🔗 Appel API pour tableau messages:', `/api/messages/conversation/${conversationId}/table`);
+
+    const response = await api.get(`/api/messages/conversation/${conversationId}/table`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    console.log('📥 Réponse API messages tableau:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ getConversationMessagesForTable error:', error);
+    
+    if (error.response?.status === 401) {
+      throw new Error('Non authentifié. Veuillez vous reconnecter.');
+    } else if (error.response?.status === 404) {
+      throw new Error('Conversation non trouvée.');
+    } else if (error.response?.status >= 500) {
+      throw new Error('Erreur serveur. Veuillez réessayer.');
+    }
+    
+    throw error;
+  }
+};
+
+export const findOrCreateConversation = async (receiverId, advertId) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    // Logs pour diagnostic
+    console.log('=== FIND OR CREATE CONVERSATION ===');
+    console.log('receiverId:', receiverId);
+    console.log('advertId:', advertId);
+    console.log('token présent:', !!token);
+
+    // Validation des paramètres
+    if (!receiverId) {
+      throw new Error('ID du destinataire manquant');
+    }
+    
+    if (!advertId) {
+      throw new Error('ID de l\'annonce manquant');
+    }
+
+    const response = await api.post('/api/conversations/find-or-create', {
+      receiverId, 
+      advertId
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      }
+    });
+
+    console.log('Réponse conversation:', response);
+
+    // Vérifiez la structure de la réponse
+    if (!response || response.success === false) {
+      throw new Error(response.message || 'Erreur serveur inconnue');
+    }
+
+    return response.data || response;
+  } catch (error) {
+    console.error('findOrCreateConversation error détaillée:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    throw error;
+  }
+};
+
+
+// POST /api/conversations      (ou ton endpoint de création)
+export const createConversationFromAdApi = async (advertId, participantId, initialMessage) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
+    const response = await api.post('/api/conversations', {
+      participantId,
+      advertId,
+      initialMessage,
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      }
+    });
+
+    if (!response || response.success === false) {
+      throw new Error(response.message || 'Échec de la création de la conversation');
+    }
+
+    return {
+      success: response.success || true,
+      conversation: response.data || response,
+      message: response.message,
+    };
+  } catch (error) {
+    console.error('createConversationFromAdApi error:', error);
+    throw error;
+  }
+};
+
+
+export const createOrGetConversation = async (receiverEmail, advertId) => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    const userEmail = await AsyncStorage.getItem('userEmail');
+    
+    if (!token || !userEmail) {
+      throw new Error('Authentification requise');
+    }
+
+    // D'abord, récupérer l'ID du destinataire depuis son email
+    const receiverResponse = await fetch(`${API_BASE_URL}/user/add-user?email=${encodeURIComponent(receiverEmail)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!receiverResponse.ok) {
+      throw new Error('Impossible de trouver le destinataire');
+    }
+
+    const receiverData = await receiverResponse.json();
+    const receiverId = receiverData._id;
+
+    // Ensuite, créer ou récupérer la conversation
+    const conversationResponse = await fetch(`${API_BASE_URL}/api/conversations/find-or-create`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        receiverId,
+        advertId
+      }),
+    });
+
+    if (!conversationResponse.ok) {
+      throw new Error('Erreur lors de la création/récupération de la conversation');
+    }
+
+    const result = await conversationResponse.json();
+    return result;
+
+  } catch (error) {
+    console.error('Erreur createOrGetConversation:', error);
     throw error;
   }
 };

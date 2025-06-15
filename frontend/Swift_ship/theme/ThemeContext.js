@@ -155,35 +155,64 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
- const updateProfileData = async (data) => {
-  try {
-    console.log('Updating profile data:', data);
-    
-    // CORRECTION : Meilleure gestion de l'URL de l'image
-    const imageUrl = data.profileImageUrl || 
-                    (data.profileImage && !data.profileImage.startsWith('http') 
-                     ? `http://192.168.1.21:3001/uploads/${data.profileImage}` 
-                     : data.profileImage);
-    
-    const mappedData = {
-      ...data,
-      fullName: data.fullName || `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-      firstName: data.firstName || data.first_name || '',
-      lastName: data.lastName || data.last_name || '',
-      phoneNumber: data.phoneNumber || data.phone || '',
-      profileImage: imageUrl || profileData.profileImage,
-    };
-    
-    const newProfileData = { ...profileData, ...mappedData };
-    setProfileData(newProfileData);
-    await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
-    await AsyncStorage.setItem('userInfo', JSON.stringify(data));
-    
-    console.log('Profile updated with image URL:', imageUrl);
-  } catch (error) {
-    console.error('Error saving profile data:', error);
-  }
-};
+const updateProfileData = async (data, shouldSaveToServer = false) => {
+    try {
+      console.log('Updating profile data:', data);
+      
+      if (shouldSaveToServer && profileData._id) {
+        try {
+          const response = await updateUserProfile(profileData._id, data);
+          if (response && response.success) {
+            data = response.user || data;
+          }
+        } catch (serverError) {
+          console.error('Server update failed:', serverError);
+          throw serverError;
+        }
+      }
+      
+      let imageUrl = null;
+      if (data.profileImageUrl) {
+        imageUrl = data.profileImageUrl;
+      } else if (data.profileImage) {
+        if (data.profileImage.startsWith('http') || data.profileImage.startsWith('file://')) {
+          imageUrl = data.profileImage;
+        } else {
+          imageUrl = `${UPLOADS_URL}/${data.profileImage}`;
+        }
+      } else {
+        imageUrl = profileData.profileImage;
+      }
+      
+      const mappedData = {
+        ...data,
+        fullName: data.fullName || `${data.first_name || data.firstName || ''} ${data.last_name || data.lastName || ''}`.trim(),
+        firstName: data.firstName || data.first_name || '',
+        lastName: data.lastName || data.last_name || '',
+        phoneNumber: data.phoneNumber || data.phone || '',
+        profileImage: imageUrl,
+        profileImageUrl: imageUrl,
+        lastUpdated: new Date().toISOString(),
+      };
+      
+      const newProfileData = { 
+        ...profileData, 
+        ...mappedData,
+        _id: profileData._id,
+        email: profileData.email,
+      };
+      
+      setProfileData(newProfileData);
+      await AsyncStorage.setItem('profileData', JSON.stringify(newProfileData));
+      await AsyncStorage.setItem('userInfo', JSON.stringify(newProfileData));
+      
+      return newProfileData;
+      
+    } catch (error) {
+      console.error('Error updating profile data:', error);
+      throw error;
+    }
+  };
 
   const updateProfileImage = async (imageUri) => {
     try {

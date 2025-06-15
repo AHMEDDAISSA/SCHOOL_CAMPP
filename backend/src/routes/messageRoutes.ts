@@ -1,33 +1,34 @@
 import express from 'express';
-import {
-  sendMessage,
-  getMessages,
-  getConversations,
-  markAsRead
+import { 
+  sendMessage, 
+  getMessages, 
+  getConversations, 
+  markAsRead,
+  getConversationMessages ,
+  getConversationMessagesForTable
 } from '../controllers/messageController';
-// Importation correcte du middleware d'authentification
+import { 
+  createConversation,
+  getConversationById,
+  addMessageToConversation,
+  markAsRead as markConversationAsRead,
+  
+} from '../controllers/conversationController';
 import { authenticateToken } from '../middleware/authMiddleware';
 
-// Création du routeur
 const router = express.Router();
 
-// Application du middleware d'authentification à toutes les routes
-router.use(authenticateToken);
+// Routes des messages
+router.post('/send', authenticateToken, sendMessage);
+router.get('/conversations', authenticateToken, getConversations);
+router.get('/conversation/:conversationId', authenticateToken, getConversationMessages);
+router.post('/conversation/:conversationId/add', authenticateToken, addMessageToConversation); // ← ROUTE MANQUANTE
+router.patch('/conversation/:conversationId/read', authenticateToken, markConversationAsRead);
+router.put('/:conversationId/read', authenticateToken, markAsRead);
 
-// Route pour envoyer un message
-// POST /api/messages/send
-router.post('/send', sendMessage);
-
-// Route pour récupérer les messages d'une conversation
-// GET /api/messages/conversation/:conversationId
-router.get('/conversation/:conversationId', getMessages);
-
-// Route pour récupérer toutes les conversations de l'utilisateur
-// GET /api/messages/conversations
-router.get('/conversations', getConversations);
-
-// Route pour marquer les messages comme lus
-// PATCH /api/messages/conversation/:conversationId/read
-router.patch('/conversation/:conversationId/read', markAsRead);
+// Routes des conversations
+router.post('/conversations', authenticateToken, createConversation);
+router.get('/conversations/:conversationId', authenticateToken, getConversationById);
+router.get('/conversation/:conversationId/table', authenticateToken, getConversationMessagesForTable);
 
 export default router;
