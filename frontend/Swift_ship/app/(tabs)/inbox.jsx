@@ -103,6 +103,28 @@ const Inbox = () => {
     setFilteredConversations(filtered);
   }, [conversations, searchQuery, activeFilter]);
 
+const getProfileImageUri = (participant) => {
+  if (!participant) return null;
+  
+  if (participant.profileImageUrl) {
+    let imageUrl = participant.profileImageUrl;
+    if (!imageUrl.startsWith('http')) {
+      imageUrl = `http://192.168.1.21:3001/uploads/${imageUrl}`;
+    }
+    return { uri: imageUrl };
+  }
+  
+  if (participant.profileImage) {
+    let imageUrl = participant.profileImage;
+    if (!imageUrl.startsWith('http')) {
+      imageUrl = `http://192.168.1.21:3001/uploads/${imageUrl}`;
+    }
+    return { uri: imageUrl };
+  }
+  
+  return null;
+};
+
   // Obtenir l'autre participant de la conversation
   const getOtherParticipant = (conversation) => {
     return conversation.participants?.find(p => p._id !== conversation.currentUserId);
@@ -321,30 +343,34 @@ const Inbox = () => {
                 >
                   <View style={styles.conversationContent}>
                     {/* Photo de profil */}
-                    <View style={styles.profileSection}>
-                      {otherParticipant?.profileImageUrl ? (
-                        <Image 
-                          source={{ uri: otherParticipant.profileImageUrl }} 
-                          style={styles.profileImage}
-                        />
-                      ) : (
-                        <View 
-                          style={[
-                            styles.profileImagePlaceholder, 
-                            {backgroundColor: getAvatarColor(otherParticipant)}
-                          ]}
-                        >
-                          <Text style={styles.initialsText}>
-                            {getInitials(otherParticipant)}
-                          </Text>
-                        </View>
-                      )}
-                      
-                      {/* Indicateur de message non lu */}
-                      {isUnread && (
-                        <View style={styles.unreadDot} />
-                      )}
-                    </View>
+                   <View style={styles.profileSection}>
+  {(() => {
+    const profileImageUri = getProfileImageUri(otherParticipant);
+    return profileImageUri ? (
+      <Image 
+        source={profileImageUri} 
+        style={styles.profileImage}
+      />
+    ) : (
+      <View 
+        style={[
+          styles.profileImagePlaceholder, 
+          {backgroundColor: getAvatarColor(otherParticipant)}
+        ]}
+      >
+        <Text style={styles.initialsText}>
+          {getInitials(otherParticipant)}
+        </Text>
+      </View>
+    );
+  })()}
+  
+  {/* Indicateur de message non lu */}
+  {isUnread && (
+    <View style={styles.unreadDot} />
+  )}
+</View>
+
                     
                     {/* Contenu de la conversation */}
                     <View style={styles.conversationInfo}>
